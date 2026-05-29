@@ -12,7 +12,7 @@ import matplotlib.dates as mdates
 from matplotlib.ticker import FuncFormatter
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from Config.var_globs import PALETA_COLORES
+from helper_ps.Config.var_globs import PALETA_COLORES
 
 # -----------------------
 # Setteo de parametros iniciales

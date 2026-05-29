@@ -1,0 +1,48 @@
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "helpers_ps"
+version = "0.1.0"
+description = "Internal helper package for portfolio analytics, charts and presentations"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "CC_Portsolutions_peru" }
+]
+dependencies = [
+  "adjustText==1.3.0",
+  "contourpy==1.3.3",
+  "cycler==0.12.1",
+  "fonttools==4.63.0",
+  "joblib==1.5.3",
+  "kiwisolver==1.5.0",
+  "lxml==6.1.1",
+  "matplotlib==3.10.9",
+  "narwhals==2.21.2",
+  "numpy==2.4.6",
+  "packaging==25.2",
+  "pandas==3.0.3",
+  "pillow==12.2.0",
+  "plotly==6.7.0",
+  "pyparsing==3.3.2",
+  "python-dateutil==2.9.0.post0",
+  "python-pptx==1.0.2",
+  "scipy==1.17.1",
+  "seaborn==0.13.2",
+  "six==1.17.0",
+  "typing_extensions==4.15.0",
+  "tzdata==2026.2",
+  "xlsxwriter==3.2.9",
+  "xlwings==0.33.6",
+  "pywin32==311; platform_system == 'Windows'"
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["helpers_ps*"]

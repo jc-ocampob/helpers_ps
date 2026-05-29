@@ -1,11 +1,11 @@
-from ppt_dicts import *
+from helper_ps.Presentacion.ppt_dicts import *
 from dataclasses import dataclass, field
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData, BubbleChartData
 from pptx.util import Cm, Pt
 from pptx.enum.chart import XL_CHART_TYPE
-from ppt_helpers import hex_to_rgb
-from Config.var_globs import PALETA_COLORES
+from helper_ps.Presentacion.ppt_helpers import hex_to_rgb
+from helper_ps.Config.var_globs import PALETA_COLORES
 
 # Clase para generar grafico de lineas en una ppt
 @dataclass
