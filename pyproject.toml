@@ -23,7 +23,7 @@ dependencies = [
   "matplotlib==3.10.9",
   "narwhals==2.21.2",
   "numpy==2.4.6",
-  "packaging==25.2",
+  "packaging==26.2",
   "pandas==3.0.3",
   "pillow==12.2.0",
   "plotly==6.7.0",
