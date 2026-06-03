@@ -891,7 +891,6 @@ class Graph_tags():
                 ticker,
                 x_values: list[str | float | int] | str = "last",
                 template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
-                loc_offset: tuple[float, float] = (0, 17),
                 font_color: str = None,
                 fontsize: int = 7,
                 bg_color: str = "None",
@@ -900,6 +899,13 @@ class Graph_tags():
                 dot_size: int = 30,
                 dot_zorder: int = 5,
                 fontweight: str = "normal",
+                label_h_align="center",
+                label_v_align="center",
+                ubic_etq=(0, 17),
+                bg_alpha=1.0,
+                edge_color="none",
+                show_bbox=True,
+                zorder=6,
         ):
             # Validar que es un ticker valido
             if ticker not in df.columns:
@@ -936,11 +942,17 @@ class Graph_tags():
                         label=template.format(x_value=x, y_value=y, ticker=ticker),
                         x_value=x,          # datetime real para texto "Mar 26: 4.3"
                         y_value=y,
-                        ubic_etq=loc_offset,
+                        ubic_etq=ubic_etq,
                         bg_color=bg_color,
                         font_color=font_color,
                         fontsize=fontsize,
-                        fontweight=fontweight
+                        fontweight=fontweight,
+                        bg_alpha=bg_alpha,
+                        edge_color=edge_color,
+                        show_bbox=show_bbox,
+                        zorder=zorder,
+                        label_h_align=label_h_align,
+                        label_v_align=label_v_align,
                         )
                 
                 if "dot" in show:
@@ -1082,7 +1094,6 @@ class Graph_tags():
                 ticker,
                 x_values: list[str | float | int] | str = "last",
                 template: str = "{y_value:,.2f}",
-                loc_offset: tuple[float, float] = (20, 0),
                 font_color: str = None,
                 fontsize: int = 7,
                 bg_color: str = "None",
@@ -1090,7 +1101,14 @@ class Graph_tags():
                 dot_color: str = None,
                 dot_size: int = 30,
                 dot_zorder: int = 5,
-                fontweight: str = "normal"
+                fontweight: str = "normal",
+                label_h_align="center",
+                label_v_align="center",
+                ubic_etq=(20, 0),
+                bg_alpha=1.0,
+                edge_color="none",
+                show_bbox=True,
+                zorder=6,
         ):
             # Validar que es un ticker valido
             if ticker not in columns:
@@ -1129,11 +1147,17 @@ class Graph_tags():
                         label=template.format(x_value=x, y_value=y, ticker=ticker),
                         x_value=z,          # datetime real para texto "Mar 26: 4.3"
                         y_value=y,
-                        ubic_etq=loc_offset,
+                        ubic_etq=ubic_etq,
                         bg_color=bg_color,
                         font_color=font_color,
                         fontsize=fontsize,
-                        fontweight=fontweight
+                        fontweight=fontweight,
+                        bg_alpha=bg_alpha,
+                        edge_color=edge_color,
+                        show_bbox=show_bbox,
+                        zorder=zorder,
+                        label_h_align=label_h_align,
+                        label_v_align=label_v_align,
                         )
                 
                 if "dot" in show:
