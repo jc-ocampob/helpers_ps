@@ -221,7 +221,7 @@ class Graph_base(Graph_meta_data):
             month_idx = np.where(month_change)[0]
             tick_idx = month_idx[::tick_step]
             self._ax.set_xticks(tick_idx)
-            self._ax.set_xticklabels([self._months[i] for i in tick_idx])
+            self._ax.set_xticklabels([self._months[i] for i in tick_idx], fontsize=fontsize)
             self.años_eje_x(y_offset=year_y_offset, fontsize=fontsize)
             self._x_axis_mode = "bbg"
             self._x_axis_fechas = fechas
