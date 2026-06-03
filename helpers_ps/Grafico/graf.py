@@ -951,9 +951,9 @@ class Graph_tags():
                         zorder=dot_zorder
                     )
 
-        for ticker in control_dict.keys():
-            _temp_controls = control_dict[ticker]
-            _generate(ticker=ticker, **_temp_controls)
+        for ti in control_dict.keys():
+            _temp_controls = control_dict[ti]
+            _generate(**_temp_controls)
 
     def _bar_label_generate(
         self,
@@ -1068,15 +1068,13 @@ class Graph_tags():
 
     def _box_whiskers_label_generate(
         self,
-        db: pd.DataFrame,
         control_dict: dict = None,
     ) -> None:
         
         if control_dict is None:
             return None
-        df = db if db is not None else self._df
+        df = self._df
         columns = df.columns.tolist()
-        print(columns)
         # una vez validado la información generar los puntos en base a las variables de control
         def _generate(
                 ticker,
@@ -1146,9 +1144,9 @@ class Graph_tags():
                         zorder=dot_zorder
                     )
 
-        for ticker in control_dict.keys():
-            _temp_controls = control_dict[ticker]
-            _generate(ticker=ticker, **_temp_controls)
+        for ti in control_dict.keys():
+            _temp_controls = control_dict[ti]
+            _generate(**_temp_controls)
         
 
 @dataclass
@@ -2138,7 +2136,7 @@ class Graph_mtplt(Graph_base, Graph_tags):
                         **mean_tag
                     )
                     
-        self._box_whiskers_label_generate(db, control_dict=tag_dot)
+        self._box_whiskers_label_generate(control_dict=tag_dot)
 
 
         # -----------------------
