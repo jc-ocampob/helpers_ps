@@ -898,7 +898,8 @@ class Graph_tags():
                 show: str = "dot",       # dot = solo punto | dot_tag = punto + etiqueta | tag = solo etiqueta):
                 dot_color: str = None,
                 dot_size: int = 30,
-                dot_zorder: int = 5
+                dot_zorder: int = 5,
+                fontweight: str = "normal",
         ):
             # Validar que es un ticker valido
             if ticker not in df.columns:
@@ -938,7 +939,8 @@ class Graph_tags():
                         ubic_etq=loc_offset,
                         bg_color=bg_color,
                         font_color=font_color,
-                        fontsize=fontsize
+                        fontsize=fontsize,
+                        fontweight=fontweight
                         )
                 
                 if "dot" in show:
