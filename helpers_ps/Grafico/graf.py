@@ -1581,7 +1581,8 @@ class Graph_mtplt(Graph_base, Graph_tags):
                                     )
 
                             self._ax.set_xticks(x)
-                            self._ax.set_xticklabels([str(v) for v in db.index], fontsize=8)
+                            _x_font =x_axis.get("fontsize", 8)
+                            self._ax.set_xticklabels([str(v) for v in db.index], fontsize=_x_font)
 
                 # -------- stacked --------
                 else:
@@ -1798,12 +1799,8 @@ class Graph_mtplt(Graph_base, Graph_tags):
                     )
 
             self._ax.set_xticks(x)
-            self._ax.set_xticklabels(cats, fontsize=8)
-
-            if len(cats) > 8:
-                for lab in self._ax.get_xticklabels():
-                    lab.set_rotation(45)
-                    lab.set_ha("right")
+            _x_font =x_axis.get("fontsize", 8)
+            self._ax.set_xticklabels(cats, fontsize=_x_font)
 
         else:
             raise ValueError("bar_mode must be one of: 'auto', 'time', 'last'")
@@ -1834,14 +1831,6 @@ class Graph_mtplt(Graph_base, Graph_tags):
                 right=0.93,
                 top=0.80,
                 bottom=0.21
-            )
-        else:
-            bottom = 0.24 if (bar_mode == "last" and len(db.index) > 8) else 0.18
-            self._fig.subplots_adjust(
-                left=0.15,
-                right=0.93,
-                top=0.80,
-                bottom=bottom
             )
 
     def graph_box_whiskers(
