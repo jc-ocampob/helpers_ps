@@ -9,7 +9,7 @@ import io
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, MultipleLocator
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from helpers_ps.Config.var_globs import PALETA_COLORES
@@ -104,6 +104,10 @@ class Graph_meta_data():
         self._months = self._meta_data[ax_index]["months"]
         self._years = self._meta_data[ax_index]["years"]
         self._ticker_label_color = self._meta_data[ax_index]["ticker_label_color"]
+
+        # Guardar el ax y jalar el nuevo
+        self._axes[self._ax_idx] = self._ax
+        self._ax = self._axes[ax_index]
         return None
 
     def _select_df(self, df_idx=0):
@@ -259,6 +263,8 @@ class Graph_base(Graph_meta_data):
         self,
         lim: tuple[float, float] | None = None,
         fmt: str | None = None,
+        fontsize: float = 7,
+        tick_step: int = None
     ) -> None:
         
         # --- Configuración del limite y ---
@@ -271,6 +277,11 @@ class Graph_base(Graph_meta_data):
         self._ax.yaxis.set_major_formatter(
             FuncFormatter(lambda x, pos: f"{x:{fmt}}")
         )
+
+        self._ax.tick_params(axis='y', labelsize=fontsize)
+
+        if tick_step is not None:
+            self._ax.yaxis.set_major_locator(MultipleLocator(tick_step))
 
     # =========================
     # Metodos de titulos subtitulos y fuente
@@ -411,7 +422,12 @@ class Graph_base(Graph_meta_data):
         nrows: int = 1,
         ncols: int = 1,
         sharex: bool = False,
-        sharey: bool = False
+        sharey: bool = False,
+        dpi: int | None = None,
+        height_ratios: list[float] | None = None,
+        width_ratios: list[float] | None = None,
+        hspace: float | None = None,
+        wspace: float | None = None
     ) -> None:
         """
         Base plot creator.
@@ -419,37 +435,106 @@ class Graph_base(Graph_meta_data):
         Supports:
         - single axis (default)
         - multiple subplots
+        - custom GridSpec layout via height_ratios / width_ratios / hspace / wspace
 
         Keeps backward compatibility with existing code.
         """
 
-        fig, axes = plt.subplots(
-            nrows=nrows,
-            ncols=ncols,
-            figsize=figsize,
-            sharex=sharex,
-            sharey=sharey
-        )
+        # -------------------------------------------------
+        # 1. Crear figura + axes
+        # -------------------------------------------------
+        use_gridspec = any([
+            height_ratios is not None,
+            width_ratios is not None,
+            hspace is not None,
+            wspace is not None,
+            dpi is not None
+        ])
 
+        if not use_gridspec:
+            fig, axes = plt.subplots(
+                nrows=nrows,
+                ncols=ncols,
+                figsize=figsize,
+                sharex=sharex,
+                sharey=sharey
+            )
+        else:
+            fig = plt.figure(figsize=figsize, dpi=dpi)
+
+            gs_kwargs = {
+                "nrows": nrows,
+                "ncols": ncols
+            }
+
+            if height_ratios is not None:
+                gs_kwargs["height_ratios"] = height_ratios
+
+            if width_ratios is not None:
+                gs_kwargs["width_ratios"] = width_ratios
+
+            if hspace is not None:
+                gs_kwargs["hspace"] = hspace
+
+            if wspace is not None:
+                gs_kwargs["wspace"] = wspace
+
+            gs = fig.add_gridspec(**gs_kwargs)
+
+            axes = []
+            first_ax = None
+
+            for r in range(nrows):
+                row_axes = []
+                for c in range(ncols):
+                    subplot_kwargs = {}
+
+                    if first_ax is not None:
+                        if sharex:
+                            subplot_kwargs["sharex"] = first_ax
+                        if sharey:
+                            subplot_kwargs["sharey"] = first_ax
+
+                    ax = fig.add_subplot(gs[r, c], **subplot_kwargs)
+
+                    if first_ax is None:
+                        first_ax = ax
+
+                    row_axes.append(ax)
+
+                axes.append(row_axes)
+
+            if nrows == 1 and ncols == 1:
+                axes = axes[0][0]
+            else:
+                axes = np.array(axes, dtype=object)
+
+        # -------------------------------------------------
+        # 2. Guardar figura
+        # -------------------------------------------------
         self._fig = fig
 
-        # --- Handle axes structure ---
+        # -------------------------------------------------
+        # 3. Manejo de estructura de axes
+        # -------------------------------------------------
         if isinstance(axes, np.ndarray):
             self._axes = axes.flatten().tolist()
             self._ax = self._axes[0]
         else:
             self._axes = [axes]
             self._ax = axes
-        
-        # --- Handle meta data ----
+
+        # -------------------------------------------------
+        # 4. Manejo de metadata
+        # -------------------------------------------------
         self._ax_idx = 0
         self._axes_shape = (nrows, ncols)
 
         self._meta_data = {
-            i:{
+            i: {
                 "dataframe": None,
                 "xmeta": {
-                    "mode": None, 
+                    "mode": None,
                     "fechas": None,
                     "x_vals": None
                 },
@@ -457,10 +542,13 @@ class Graph_base(Graph_meta_data):
                 "months": None,
                 "years": None,
                 "ticker_label_color": None
-            } for i, ax in enumerate(self._axes)
+            }
+            for i, ax in enumerate(self._axes)
         }
 
-        # --- Top & bottom lines at figure level ---
+        # -------------------------------------------------
+        # 5. Líneas decorativas de figura
+        # -------------------------------------------------
         self._fig.add_artist(
             Line2D(
                 [0.01, 0.98], [0.95, 0.95],
@@ -477,12 +565,18 @@ class Graph_base(Graph_meta_data):
             )
         )
 
-        self._fig.subplots_adjust(
-            left=0.15,
-            right=0.93,
-            top=0.80,
-            bottom=0.18
-        )
+        # -------------------------------------------------
+        # 6. Ajustes globales
+        # -------------------------------------------------
+        # Si no usas gridspec custom, mantén el comportamiento original
+        if not use_gridspec:
+            self._fig.subplots_adjust(
+                left=0.15,
+                right=0.93,
+                top=0.80,
+                bottom=0.18
+            )
+
 
     # =========================
     # Metodos de as etiquetas, guias y sombras
@@ -508,7 +602,7 @@ class Graph_base(Graph_meta_data):
         label_v_align="center",
         ubic_etq=(0, 17),
         fontsize=7,
-        fontweight="bold",
+        fontweight="normal",
         font_color="black",
         bg_color="#ECEFF1",
         bg_alpha=1.0,
@@ -869,7 +963,7 @@ class Graph_tags():
         anchor_values=None,
         value_fmt: str = ",.2f",
         fontsize: int = 7,
-        fontweight: str = "bold",
+        fontweight: str = "normal",
         font_color: str = "#222222",
         zorder: int = 6,
     ):
