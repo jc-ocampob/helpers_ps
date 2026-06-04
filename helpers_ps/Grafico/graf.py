@@ -2174,19 +2174,6 @@ class Graph_mtplt(Graph_base, Graph_tags):
 
         self._prep_y_axis(**y_axis)
 
-        for lab in self._ax.get_xticklabels():
-            lab.set_rotation(x_label_rotation)
-            lab.set_ha(x_label_ha)
-
-        self._ax.margins(x=0.03)
-
-        self._fig.subplots_adjust(
-            left=0.15,
-            right=0.93,
-            top=0.80,
-            bottom=0.18 if x_label_rotation == 0 else 0.24
-        )
-
         # source
         if isinstance(source, str):
             self.add_source(source, color="#454444")
