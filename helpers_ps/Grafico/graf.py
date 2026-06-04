@@ -736,7 +736,6 @@ class Graph_base(Graph_meta_data):
         if not hasattr(self, "_ax") or self._ax is None:
             raise RuntimeError("No axis found. Call graph_line/graph_bar first.")
 
-        self._sync_active_axis_meta()
 
         if isinstance(periods, tuple) and len(periods) == 2:
             periods = [periods]
