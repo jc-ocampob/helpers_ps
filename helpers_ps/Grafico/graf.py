@@ -979,6 +979,8 @@ class Graph_tags():
         fontweight: str = "normal",
         font_color: str = "#222222",
         zorder: int = 6,
+        offset_pos: tuple[float, float] = (0, 3),
+        offset_neg: tuple[float, float] = (0, -3),
     ):
         """
         Helper para agregar etiquetas de valor sobre barras.
@@ -993,18 +995,6 @@ class Graph_tags():
             - útil para etiquetar totales en stacked bars
             - anchor_values define dónde se ancla el texto
             (si no se pasa, usa y_values)
-
-        Parámetros
-        ----------
-        rects : container de barras matplotlib
-        x_values : lista/array de posiciones x
-        y_values : lista/array de valores a mostrar
-        anchor_values : lista/array de coordenadas y donde se ancla la etiqueta
-        value_fmt : formato numérico
-        fontsize : tamaño de fuente
-        fontweight : peso de fuente
-        font_color : color de texto
-        zorder : zorder del texto
         """
 
         # -------------------------
@@ -1017,22 +1007,21 @@ class Graph_tags():
                 if pd.isna(h):
                     continue
 
-                # valor mostrado
                 v = h
 
-                # anclaje
+                # el extremo real de la barra siempre es y + height
+                y_end = rect.get_y() + rect.get_height()
+
                 if h >= 0:
-                    xytext = (0, 3)
+                    xytext = offset_pos
                     va = "bottom"
-                    y_anchor = rect.get_y() + rect.get_height()
                 else:
-                    xytext = (0, -3)
+                    xytext = offset_neg
                     va = "top"
-                    y_anchor = rect.get_y()
 
                 self._ax.annotate(
                     f"{v:{value_fmt}}",
-                    xy=(rect.get_x() + rect.get_width() / 2, y_anchor),
+                    xy=(rect.get_x() + rect.get_width() / 2, y_end),
                     xytext=xytext,
                     textcoords="offset points",
                     ha="center",
@@ -1040,7 +1029,8 @@ class Graph_tags():
                     fontsize=fontsize,
                     fontweight=fontweight,
                     color=font_color,
-                    zorder=zorder
+                    zorder=zorder,
+                    annotation_clip=False
                 )
             return None
 
@@ -1058,10 +1048,10 @@ class Graph_tags():
                 continue
 
             if y >= 0:
-                xytext = (0, 3)
+                xytext = offset_pos
                 va = "bottom"
             else:
-                xytext = (0, -3)
+                xytext = offset_neg
                 va = "top"
 
             self._ax.annotate(
@@ -1074,7 +1064,8 @@ class Graph_tags():
                 fontsize=fontsize,
                 fontweight=fontweight,
                 color=font_color,
-                zorder=zorder
+                zorder=zorder,
+                annotation_clip=False
             )
 
         return None
