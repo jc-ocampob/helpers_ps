@@ -59,9 +59,14 @@ class Graph_meta_data():
     _x_axis_fechas = None
     _x_axis_mode = None
     _x_vals = None
-    _bar_mode = None
     _months = None
     _years = None
+
+    # Meta data de barras
+    _bar_mode = None
+    _bar_stacked = None
+    _bar_grouped = None
+    _bar_rects = None
 
     def __post_init__(self):
         self.dataframe = [self.dataframe] if isinstance(self.dataframe, pd.DataFrame) else self.dataframe
@@ -89,6 +94,9 @@ class Graph_meta_data():
                     "x_vals": self._x_vals
                 },
                 "bar_mode": self._bar_mode,
+                "bar_stacked": self._bar_stacked,
+                "bar_grouped": self._bar_grouped,
+                "bar_rects": self._bar_rects,
                 "months": self._months,
                 "years": self._years,
                 "ticker_label_color": self._ticker_label_color
@@ -97,12 +105,18 @@ class Graph_meta_data():
         # jalar la informacion del nuevo plot
         self._df_idx = self._meta_data[ax_index]["dataframe"]
         self._df = self.dataframe[self._df_idx]
+
         self._x_axis_fechas = self._meta_data[ax_index]["xmeta"]["fechas"]
         self._x_axis_mode = self._meta_data[ax_index]["xmeta"]["mode"]
         self._x_vals = self._meta_data[ax_index]["xmeta"]["x_vals"]
-        self._bar_mode = self._meta_data[ax_index]["bar_mode"]
         self._months = self._meta_data[ax_index]["months"]
         self._years = self._meta_data[ax_index]["years"]
+
+        self._bar_mode = self._meta_data[ax_index]["bar_mode"]
+        self._bar_stacked = self._meta_data[ax_index]["bar_stacked"]
+        self._bar_grouped = self._meta_data[ax_index]["bar_grouped"]
+        self._bar_rects = self._meta_data[ax_index]["bar_rects"]
+        
         self._ticker_label_color = self._meta_data[ax_index]["ticker_label_color"]
 
         # Guardar el ax y jalar el nuevo
@@ -114,6 +128,53 @@ class Graph_meta_data():
         self._df_idx = df_idx
         self._df = self.dataframe[df_idx]
         return self._df
+
+    def _generate_metadata(
+        self,
+        fig,
+        axes,
+        nrows,
+        ncols,
+    ):
+        # -------------------------------------------------
+        # 2. Guardar figura
+        # -------------------------------------------------
+        self._fig = fig
+
+        # -------------------------------------------------
+        # 3. Manejo de estructura de axes
+        # -------------------------------------------------
+        if isinstance(axes, np.ndarray):
+            self._axes = axes.flatten().tolist()
+            self._ax = self._axes[0]
+        else:
+            self._axes = [axes]
+            self._ax = axes
+
+        # -------------------------------------------------
+        # 4. Manejo de metadata
+        # -------------------------------------------------
+        self._ax_idx = 0
+        self._axes_shape = (nrows, ncols)
+
+        self._meta_data = {
+            i: {
+                "dataframe": None,
+                "xmeta": {
+                    "mode": None,
+                    "fechas": None,
+                    "x_vals": None
+                },
+                "bar_mode": None,
+                "bar_stacked": None,
+                "bar_grouped": None,
+                "bar_rects": None,
+                "months": None,
+                "years": None,
+                "ticker_label_color": None
+            }
+            for i, ax in enumerate(self._axes)
+        }
 
 class Graph_base(Graph_meta_data):
 
@@ -512,39 +573,12 @@ class Graph_base(Graph_meta_data):
         # -------------------------------------------------
         # 2. Guardar figura
         # -------------------------------------------------
-        self._fig = fig
-
-        # -------------------------------------------------
-        # 3. Manejo de estructura de axes
-        # -------------------------------------------------
-        if isinstance(axes, np.ndarray):
-            self._axes = axes.flatten().tolist()
-            self._ax = self._axes[0]
-        else:
-            self._axes = [axes]
-            self._ax = axes
-
-        # -------------------------------------------------
-        # 4. Manejo de metadata
-        # -------------------------------------------------
-        self._ax_idx = 0
-        self._axes_shape = (nrows, ncols)
-
-        self._meta_data = {
-            i: {
-                "dataframe": None,
-                "xmeta": {
-                    "mode": None,
-                    "fechas": None,
-                    "x_vals": None
-                },
-                "bar_mode": None,
-                "months": None,
-                "years": None,
-                "ticker_label_color": None
-            }
-            for i, ax in enumerate(self._axes)
-        }
+        self._generate_metadata(
+            fig,
+            axes,
+            nrows,
+            ncols
+        )
 
         # -------------------------------------------------
         # 5. Líneas decorativas de figura
@@ -856,7 +890,7 @@ class Graph_base(Graph_meta_data):
     # Metodos para la barras
     # =========================
 
-class Graph_tags():
+class Line_tags():
     # funcion para procesar diccionario de controles de annotaciones
     def _line_label_generate(
         self,
@@ -867,7 +901,8 @@ class Graph_tags():
 
         El formato del dict es:
         {
-            ticker: {
+            key_random: {
+                ticker: ticker en cuestion,
                 x_values: lista de valores x sobre el que se quiere poner el punto / punto y tag / tag
                 template: plantilla de tag con disponibles ticker, x_value, y_value
                 loc_offset: offset para el tag relativo al punto original
@@ -968,108 +1003,508 @@ class Graph_tags():
             _temp_controls = control_dict[ti]
             _generate(**_temp_controls)
 
-    def _bar_label_generate(
-        self,
-        rects=None,
-        x_values=None,
-        y_values=None,
-        anchor_values=None,
-        value_fmt: str = ",.2f",
-        fontsize: int = 7,
-        fontweight: str = "normal",
-        font_color: str = "#222222",
-        zorder: int = 6,
-        offset_pos: tuple[float, float] = (0, 3),
-        offset_neg: tuple[float, float] = (0, -3),
-    ):
+class Bar_tags():
+
+    def _bar_x_key_normalize(self, value):
         """
-        Helper para agregar etiquetas de valor sobre barras.
-
-        Soporta dos modos:
-
-        1) rects:
-            - pasar directamente el resultado de ax.bar(...)
-            - opcionalmente values si se quiere usar un valor distinto al alto
-
-        2) x_values + y_values:
-            - útil para etiquetar totales en stacked bars
-            - anchor_values define dónde se ancla el texto
-            (si no se pasa, usa y_values)
+        Normaliza fechas/categorías para comparación consistente.
         """
+        try:
+            if isinstance(value, (pd.Timestamp, np.datetime64)):
+                return pd.Timestamp(value)
+            return pd.Timestamp(value)
+        except Exception:
+            return str(value)
 
-        # -------------------------
-        # MODO 1: etiquetar desde rectángulos
-        # -------------------------
-        if rects is not None:
-            for rect in rects:
-                h = rect.get_height()
+    def _bar_resolve_x_indices(self, ticker: str, x_values) -> list[int]:
+        """
+        Resuelve x_values a posiciones enteras del eje x usando self._bars_x_reference.
 
-                if pd.isna(h):
+        x_values soporta:
+        - "all"
+        - "last"
+        - lista/tupla/set de fechas/categorías
+        """
+        if not hasattr(self, "_bars_x_reference"):
+            raise ValueError("No existe self._bars_x_reference. Guarda la referencia del eje x dentro de graph_bar.")
+
+        x_ref = list(self._bars_x_reference)
+        x_ref_norm = [self._bar_x_key_normalize(v) for v in x_ref]
+
+        if x_values == "all":
+            return list(range(len(x_ref)))
+
+        if x_values == "last":
+            bars_entry = self._bars_data.get(ticker)
+            if bars_entry is None:
+                return []
+
+            for idx in range(len(x_ref) - 1, -1, -1):
+                rect, _mode = self._bar_get_rect_for_index(bars_entry=bars_entry, idx=idx)
+                if rect is None:
                     continue
 
-                v = h
+                h = rect.get_height()
+                if h is not None and not np.isnan(h) and abs(h) > 0:
+                    return [idx]
 
-                # el extremo real de la barra siempre es y + height
-                y_end = rect.get_y() + rect.get_height()
+            return [len(x_ref) - 1] if len(x_ref) > 0 else []
 
-                if h >= 0:
-                    xytext = offset_pos
-                    va = "bottom"
-                else:
-                    xytext = offset_neg
-                    va = "top"
+        if not isinstance(x_values, (list, tuple, set)):
+            raise ValueError("x_values debe ser 'all', 'last' o una lista/tupla/set de fechas/categorías.")
 
-                self._ax.annotate(
-                    f"{v:{value_fmt}}",
-                    xy=(rect.get_x() + rect.get_width() / 2, y_end),
-                    xytext=xytext,
-                    textcoords="offset points",
-                    ha="center",
-                    va=va,
-                    fontsize=fontsize,
-                    fontweight=fontweight,
-                    color=font_color,
-                    zorder=zorder,
-                    annotation_clip=False
-                )
-            return None
+        requested = {self._bar_x_key_normalize(v) for v in x_values}
+        return [i for i, v in enumerate(x_ref_norm) if v in requested]
 
-        # -------------------------
-        # MODO 2: etiquetar desde coordenadas explícitas
-        # -------------------------
-        if x_values is None or y_values is None:
-            return None
+    def _bar_get_rect_for_index(self, bars_entry: dict, idx: int):
+        """
+        Retorna el rectángulo útil para un ticker en la posición idx.
 
-        if anchor_values is None:
-            anchor_values = y_values
+        Retorna:
+        - (rect, "grouped") si bars_entry["bars"] es BarContainer
+        - (rect, "stacked") si bars_entry["bars"] es {"pos":..., "neg":...}
+        - (None, mode) si no hay rectángulo válido
+        """
+        bars_obj = bars_entry["bars"]
 
-        for x, y, y_anchor in zip(x_values, y_values, anchor_values):
-            if pd.isna(y):
+        # --- stacked
+        if isinstance(bars_obj, dict):
+            bars_pos = bars_obj.get("pos")
+            bars_neg = bars_obj.get("neg")
+
+            rect_pos = None
+            rect_neg = None
+
+            if bars_pos is not None and idx < len(bars_pos):
+                rect_pos = bars_pos[idx]
+
+            if bars_neg is not None and idx < len(bars_neg):
+                rect_neg = bars_neg[idx]
+
+            h_pos = rect_pos.get_height() if rect_pos is not None else 0.0
+            h_neg = rect_neg.get_height() if rect_neg is not None else 0.0
+
+            if rect_pos is not None and h_pos is not None and not np.isnan(h_pos) and abs(h_pos) > 0:
+                return rect_pos, "stacked"
+
+            if rect_neg is not None and h_neg is not None and not np.isnan(h_neg) and abs(h_neg) > 0:
+                return rect_neg, "stacked"
+
+            return None, "stacked"
+
+        # --- grouped / single
+        if idx < len(bars_obj):
+            return bars_obj[idx], "grouped"
+
+        return None, "grouped"
+
+    def _bar_get_stack_total_anchor(self, idx: int, ref_ticker: str):
+        """
+        Obtiene el ancla del total del stack en la posición idx.
+
+        Retorna:
+        - x
+        - y_anchor
+        - total_value
+        - sign ("positive" | "negative")
+        """
+        if ref_ticker not in self._bars_data:
+            return None, None, None, None
+
+        total_value = 0.0
+        top_positive = 0.0
+        bottom_negative = 0.0
+
+        # --- usar un rect de referencia para obtener x
+        ref_rect, ref_mode = self._bar_get_rect_for_index(self._bars_data[ref_ticker], idx)
+        if ref_rect is None:
+            return None, None, None, None
+
+        if ref_mode != "stacked":
+            raise ValueError("El total del stack solo aplica cuando el gráfico es stacked.")
+
+        x = ref_rect.get_x() + ref_rect.get_width() / 2.0
+
+        for _ticker, entry in self._bars_data.items():
+            bars_obj = entry["bars"]
+
+            if not isinstance(bars_obj, dict):
                 continue
 
-            if y >= 0:
-                xytext = offset_pos
-                va = "bottom"
-            else:
-                xytext = offset_neg
-                va = "top"
+            rect_pos = None
+            rect_neg = None
 
-            self._ax.annotate(
-                f"{y:{value_fmt}}",
-                xy=(x, y_anchor),
-                xytext=xytext,
-                textcoords="offset points",
-                ha="center",
-                va=va,
-                fontsize=fontsize,
-                fontweight=fontweight,
-                color=font_color,
-                zorder=zorder,
-                annotation_clip=False
+            if bars_obj.get("pos") is not None and idx < len(bars_obj["pos"]):
+                rect_pos = bars_obj["pos"][idx]
+
+            if bars_obj.get("neg") is not None and idx < len(bars_obj["neg"]):
+                rect_neg = bars_obj["neg"][idx]
+
+            if rect_pos is not None:
+                h = rect_pos.get_height()
+                if h is not None and not np.isnan(h):
+                    total_value += h
+                    top_positive = max(top_positive, rect_pos.get_y() + rect_pos.get_height())
+
+            if rect_neg is not None:
+                h = rect_neg.get_height()
+                if h is not None and not np.isnan(h):
+                    total_value += h
+                    bottom_negative = min(bottom_negative, rect_neg.get_y() + rect_neg.get_height())
+
+        if total_value >= 0:
+            return x, top_positive, total_value, "positive"
+
+        return x, bottom_negative, total_value, "negative"
+
+    def _bar_format_template(
+            self,
+            template: str,
+            ticker: str,
+            x_value,
+            y_value: float | None = None,
+            total_value: float | None = None,
+            label: str | None = None
+        ) -> str:
+        """
+        Formatea template con placeholders estilo:
+        {ticker}, {label}, {x_value}, {y_value}, {total_value}
+        """
+        return template.format(
+            ticker=ticker,
+            label=label if label is not None else ticker,
+            x_value=x_value,
+            y_value=y_value,
+            total_value=total_value
+        )
+
+    def _bar_value_label_generate_dict(self, label_dict: dict | None = None) -> None:
+        """
+        Genera etiquetas numéricas sobre barras usando una configuración tipo dict.
+
+        Comportamiento:
+        - grouped / single: etiqueta al final de la barra
+        - stacked: etiqueta al centro del segmento del ticker seleccionado
+
+        Estructura esperada de label_dict:
+        {
+            "1": dict(
+                ticker="PX_LAST-SPX INDEX",
+                x_values=["last", pd.Timestamp("2025-12-31")],   # o "all" o "last"
+                template="{y_value:,.0f}",
+                fontsize=7,
+                font_color="black",
+                fontweight="normal",
+                bbox=None,
+                pad_points=2,
+                zorder=6
+            ),
+            "2": dict(
+                ticker="PX_LAST-RUO INDEX",
+                x_values=[pd.Timestamp("2023-12-31")],
+                template="{y_value:,.0f}",
+                fontsize=7,
+                font_color="blue",
+                fontweight="bold"
             )
+        }
+        """
 
-        return None
+        if not label_dict:
+            return
 
+        if not hasattr(self, "_bars_data") or not self._bars_data:
+            raise ValueError("No existe self._bars_data. Ejecuta graph_bar antes de usar este helper.")
+
+        # label -> ticker
+        ticker_to_label = {}
+        if hasattr(self, "_ticker_label_color"):
+            for t, lbl, _c in self._ticker_label_color:
+                ticker_to_label[t] = lbl
+
+        x_ref = list(self._bars_x_reference)
+
+        def _control(
+                ticker: str | None = None,
+                x_values: list[str | int | float] | str | None = None,
+                template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
+                font_color: str = "black",
+                fontsize: int = 7,
+                bg_color: str = "None",
+                fontweight: str = "normal",
+                label_h_align="center",
+                label_v_align="center",
+                ubic_etq=(0, 17),
+                bg_alpha=1.0,
+                edge_color="none",
+                show_bbox=True,
+                zorder=6,
+
+        ):
+            # Funcion para controlar el dictionario de input
+            if not ticker:
+                return None
+
+            if ticker not in self._bars_data.keys():
+                return None
+
+            idxs = self._bar_resolve_x_indices(ticker=ticker, x_values=x_values)
+
+            for idx in idxs:
+                rect, mode = self._bar_get_rect_for_index(
+                    bars_entry=self._bars_data[ticker],
+                    idx=idx
+                )
+
+                if rect is None:
+                    continue
+
+                h = rect.get_height()
+                if h is None or np.isnan(h) or abs(h) == 0:
+                    continue
+
+                x = rect.get_x() + rect.get_width() / 2.0
+                x_value = x_ref[idx]
+                label = ticker_to_label.get(ticker, ticker)
+
+                text = self._bar_format_template(
+                    template=template,
+                    ticker=ticker,
+                    x_value=x_value,
+                    y_value=h,
+                    total_value=None,
+                    label=label
+                )
+
+                # --- stacked: centro del segmento
+                if mode == "stacked":
+                    y = rect.get_y() + rect.get_height() / 2.0
+                    
+                    self.etiqueta_valor(
+                        x_value = x_value,
+                        y_value = y,
+                        label=text,
+                        ubic_etq=ubic_etq,
+                        bg_color=bg_color,
+                        font_color=font_color,
+                        fontsize=fontsize,
+                        fontweight=fontweight,
+                        bg_alpha=bg_alpha,
+                        edge_color=edge_color,
+                        show_bbox=show_bbox,
+                        zorder=zorder,
+                        label_h_align=label_h_align,
+                        label_v_align=label_v_align,
+                    )
+
+                # --- grouped / single: final de la barra
+                else:
+                    y_end = rect.get_y() + rect.get_height()
+
+                    if h >= 0:
+                        va = "bottom"
+                        ubic_etq = (ubic_etq[0], ubic_etq[1] + 5)
+                    else:
+                        va = "top"
+                        ubic_etq = (ubic_etq[0], ubic_etq[1] - 10)
+                    
+                    self.etiqueta_valor(
+                        x_value = x,
+                        y_value = y_end,
+                        label=text,
+                        ubic_etq=ubic_etq,
+                        bg_color=bg_color,
+                        font_color=font_color,
+                        fontsize=fontsize,
+                        fontweight=fontweight,
+                        bg_alpha=bg_alpha,
+                        edge_color=edge_color,
+                        show_bbox=show_bbox,
+                        zorder=zorder,
+                        label_h_align=label_h_align,
+                        label_v_align=label_v_align,
+                    )            
+
+        for _key, cfg in label_dict.items():
+            _control(**label_dict[_key])
+            
+    def _bar_tag_generate_dict(self, tag_dict: dict | None = None) -> None:
+        """
+        Genera tags sobre barras usando una configuración tipo dict.
+
+        show soporta:
+        - "bar_tag"      -> tag al centro de la barra / segmento
+        - "stack_total"  -> tag sobre el total del stack (solo si stacked)
+
+        Estructura esperada:
+        {
+            "1": dict(
+                ticker="PX_LAST-SPX INDEX",
+                x_values=["last", pd.Timestamp("2025-12-31")],
+                template="hola",
+                show="bar_tag",
+                fontsize=7,
+                font_color="black",
+                fontweight="normal",
+                bbox=dict(
+                    boxstyle="round,pad=0.2",
+                    facecolor="white",
+                    edgecolor="#BFBFBF",
+                    alpha=0.95
+                ),
+                zorder=7
+            ),
+            "2": dict(
+                ticker="PX_LAST-SPX INDEX",
+                x_values=[pd.Timestamp("2025-12-31")],
+                template="{total_value:,.0f}",
+                show="stack_total",
+                fontsize=7,
+                font_color="black"
+            )
+        }
+        """
+
+        if not tag_dict:
+            return
+
+        if not hasattr(self, "_bars_data") or not self._bars_data:
+            raise ValueError("No existe self._bars_data. Ejecuta graph_bar antes de usar este helper.")
+
+        # ticker -> label
+        ticker_to_label = {}
+        if hasattr(self, "_ticker_label_color"):
+            for t, lbl, _c in self._ticker_label_color:
+                ticker_to_label[t] = lbl
+
+        x_ref = list(self._bars_x_reference)
+
+        def _control(
+                ticker: str | None = None,
+                show: dict = "stalked_total", 
+                x_values: list[str | int | float] | str | None = None,
+                template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
+                font_color: str = "black",
+                fontsize: int = 7,
+                bg_color: str = "None",
+                fontweight: str = "normal",
+                label_h_align="center",
+                label_v_align="center",
+                ubic_etq=(0, 0),
+                bg_alpha=1.0,
+                edge_color="none",
+                show_bbox=True,
+                zorder=6,
+        ):
+            if not ticker:
+                return None
+
+            if ticker not in self._bars_data.keys():
+                return None
+
+            idxs = self._bar_resolve_x_indices(ticker=ticker, x_values=x_values)
+
+            for idx in idxs:
+                x_value = x_ref[idx]
+                label = ticker_to_label.get(ticker, ticker)
+
+                # ======================================================
+                # stack_total -> total del stack
+                # ======================================================
+                if show == "stack_total":
+                    x, y_anchor, total_value, sign = self._bar_get_stack_total_anchor(
+                        idx=idx,
+                        ref_ticker=ticker
+                    )
+
+                    if x is None:
+                        continue
+
+                    text = self._bar_format_template(
+                        template=template,
+                        ticker=ticker,
+                        x_value=x_value,
+                        y_value=None,
+                        total_value=total_value,
+                        label=label
+                    )
+
+                    if sign == "positive":
+                        va = "bottom"
+                        ubic_etq = (ubic_etq[0], ubic_etq[1] + 5)
+                    else:
+                        va = "top"
+                        ubic_etq = (ubic_etq[0], ubic_etq[1] - 10)
+
+                    self.etiqueta_valor(
+                        x_value = x,
+                        y_value = y_anchor,
+                        label = text,
+                        ubic_etq=ubic_etq,
+                        bg_color=bg_color,
+                        font_color=font_color,
+                        fontsize=fontsize,
+                        fontweight=fontweight,
+                        bg_alpha=bg_alpha,
+                        edge_color=edge_color,
+                        show_bbox=show_bbox,
+                        zorder=zorder,
+                        label_h_align=label_h_align,
+                        label_v_align=label_v_align,
+                    )
+
+                    continue
+
+                # ======================================================
+                # bar_tag -> centro de barra / segmento
+                # ======================================================
+                rect, mode = self._bar_get_rect_for_index(
+                    bars_entry=self._bars_data[ticker],
+                    idx=idx
+                )
+
+                if rect is None:
+                    continue
+
+                h = rect.get_height()
+                if h is None or np.isnan(h) or abs(h) == 0:
+                    continue
+
+                x = rect.get_x() + rect.get_width() / 2.0
+                y = rect.get_y() + rect.get_height() / 2.0
+
+                text = self._bar_format_template(
+                    template=template,
+                    ticker=ticker,
+                    x_value=x_value,
+                    y_value=h,
+                    total_value=None,
+                    label=label
+                )
+
+                self.etiqueta_valor(
+                        x_value = x,
+                        y_value = y,
+                        label = text,
+                        ubic_etq=ubic_etq,
+                        bg_color=bg_color,
+                        font_color=font_color,
+                        fontsize=fontsize,
+                        fontweight=fontweight,
+                        bg_alpha=bg_alpha,
+                        edge_color=edge_color,
+                        show_bbox=show_bbox,
+                        zorder=zorder,
+                        label_h_align=label_h_align,
+                        label_v_align=label_v_align,
+                    )
+
+        for _key, cfg in tag_dict.items():
+            _control(**tag_dict[_key])
+            
+
+
+class BoxW_tags():
     def _box_whiskers_label_generate(
         self,
         control_dict: dict = None,
@@ -1166,7 +1601,7 @@ class Graph_tags():
         
 
 @dataclass
-class Graph_mtplt(Graph_base, Graph_tags):
+class Graph_mtplt(Graph_base, Line_tags, Bar_tags, BoxW_tags):
 
     def graph_line(
         self,
@@ -1321,531 +1756,527 @@ class Graph_mtplt(Graph_base, Graph_tags):
                 bottom=0.18
             )
 
+
     def graph_bar(
-        self,
-        # --- Configuración del grafico
-        figsize: tuple[float, float] = (6.00, 5.00),
+            self,
+            # --- Configuración del grafico
+            figsize: tuple[float, float] = (6.00, 5.00),
 
-        # --- Configuración de los elementos adicionales del grafico
-        titles: dict | None = None,
-        source: list[str] | str | None = None,
+            # --- Configuración de los elementos adicionales del grafico
+            titles: dict | None = None,
+            source: list[str] | str | None = None,
 
-        # --- Configuración de df
-        df_index: int = 0,
+            # --- Configuración de df
+            df_index: int = 0,
 
-        # --- Configuración de las series
-        tickers: list[str] | str = "all",
-        labels: list[str] | str | None = None,
-        colors: list[str] | str = PALETA_COLORES,
+            # --- Configuración de las series
+            tickers: list[str] | str = "all",
+            labels: list[str] | str | None = None,
+            colors: list[str] | str = PALETA_COLORES,
 
-        # --- Configuración del eje x / y
-        x_axis: dict | None = None,
-        y_axis: dict | None = None,
+            # --- Configuración del eje x / y
+            x_axis: dict | None = None,
+            y_axis: dict | None = None,
 
-        # --- Configuración de barras
-        bar_mode: str = "auto",       # "auto" | "time" | "last"
-        stacked: bool = False,
-        grouped: bool = False,
-        bar_width: float = 0.8,
-        alpha: float = 0.95,
+            # --- Configuración de barras
+            bar_mode: str = "auto",       # "auto" | "time" | "last"
+            stacked: bool = False,
+            grouped: bool = False,
+            bar_width: float = 0.8,
+            alpha: float = 0.95,
 
-        # --- Etiquetas de valores
-        show_values: bool = False,
-        value_fmt: str = ",.2f",
-        value_fontsize: int = 7,
+            # --- Etiquetas de valores
+            bar_labels: dict | None = None,
+            bar_tags: dict | None = None,
 
-        # --- Configuración Leyenda
-        legend: dict | None = None,
+            # --- Configuración Leyenda
+            legend: dict | None = None,
 
-        # --- Configuración lineas horizontales
-        hlines: dict | None = None,
+            # --- Configuración lineas horizontales
+            hlines: dict | None = None,
 
-        # --- Mostrar guias horizontales
-        show_hguide: bool = False
-    ) -> None:
-        """
-        Gráfico de barras siguiendo la misma estructura de graph_line.
+            # --- Mostrar guias horizontales
+            show_hguide: bool = False
+        ) -> None:
+            """
+            Gráfico de barras siguiendo la misma estructura de graph_line.
 
-        Modos:
-        - last: snapshot / categorías en el índice
-        - time: series de tiempo
-        - auto:
-            * 1 ticker  -> time
-            * >1 ticker -> time si grouped/stacked, de lo contrario last
-        """
+            Modos:
+            - last: snapshot / categorías en el índice
+            - time: series de tiempo
+            - auto:
+                * 1 ticker  -> time
+                * >1 ticker -> time si grouped/stacked, de lo contrario last
+            """
 
-        # --- 1. Importación y setteo del dataframe
-        db = self._select_df(df_idx=df_index)
+            # --- 1. Importación y setteo del dataframe
+            db = self._select_df(df_idx=df_index)
 
-        # --- 2. Normalización de los tickers
-        if isinstance(tickers, str):
-            if tickers == "all":
-                tickers = db.columns.tolist()
-            else:
-                tickers = [tickers]
-
-        tickers = [t for t in tickers if t in db.columns]
-        if len(tickers) == 0:
-            raise ValueError("No hay tickers válidos para graficar.")
-        
-        db = db[tickers].copy()  # filtrar solo los tickers seleccionados
-
-        # --- 3. Asignación de etiquetas
-        if isinstance(labels, str):
-            labels = [labels]
-        elif isinstance(labels, list):
-            if len(labels) < len(tickers):
-                labels = labels + tickers[len(labels):]
-        else:
-            labels = tickers.copy()
-
-        # --- 4. Normalización de los colores
-        if isinstance(colors, str):
-            colors = [colors]
-        elif isinstance(colors, list):
-            if len(colors) < len(tickers):
-                add = PALETA_COLORES.copy()
-                colors = colors + add[:max(0, len(tickers) - len(colors))]
-        else:
-            colors = PALETA_COLORES.copy()
-
-        colors = [
-            colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
-            for i in range(len(tickers))
-        ]
-
-        # --- 5. Asignación de ticker label color
-        self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i in range(len(tickers))]
-
-        # --- 6. Revisión de dicts
-        x_axis = x_axis if x_axis is not None else dict()
-        y_axis = y_axis if y_axis is not None else dict()
-        titles = titles if titles is not None else dict()
-        legend = legend if legend is not None else dict()
-        hlines = hlines if hlines is not None else dict()
-
-        # --- 7. Generación del gráfico y el plot en caso no exista
-        if not hasattr(self, "_ax") or self._ax is None:
-            self.plot(figsize=figsize)
-
-        # --- 8. Definición automática del modo
-        if bar_mode == "auto":
-            if len(tickers) == 1:
-                bar_mode = "time"
-            else:
-                bar_mode = "time" if (grouped or stacked) else "last"
-
-        self._bar_mode = bar_mode
-
-        # --- 9. Agregar títulos globales
-        self.set_titles(**titles)
-        if source:
-            self.add_source(source)
-
-        # ==========================================================
-        # MODE: TIME
-        # ==========================================================
-        if bar_mode == "time":
-            # preparar eje x usando helper base (igual lógica que graph_line)
-            db = self._prep_x_axis(dataframe=db, **x_axis)
-
-            m = len(tickers)
-
-            # --- A. Un ticker
-            if m == 1:
-                t = tickers[0]
-                s = db[[t]].copy()
-
-                if self._x_axis_mode == "bbg":
-                    serie = s.reindex(self._x_axis_fechas)[t]
-                    bars = self._ax.bar(
-                        self._x_vals,
-                        serie.to_numpy(),
-                        width=min(bar_width, 0.85),
-                        color=colors[0],
-                        alpha=alpha,
-                        label=labels[0],
-                        zorder=3
-                    )
+            # --- 2. Normalización de los tickers
+            if isinstance(tickers, str):
+                if tickers == "all":
+                    tickers = db.columns.tolist()
                 else:
-                    bars = self._ax.bar(
-                        s.index,
-                        s[t],
-                        width=min(bar_width, 0.85),
-                        color=colors[0],
-                        alpha=alpha,
-                        label=labels[0],
-                        zorder=3
-                    )
+                    tickers = [tickers]
 
-                if show_values:
-                    self._bar_label_generate(
-                        rects=bars,
-                        value_fmt=value_fmt,
-                        fontsize=value_fontsize
-                    )
+            tickers = [t for t in tickers if t in db.columns]
+            if len(tickers) == 0:
+                raise ValueError("No hay tickers válidos para graficar.")
+            
+            db = db[tickers].copy()  # filtrar solo los tickers seleccionados
 
-            # --- B. Multiples tickers
+            # --- 3. Asignación de etiquetas
+            if isinstance(labels, str):
+                labels = [labels]
+            elif isinstance(labels, list):
+                if len(labels) < len(tickers):
+                    labels = labels + tickers[len(labels):]
             else:
-                # -------- grouped --------
-                if grouped and not stacked:
+                labels = tickers.copy()
+
+            # --- 4. Normalización de los colores
+            if isinstance(colors, str):
+                colors = [colors]
+            elif isinstance(colors, list):
+                if len(colors) < len(tickers):
+                    add = PALETA_COLORES.copy()
+                    colors = colors + add[:max(0, len(tickers) - len(colors))]
+            else:
+                colors = PALETA_COLORES.copy()
+
+            colors = [
+                colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
+                for i in range(len(tickers))
+            ]
+
+            # --- 5. Asignación de ticker label color
+            self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i in range(len(tickers))]
+
+            # --- 6. Revisión de dicts
+            x_axis = x_axis if x_axis is not None else dict()
+            y_axis = y_axis if y_axis is not None else dict()
+            titles = titles if titles is not None else dict()
+            legend = legend if legend is not None else dict()
+            hlines = hlines if hlines is not None else dict()
+            bar_labels = bar_labels if bar_labels is not None else dict()
+            bar_tags = bar_tags if bar_tags is not None else dict()
+
+
+            # --- 7. Generación del gráfico y el plot en caso no exista
+            if not hasattr(self, "_ax") or self._ax is None:
+                self.plot(figsize=figsize)
+
+            # --- 8. Definición automática del modo
+            if bar_mode == "auto":
+                if len(tickers) == 1:
+                    bar_mode = "time"
+                else:
+                    bar_mode = "time" if (grouped or stacked) else "last"
+
+            self._bar_mode = bar_mode
+
+            # --- 9. Agregar títulos globales
+            self.set_titles(**titles)
+            if source:
+                self.add_source(source)
+
+            bars_data = {}
+
+            # ==========================================================
+            # MODE: TIME
+            # ==========================================================
+            if bar_mode == "time":
+                # preparar eje x usando helper base (igual lógica que graph_line)
+                db = self._prep_x_axis(dataframe=db, **x_axis)
+                
+                if self._x_axis_mode == "bbg":
+                    self._bars_x_reference = list(self._x_axis_fechas)
+                else:
+                    self._bars_x_reference = list(db.index)
+
+
+                m = len(tickers)
+
+                # --- A. Un ticker
+                if m == 1:
+                    t = tickers[0]
+                    s = db[[t]].copy()
+
                     if self._x_axis_mode == "bbg":
-                        base_x = self._x_vals.astype(float)
-                        width = min(bar_width / m, 0.8 / m)
-
-                        for i, t in enumerate(tickers):
-                            serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
-                            offset = (i - (m - 1) / 2) * width
-
-                            bars = self._ax.bar(
-                                base_x + offset,
-                                serie.to_numpy(),
-                                width=width,
-                                color=colors[i],
-                                alpha=alpha,
-                                label=labels[i],
-                                zorder=3
-                            )
-
-                            if show_values:
-                                self._bar_label_generate(
-                                    rects=bars,
-                                    value_fmt=value_fmt,
-                                    fontsize=value_fontsize
-                                )
-
+                        serie = s.reindex(self._x_axis_fechas)[t]
+                        bars = self._ax.bar(
+                            self._x_vals,
+                            serie.to_numpy(),
+                            width=min(bar_width, 0.85),
+                            color=colors[0],
+                            alpha=alpha,
+                            label=labels[0],
+                            zorder=3
+                        )
                     else:
-                        x_index = db.index
-                        is_datetime = pd.api.types.is_datetime64_any_dtype(x_index)
-                        is_numeric = pd.api.types.is_numeric_dtype(x_index)
+                        bars = self._ax.bar(
+                            s.index,
+                            s[t],
+                            width=min(bar_width, 0.85),
+                            color=colors[0],
+                            alpha=alpha,
+                            label=labels[0],
+                            zorder=3
+                        )
+                    
+                    bars_data[t] = {
+                        "bars": bars
+                    }
 
-                        if is_datetime:
-                            x_num = mdates.date2num(pd.to_datetime(x_index).to_pydatetime())
-                            diffs = np.diff(np.sort(np.unique(x_num)))
-                            base_step = np.median(diffs) if len(diffs) else 30.0
-                            group_total = base_step * 0.8
-                            width = group_total / m
-
-                            for i, t in enumerate(tickers):
-                                offset = (i - (m - 1) / 2) * width
-                                bars = self._ax.bar(
-                                    x_num + offset,
-                                    np.asarray(db[t].values, dtype=float),
-                                    width=width,
-                                    color=colors[i],
-                                    alpha=alpha,
-                                    label=labels[i],
-                                    zorder=3
-                                )
-                                if show_values:
-                                    self._bar_label_generate(
-                                        rects=bars,
-                                        value_fmt=value_fmt,
-                                        fontsize=value_fontsize
-                                    )
-
-                            self._ax.xaxis_date()
-
-                        elif is_numeric:
-                            x_num = np.asarray(x_index.values, dtype=float)
-                            diffs = np.diff(np.sort(np.unique(x_num)))
-                            base_step = np.median(diffs) if len(diffs) else 1.0
-                            group_total = base_step * 0.8
-                            width = group_total / m
-
-                            for i, t in enumerate(tickers):
-                                offset = (i - (m - 1) / 2) * width
-                                bars = self._ax.bar(
-                                    x_num + offset,
-                                    np.asarray(db[t].values, dtype=float),
-                                    width=width,
-                                    color=colors[i],
-                                    alpha=alpha,
-                                    label=labels[i],
-                                    zorder=3
-                                )
-                                if show_values:
-                                    self._bar_label_generate(
-                                        rects=bars,
-                                        value_fmt=value_fmt,
-                                        fontsize=value_fontsize
-                                    )
-
-                        else:
-                            # categórico en modo time
-                            x = np.arange(len(db.index), dtype=float)
+                # --- B. Multiples tickers
+                else:
+                    # -------- grouped --------
+                    if grouped and not stacked:
+                        if self._x_axis_mode == "bbg":
+                            base_x = self._x_vals.astype(float)
                             width = min(bar_width / m, 0.8 / m)
 
                             for i, t in enumerate(tickers):
+                                serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
                                 offset = (i - (m - 1) / 2) * width
+
                                 bars = self._ax.bar(
-                                    x + offset,
-                                    np.asarray(db[t].values, dtype=float),
+                                    base_x + offset,
+                                    serie.to_numpy(),
                                     width=width,
                                     color=colors[i],
                                     alpha=alpha,
                                     label=labels[i],
                                     zorder=3
                                 )
-                                if show_values:
-                                    self._bar_label_generate(
-                                        rects=bars,
-                                        value_fmt=value_fmt,
-                                        fontsize=value_fontsize
+
+                                bars_data[t] = {
+                                    "bars": bars
+                                }
+
+                        else:
+                            x_index = db.index
+                            is_datetime = pd.api.types.is_datetime64_any_dtype(x_index)
+                            is_numeric = pd.api.types.is_numeric_dtype(x_index)
+
+                            if is_datetime:
+                                x_num = mdates.date2num(pd.to_datetime(x_index).to_pydatetime())
+                                diffs = np.diff(np.sort(np.unique(x_num)))
+                                base_step = np.median(diffs) if len(diffs) else 30.0
+                                group_total = base_step * 0.8
+                                width = group_total / m
+
+                                for i, t in enumerate(tickers):
+                                    offset = (i - (m - 1) / 2) * width
+                                    bars = self._ax.bar(
+                                        x_num + offset,
+                                        np.asarray(db[t].values, dtype=float),
+                                        width=width,
+                                        color=colors[i],
+                                        alpha=alpha,
+                                        label=labels[i],
+                                        zorder=3
                                     )
 
-                            self._ax.set_xticks(x)
-                            _x_font =x_axis.get("fontsize", 8)
-                            self._ax.set_xticklabels([str(v) for v in db.index], fontsize=_x_font)
+                                    bars_data[t] = {
+                                        "bars": bars
+                                    }
 
-                # -------- stacked --------
-                else:
-                    if self._x_axis_mode == "bbg":
-                        bottom_pos = np.zeros(len(self._x_vals), dtype=float)
-                        bottom_neg = np.zeros(len(self._x_vals), dtype=float)
+                                self._ax.xaxis_date()
 
-                        for i, t in enumerate(tickers):
-                            serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
-                            y = np.asarray(serie.values, dtype=float)
+                            elif is_numeric:
+                                x_num = np.asarray(x_index.values, dtype=float)
+                                diffs = np.diff(np.sort(np.unique(x_num)))
+                                base_step = np.median(diffs) if len(diffs) else 1.0
+                                group_total = base_step * 0.8
+                                width = group_total / m
 
-                            y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
-                            y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
+                                for i, t in enumerate(tickers):
+                                    offset = (i - (m - 1) / 2) * width
+                                    bars = self._ax.bar(
+                                        x_num + offset,
+                                        np.asarray(db[t].values, dtype=float),
+                                        width=width,
+                                        color=colors[i],
+                                        alpha=alpha,
+                                        label=labels[i],
+                                        zorder=3
+                                    )
 
-                            if np.any(y_pos != 0):
-                                self._ax.bar(
-                                    self._x_vals,
-                                    y_pos,
-                                    width=min(bar_width, 0.85),
-                                    bottom=bottom_pos,
-                                    color=colors[i],
-                                    alpha=alpha,
-                                    label=labels[i],
-                                    zorder=3
-                                )
-                                bottom_pos = bottom_pos + y_pos
+                                    bars_data[t] = {
+                                        "bars": bars
+                                    }
 
-                            if np.any(y_neg != 0):
-                                self._ax.bar(
-                                    self._x_vals,
-                                    y_neg,
-                                    width=min(bar_width, 0.85),
-                                    bottom=bottom_neg,
-                                    color=colors[i],
-                                    alpha=alpha,
-                                    zorder=3
-                                )
-                                bottom_neg = bottom_neg + y_neg
+                            else:
+                                # categórico en modo time
+                                x = np.arange(len(db.index), dtype=float)
+                                width = min(bar_width / m, 0.8 / m)
 
-                        if show_values:
-                            vals_matrix = np.column_stack([
-                                db[[t]].copy().reindex(self._x_axis_fechas)[t].values for t in tickers
-                            ])
-                            totals = np.nansum(vals_matrix, axis=1)
-                            anchors = np.where(totals >= 0, bottom_pos, bottom_neg)
+                                for i, t in enumerate(tickers):
+                                    offset = (i - (m - 1) / 2) * width
+                                    bars = self._ax.bar(
+                                        x + offset,
+                                        np.asarray(db[t].values, dtype=float),
+                                        width=width,
+                                        color=colors[i],
+                                        alpha=alpha,
+                                        label=labels[i],
+                                        zorder=3
+                                    )
 
-                            self._bar_label_generate(
-                                x_values=self._x_vals,
-                                y_values=totals,
-                                anchor_values=anchors,
-                                value_fmt=value_fmt,
-                                fontsize=value_fontsize
-                            )
+                                    bars_data[t] = {
+                                        "bars": bars
+                                    }
 
+                                self._ax.set_xticks(x)
+                                _x_font = x_axis.get("fontsize", 8)
+                                self._ax.set_xticklabels([str(v) for v in db.index], fontsize=_x_font)
+
+                    # -------- stacked --------
                     else:
-                        x_plot = db.index
-                        bottom_pos = np.zeros(len(db.index), dtype=float)
-                        bottom_neg = np.zeros(len(db.index), dtype=float)
+                        if self._x_axis_mode == "bbg":
+                            bottom_pos = np.zeros(len(self._x_vals), dtype=float)
+                            bottom_neg = np.zeros(len(self._x_vals), dtype=float)
 
-                        for i, t in enumerate(tickers):
-                            y = np.asarray(db[t].values, dtype=float)
+                            for i, t in enumerate(tickers):
+                                serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
+                                y = np.asarray(serie.values, dtype=float)
 
-                            y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
-                            y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
+                                y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
+                                y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
 
-                            if np.any(y_pos != 0):
-                                self._ax.bar(
-                                    x_plot,
-                                    y_pos,
-                                    width=min(bar_width, 0.85),
-                                    bottom=bottom_pos,
-                                    color=colors[i],
-                                    alpha=alpha,
-                                    label=labels[i],
-                                    zorder=3
-                                )
-                                bottom_pos = bottom_pos + y_pos
+                                bars_pos = None
+                                bars_neg = None
 
-                            if np.any(y_neg != 0):
-                                self._ax.bar(
-                                    x_plot,
-                                    y_neg,
-                                    width=min(bar_width, 0.85),
-                                    bottom=bottom_neg,
-                                    color=colors[i],
-                                    alpha=alpha,
-                                    zorder=3
-                                )
-                                bottom_neg = bottom_neg + y_neg
+                                if np.any(y_pos != 0):
+                                    bars_pos = self._ax.bar(
+                                        self._x_vals,
+                                        y_pos,
+                                        width=min(bar_width, 0.85),
+                                        bottom=bottom_pos,
+                                        color=colors[i],
+                                        alpha=alpha,
+                                        label=labels[i],
+                                        zorder=3
+                                    )
+                                    bottom_pos = bottom_pos + y_pos
 
-                        if show_values:
-                            vals_matrix = np.column_stack([db[t].values for t in tickers])
-                            totals = np.nansum(vals_matrix, axis=1)
-                            anchors = np.where(totals >= 0, bottom_pos, bottom_neg)
+                                if np.any(y_neg != 0):
+                                    bars_neg = self._ax.bar(
+                                        self._x_vals,
+                                        y_neg,
+                                        width=min(bar_width, 0.85),
+                                        bottom=bottom_neg,
+                                        color=colors[i],
+                                        alpha=alpha,
+                                        zorder=3
+                                    )
+                                    bottom_neg = bottom_neg + y_neg
 
-                            self._bar_label_generate(
-                                x_values=x_plot,
-                                y_values=totals,
-                                anchor_values=anchors,
-                                value_fmt=value_fmt,
-                                fontsize=value_fontsize
-                            )
+                                bars_data[t] = {
+                                    "bars": {
+                                        "pos": bars_pos,
+                                        "neg": bars_neg
+                                    }
+                                }
 
-        # ==========================================================
-        # MODE: LAST
-        # ==========================================================
-        elif bar_mode == "last":
-            db = db[tickers].copy()
-            x = np.arange(len(db.index), dtype=float)
-            cats = [str(v) for v in db.index]
-            m = len(tickers)
+                        else:
+                            x_plot = db.index
+                            bottom_pos = np.zeros(len(db.index), dtype=float)
+                            bottom_neg = np.zeros(len(db.index), dtype=float)
 
-            vals_matrix = np.column_stack([
-                np.asarray(db[t].values, dtype=float) for t in tickers
-            ])
+                            for i, t in enumerate(tickers):
+                                y = np.asarray(db[t].values, dtype=float)
 
-            # guardar metadata básica del eje x
-            self._x_axis_mode = "categorical"
-            self._x_axis_fechas = None
-            self._x_vals = x
+                                y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
+                                y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
 
-            # -------- grouped --------
-            if grouped and not stacked:
-                width = min(bar_width / max(m, 1), 0.8 / max(m, 1))
+                                bars_pos = None
+                                bars_neg = None
 
-                for i, t in enumerate(tickers):
-                    offset = (i - (m - 1) / 2) * width
-                    y = vals_matrix[:, i]
+                                if np.any(y_pos != 0):
+                                    bars_pos = self._ax.bar(
+                                        x_plot,
+                                        y_pos,
+                                        width=min(bar_width, 0.85),
+                                        bottom=bottom_pos,
+                                        color=colors[i],
+                                        alpha=alpha,
+                                        label=labels[i],
+                                        zorder=3
+                                    )
+                                    bottom_pos = bottom_pos + y_pos
 
-                    bars = self._ax.bar(
-                        x + offset,
-                        y,
-                        width=width,
-                        color=colors[i],
-                        alpha=alpha,
-                        label=labels[i],
-                        zorder=3
-                    )
+                                if np.any(y_neg != 0):
+                                    bars_neg = self._ax.bar(
+                                        x_plot,
+                                        y_neg,
+                                        width=min(bar_width, 0.85),
+                                        bottom=bottom_neg,
+                                        color=colors[i],
+                                        alpha=alpha,
+                                        zorder=3
+                                    )
+                                    bottom_neg = bottom_neg + y_neg
 
-                    if show_values:
-                        self._bar_label_generate(
-                            rects=bars,
-                            value_fmt=value_fmt,
-                            fontsize=value_fontsize
-                        )
+                                bars_data[t] = {
+                                    "bars": {
+                                        "pos": bars_pos,
+                                        "neg": bars_neg
+                                    }
+                                }
 
-            # -------- stacked --------
-            elif stacked:
-                bottom_pos = np.zeros(len(x), dtype=float)
-                bottom_neg = np.zeros(len(x), dtype=float)
+            # ==========================================================
+            # MODE: LAST
+            # ==========================================================
+            elif bar_mode == "last":
+                
+                db = db[tickers].copy()
+                self._bars_x_reference = list(db.index)
+                x = np.arange(len(db.index), dtype=float)
+                cats = [str(v) for v in db.index]
+                m = len(tickers)
 
-                for i, t in enumerate(tickers):
-                    y = vals_matrix[:, i]
+                vals_matrix = np.column_stack([
+                    np.asarray(db[t].values, dtype=float) for t in tickers
+                ])
 
-                    y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
-                    y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
+                # guardar metadata básica del eje x
+                self._x_axis_mode = "categorical"
+                self._x_axis_fechas = None
+                self._x_vals = x
 
-                    if np.any(y_pos != 0):
-                        self._ax.bar(
-                            x,
-                            y_pos,
-                            width=min(bar_width, 0.85),
-                            bottom=bottom_pos,
+                # -------- grouped --------
+                if grouped and not stacked:
+                    width = min(bar_width / max(m, 1), 0.8 / max(m, 1))
+
+                    for i, t in enumerate(tickers):
+                        offset = (i - (m - 1) / 2) * width
+                        y = vals_matrix[:, i]
+
+                        bars = self._ax.bar(
+                            x + offset,
+                            y,
+                            width=width,
                             color=colors[i],
                             alpha=alpha,
                             label=labels[i],
                             zorder=3
                         )
-                        bottom_pos = bottom_pos + y_pos
 
-                    if np.any(y_neg != 0):
-                        self._ax.bar(
-                            x,
-                            y_neg,
-                            width=min(bar_width, 0.85),
-                            bottom=bottom_neg,
-                            color=colors[i],
-                            alpha=alpha,
-                            zorder=3
-                        )
-                        bottom_neg = bottom_neg + y_neg
+                        bars_data[t] = {
+                            "bars": bars
+                        }
 
-                if show_values:
-                    totals = np.nansum(vals_matrix, axis=1)
-                    anchors = np.where(totals >= 0, bottom_pos, bottom_neg)
+                # -------- stacked --------
+                elif stacked:
+                    bottom_pos = np.zeros(len(x), dtype=float)
+                    bottom_neg = np.zeros(len(x), dtype=float)
 
-                    self._bar_label_generate(
-                        x_values=x,
-                        y_values=totals,
-                        anchor_values=anchors,
-                        value_fmt=value_fmt,
-                        fontsize=value_fontsize
+                    for i, t in enumerate(tickers):
+                        y = vals_matrix[:, i]
+
+                        y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
+                        y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
+
+                        bars_pos = None
+                        bars_neg = None
+
+                        if np.any(y_pos != 0):
+                            bars_pos = self._ax.bar(
+                                x,
+                                y_pos,
+                                width=min(bar_width, 0.85),
+                                bottom=bottom_pos,
+                                color=colors[i],
+                                alpha=alpha,
+                                label=labels[i],
+                                zorder=3
+                            )
+                            bottom_pos = bottom_pos + y_pos
+
+                        if np.any(y_neg != 0):
+                            bars_neg = self._ax.bar(
+                                x,
+                                y_neg,
+                                width=min(bar_width, 0.85),
+                                bottom=bottom_neg,
+                                color=colors[i],
+                                alpha=alpha,
+                                zorder=3
+                            )
+                            bottom_neg = bottom_neg + y_neg
+
+                        bars_data[t] = {
+                            "bars": {
+                                "pos": bars_pos,
+                                "neg": bars_neg
+                            }
+                        }
+                # -------- default: first ticker only --------
+                else:
+                    y = vals_matrix[:, 0]
+
+                    bars = self._ax.bar(
+                        x,
+                        y,
+                        width=min(bar_width, 0.85),
+                        color=colors[0],
+                        alpha=alpha,
+                        label=labels[0],
+                        zorder=3
                     )
 
-            # -------- default: first ticker only --------
-            else:
-                y = vals_matrix[:, 0]
+                    bars_data[tickers[0]] = {
+                        "bars": bars
+                    }
 
-                bars = self._ax.bar(
-                    x,
-                    y,
-                    width=min(bar_width, 0.85),
-                    color=colors[0],
-                    alpha=alpha,
-                    label=labels[0],
-                    zorder=3
+                self._ax.set_xticks(x)
+                _x_font = x_axis.get("fontsize", 8)
+                self._ax.set_xticklabels(cats, fontsize=_x_font)
+
+            else:
+                raise ValueError("bar_mode must be one of: 'auto', 'time', 'last'")
+
+            # --- guardar referencia para uso posterior
+            self._bars_data = bars_data
+            self._bars_stacked = stacked
+
+            # --- 10. Configuración del eje y
+            self._prep_y_axis(**y_axis)
+
+            # --- 11. Agregar lineas horizontales
+            self.lineas_horizontales(**hlines)
+
+            # --- 12. Agregar guias horizontales
+            if show_hguide:
+                self.guias_horizontales(mostrar_cero=False)
+
+            # --- 13. Agregar leyenda
+            if "show" not in legend:
+                if bar_mode == "last":
+                    legend["show"] = len(tickers) > 1 and (grouped or stacked)
+                else:
+                    legend["show"] = len(tickers) > 1
+
+            self.add_legend(**legend)
+
+            if bar_labels:
+                self._bar_value_label_generate_dict(label_dict=bar_labels)
+
+            if bar_tags:
+                self._bar_tag_generate_dict(tag_dict=bar_tags)
+
+
+            # --- 14. Ajuste de layout igual que graph_line
+            if self._x_axis_mode == "bbg":
+                self._fig.subplots_adjust(
+                    left=0.15,
+                    right=0.93,
+                    top=0.80,
+                    bottom=0.21
                 )
 
-                if show_values:
-                    self._bar_label_generate(
-                        rects=bars,
-                        value_fmt=value_fmt,
-                        fontsize=value_fontsize
-                    )
-
-            self._ax.set_xticks(x)
-            _x_font =x_axis.get("fontsize", 8)
-            self._ax.set_xticklabels(cats, fontsize=_x_font)
-
-        else:
-            raise ValueError("bar_mode must be one of: 'auto', 'time', 'last'")
-
-        # --- 10. Configuración del eje y
-        self._prep_y_axis(**y_axis)
-
-        # --- 11. Agregar lineas horizontales
-        self.lineas_horizontales(**hlines)
-
-        # --- 12. Agregar guias horizontales
-        if show_hguide:
-            self.guias_horizontales(mostrar_cero=False)
-
-        # --- 13. Agregar leyenda
-        if "show" not in legend:
-            if bar_mode == "last":
-                legend["show"] = len(tickers) > 1 and (grouped or stacked)
-            else:
-                legend["show"] = len(tickers) > 1
-
-        self.add_legend(**legend)
-
-        # --- 14. Ajuste de layout igual que graph_line
-        if self._x_axis_mode == "bbg":
-            self._fig.subplots_adjust(
-                left=0.15,
-                right=0.93,
-                top=0.80,
-                bottom=0.21
-            )
 
     def graph_box_whiskers(
         self,
@@ -1880,19 +2311,7 @@ class Graph_mtplt(Graph_base, Graph_tags):
         
         # Configuración de la leyenda   
         legend: dict | None = None,
-        x_label_rotation: float = 0,
-        x_label_ha: str = "center",
-
         tag_dot: dict | None = None,
-
-        
-        show_last_value_legend: bool = True,
-        last_value_legend_label: str = "Last value",
-        last_value_legend_loc: str = "upper right",
-        last_value_legend_fontsize: int = 8,
-        last_value_legend_frameon: bool = False,
-        last_value_legend_color: str | None = None,
-
 
         # --- Configuración de otros factores ---
         hlines: dict | None = None,
