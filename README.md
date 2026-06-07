@@ -2,14 +2,14 @@
 
 Paqueteria de asistencia dentro de PS Perú
 
-## Modulo Config
+## Modulo Config.var_globs
 Config.vars_globs
 
 Contiene:
 
 Variables globales del area como la paleta de colores de la compañía
 
-## Modulo Grafico
+## Modulo Grafico.graf
 Grafico.graf import Graph_mtplt
 
 Contiene:
@@ -38,6 +38,8 @@ Funciones de addicionales en la grafica:
     .punto_valor()           -> Para agregar scatter plot en puntos especificos
     .shade_x_periods()       -> Sombreo de area
 
+## Modulo Grafico.renderer
+
 Grafico.renderer
 
 Contiene:
@@ -49,7 +51,7 @@ render_and_save_bytesio_dict()  -> Para renderizar y guardar graficos de dict de
 
 ** en desarrollo para poder importar info de bloomberg y guardar en cualquier formato 
 
-## Modulo Calculo
+## Modulo Calculo.helper_metricas
 Calculo.helper_metricas import Metrics
 
 Contiene:
@@ -59,16 +61,16 @@ class Metrics (
     descripcion             |un data frame index = ticker + columna llamada "Nombre"
     )
 funciones:
-    mtd()           -> retorna dataframe con serie de mtd para todas las columnas
-    ytd()           -> retorna dataframe con serie de ytd para todas las columnas
-    qtd()           -> retorna dataframe con serie de qtd para todas las columnas
-    drawdown()      -> retorna dataframe con serie de drawdown historico
-    rsi()           -> Calcula el RSI de cada uno de las series
-    sma()           -> Calcula la media movil simple para cada uno de las series
-    ema()           -> Calcula el exponential moving average
-    ranges()        -> Calcula los rangos de la serie sobre la media +- # de desviaciones
-    relative()      -> Calcula el (+,-,/,*) entre dos series y devuelve la serie ajustada
-    momentum()      -> Calcula indice de momentum simple
-    momentum_sma()  -> Calcula indice de momentum con SMA
+    .mtd()           -> retorna dataframe con serie de mtd para todas las columnas
+    .ytd()           -> retorna dataframe con serie de ytd para todas las columnas
+    .qtd()           -> retorna dataframe con serie de qtd para todas las columnas
+    .drawdown()      -> retorna dataframe con serie de drawdown historico
+    .rsi()           -> Calcula el RSI de cada uno de las series
+    .sma()           -> Calcula la media movil simple para cada uno de las series
+    .ema()           -> Calcula el exponential moving average
+    .ranges()        -> Calcula los rangos de la serie sobre la media +- # de desviaciones
+    .relative()      -> Calcula el (+,-,/,*) entre dos series y devuelve la serie ajustada
+    .momentum()      -> Calcula indice de momentum simple
+    .momentum_sma()  -> Calcula indice de momentum con SMA
 
     
