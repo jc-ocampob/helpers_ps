@@ -1502,8 +1502,6 @@ class Bar_tags():
         for _key, cfg in tag_dict.items():
             _control(**tag_dict[_key])
             
-
-
 class BoxW_tags():
     def _box_whiskers_label_generate(
         self,
@@ -1599,7 +1597,6 @@ class BoxW_tags():
             _temp_controls = control_dict[ti]
             _generate(**_temp_controls)
         
-
 @dataclass
 class Graph_mtplt(Graph_base, Line_tags, Bar_tags, BoxW_tags):
 
@@ -1755,7 +1752,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, BoxW_tags):
                 top=0.80,
                 bottom=0.18
             )
-
 
     def graph_bar(
             self,
@@ -2276,7 +2272,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, BoxW_tags):
                     top=0.80,
                     bottom=0.21
                 )
-
 
     def graph_box_whiskers(
         self,
