@@ -1234,7 +1234,7 @@ class Bar_tags():
                 fontweight: str = "normal",
                 label_h_align="center",
                 label_v_align="center",
-                ubic_etq=(0, 17),
+                ubic_etq=(0, 0),
                 bg_alpha=1.0,
                 edge_color="none",
                 show_bbox=True,
@@ -1300,19 +1300,19 @@ class Bar_tags():
                 # --- grouped / single: final de la barra
                 else:
                     y_end = rect.get_y() + rect.get_height()
-
+                    
                     if h >= 0:
-                        va = "bottom"
-                        ubic_etq = (ubic_etq[0], ubic_etq[1] + 5)
+                        local_va = "bottom" if label_v_align == "center" else label_v_align
+                        local_offset = (ubic_etq[0], abs(ubic_etq[1]))
                     else:
-                        va = "top"
-                        ubic_etq = (ubic_etq[0], ubic_etq[1] - 10)
+                        local_va = "top" if label_v_align == "center" else label_v_align
+                        local_offset = (ubic_etq[0], -abs(ubic_etq[1]))
                     
                     self.etiqueta_valor(
                         x_value = x,
                         y_value = y_end,
                         label=text,
-                        ubic_etq=ubic_etq,
+                        ubic_etq=local_offset,
                         bg_color=bg_color,
                         font_color=font_color,
                         fontsize=fontsize,
@@ -1322,7 +1322,7 @@ class Bar_tags():
                         show_bbox=show_bbox,
                         zorder=zorder,
                         label_h_align=label_h_align,
-                        label_v_align=label_v_align,
+                        label_v_align=local_va,
                     )            
 
         for _key, cfg in label_dict.items():
