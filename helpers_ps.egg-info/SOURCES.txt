@@ -10,6 +10,7 @@ helpers_ps/Calculo/__init__.py
 helpers_ps/Calculo/helper_metricas.py
 helpers_ps/Config/__init__.py
 helpers_ps/Config/var_globs.py
+helpers_ps/Data/recessions.csv
 helpers_ps/Grafico/__init__.py
 helpers_ps/Grafico/graf.py
 helpers_ps/Grafico/renderer.py

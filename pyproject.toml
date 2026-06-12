@@ -43,3 +43,7 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["helpers_ps", "helpers_ps.*"]
+
+[tool.setuptools.package-data]
+helpers_ps = ["Data/*.csv"]
+
