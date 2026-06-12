@@ -17,3 +17,4 @@ helpers_ps/Presentacion/__init__.py
 helpers_ps/Presentacion/ppt_dicts.py
 helpers_ps/Presentacion/ppt_grafs.py
 helpers_ps/Presentacion/ppt_helpers.py
+helpers_ps/bloomberg/bbg.py

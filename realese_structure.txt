@@ -20,10 +20,10 @@ git push origin v0.1.2
 
 
 # 7. Para instalaciones hacer lo siguiente reemplazando por la version v*
-pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.1"
+pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.2"
 
 # Para instalaciones ignorando las dependencias del paquete
-pip install --no-deps "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.1"
+pip install --no-deps "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.2"
 
 # si es que la paqueteria ya esta instalada entonces usar la funcion de aquí
 pip install --upgrade "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.1"

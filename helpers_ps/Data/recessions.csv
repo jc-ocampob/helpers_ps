@@ -1,0 +1,37 @@
+recesion_id,country,start_date,end_date,description
+1,United States,1902-09-01,1904-08-01,Contracción industrial temprana
+2,United States,1907-05-01,1908-06-01,Pánico bancario 1907
+3,United States,1910-01-01,1912-01-01,Ajuste post crisis financiera
+4,United States,1913-01-01,1914-12-01,Recesión pre WWI
+5,United States,1918-08-01,1919-03-01,Fin WWI ajuste
+6,United States,1920-01-01,1921-07-01,Contracción posguerra
+7,United States,1923-05-01,1924-07-01,Ajuste inventarios
+8,United States,1926-10-01,1927-11-01,Ajuste industrial
+9,United States,1929-08-01,1933-03-01,Gran Depresión
+10,United States,1937-05-01,1938-06-01,Recaída Gran Depresión
+11,United States,1945-02-01,1945-10-01,Fin WWII ajuste
+12,United States,1948-11-01,1949-10-01,Ajuste posguerra
+13,United States,1953-07-01,1954-05-01,Post Corea contracción
+14,United States,1957-08-01,1958-04-01,Política restrictiva
+15,United States,1960-04-01,1961-02-01,Menor inversión
+16,United States,1969-12-01,1970-11-01,Endurecimiento monetario
+17,United States,1973-11-01,1975-03-01,Shock petrolero
+18,United States,1980-01-01,1980-07-01,Ajuste anti inflación
+19,United States,1981-07-01,1982-11-01,Volcker shock
+20,United States,1990-07-01,1991-03-01,Crisis S&L
+21,United States,2001-03-01,2001-11-01,Dot-com burst
+22,United States,2007-12-01,2009-06-01,Crisis financiera global
+23,United States,2020-02-01,2020-04-01,COVID shock
+24,Peru,1929-10-01,1932-12-31,Gran Depresión impacto
+25,Peru,1937-01-01,1938-12-31,Contracción externa
+26,Peru,1948-01-01,1949-12-31,Inestabilidad política
+27,Peru,1952-01-01,1953-12-31,Shock externo leve
+28,Peru,1967-01-01,1969-12-31,Crisis balanza pagos
+29,Peru,1975-01-01,1978-12-31,Crisis modelo estatal
+30,Peru,1980-01-01,1982-12-31,Crisis deuda inicio
+31,Peru,1983-01-01,1984-12-31,El Niño impacto
+32,Peru,1987-01-01,1990-07-31,Hiperinflación
+33,Peru,1992-01-01,1993-12-31,Ajuste estabilización
+34,Peru,1998-01-01,1999-12-31,Asia + El Niño
+35,Peru,2009-01-01,2009-12-31,Crisis global
+36,Peru,2020-03-01,2020-12-31,COVID shock

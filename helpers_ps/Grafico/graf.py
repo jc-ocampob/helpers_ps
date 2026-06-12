@@ -13,6 +13,7 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from helpers_ps.Config.var_globs import PALETA_COLORES
+from importlib.resources import files
 
 # -----------------------
 # Setteo de parametros iniciales
@@ -611,7 +612,6 @@ class Graph_base(Graph_meta_data):
                 bottom=0.18
             )
 
-
     # =========================
     # Metodos de as etiquetas, guias y sombras
     # =========================
@@ -774,8 +774,8 @@ class Graph_base(Graph_meta_data):
         if isinstance(periods, tuple) and len(periods) == 2:
             periods = [periods]
 
-        mode = getattr(self, "_xmeta", {}).get("mode", None)
-        bar_meta = getattr(self, "_bar_meta", None)
+        mode = self._x_axis_mode
+        bar_meta = self._bar_mode
 
         used_label = False
         xlim = self._ax.get_xlim()
@@ -796,7 +796,7 @@ class Graph_base(Graph_meta_data):
                 x0 = self._coerce_to_bbg_x(start)
                 x1 = self._coerce_to_bbg_x(end)
 
-            elif bar_meta is not None and bar_meta.get("mode") == "last":
+            elif bar_meta is not None and bar_meta == "last":
                 xticklabels = [t.get_text() for t in self._ax.get_xticklabels()]
 
                 def _to_pos(val):
@@ -829,7 +829,7 @@ class Graph_base(Graph_meta_data):
                         pass
 
                     # widen only for bar charts in time mode
-                    if bar_meta is not None and bar_meta.get("mode") == "time":
+                    if bar_meta is not None and bar_meta == "time":
                         delta = pd.Timedelta(days=15)
                         s = s - delta
                         e = e + delta
@@ -887,8 +887,38 @@ class Graph_base(Graph_meta_data):
             self._ax.axhline(y, color=color, linestyle=linestyle, linewidth=linewidth)
 
     # =========================
-    # Metodos para la barras
+    # Metodos para agregar recesiones a las graficas
     # =========================
+    def add_recesiones(
+            self,
+            country: str = "United States",
+            data_frame: bool = False,
+            controles: dict = None
+    ):
+        csv_path = files("helpers_ps").joinpath("Data/recessions.csv")
+        recesiones = pd.read_csv(csv_path, parse_dates=["start_date", "end_date"])
+        recesiones = recesiones.set_index("recesion_id")
+        if data_frame:
+            return recesiones
+        
+        # plotear en el eje
+        if self._ax is None:
+            raise RuntimeError("No existe grafico para agregar las recesiones")
+        
+        if self._x_axis_mode not in ["bbg", "datetime"]:
+            raise TypeError("No se pueden aplicar recesiones a un grafico que no tiene como eje fechas")
+        
+        if country not in recesiones["country"].unique():
+            raise NotImplementedError("No hay registro de recesiones para ese pais")
+        
+        recesiones = recesiones[recesiones["country"] == country].copy()
+        
+        # agregar recesiones a la grafica
+        date_list = [(f"{recesiones.loc[x,"start_date"]:%Y-%m-%d}", f"{recesiones.loc[x,"end_date"]:%Y-%m-%d}") for x in recesiones.index.tolist()]
+        controles = controles if controles is not None else dict(color="grey", alpha=0.3)
+        self.shade_x_periods(periods=date_list, **controles)
+
+        return None
 
 class Line_tags():
     # funcion para procesar diccionario de controles de annotaciones
