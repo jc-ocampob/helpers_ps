@@ -12,6 +12,7 @@ import matplotlib.dates as mdates
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+import matplotlib.patheffects as path_effects
 from helpers_ps.Config.var_globs import PALETA_COLORES
 from importlib.resources import files
 
@@ -642,6 +643,8 @@ class Graph_base(Graph_meta_data):
         bg_alpha=1.0,
         edge_color="none",
         show_bbox=True,
+        text_edge_color: str | None = None,
+        text_edge_width: float = 0.0,
         zorder=6,
     ):
         """
@@ -683,7 +686,7 @@ class Graph_base(Graph_meta_data):
             )
 
         # --- Annotate ---
-        self._ax.annotate(
+        annotation = self._ax.annotate(
             label,
             xy=(x_plot, y_value),
             xytext=ubic_etq,
@@ -696,6 +699,12 @@ class Graph_base(Graph_meta_data):
             bbox=bbox,
             zorder=zorder
         )
+
+        # Optional text stroke to improve readability over busy backgrounds.
+        if text_edge_color is not None and text_edge_width and text_edge_width > 0:
+            annotation.set_path_effects([
+                path_effects.withStroke(linewidth=text_edge_width, foreground=text_edge_color)
+            ])
     
     def punto_valor(
         self,
@@ -969,6 +978,8 @@ class Line_tags():
                 bg_alpha=1.0,
                 edge_color="none",
                 show_bbox=True,
+                text_edge_color: str | None = None,
+                text_edge_width: float = 0.0,
                 zorder=6,
         ):
             # Validar que es un ticker valido
@@ -1014,6 +1025,8 @@ class Line_tags():
                         bg_alpha=bg_alpha,
                         edge_color=edge_color,
                         show_bbox=show_bbox,
+                        text_edge_color=text_edge_color,
+                        text_edge_width=text_edge_width,
                         zorder=zorder,
                         label_h_align=label_h_align,
                         label_v_align=label_v_align,
@@ -1268,6 +1281,8 @@ class Bar_tags():
                 bg_alpha=1.0,
                 edge_color="none",
                 show_bbox=True,
+                text_edge_color: str | None = None,
+                text_edge_width: float = 0.0,
                 zorder=6,
 
         ):
@@ -1322,6 +1337,8 @@ class Bar_tags():
                         bg_alpha=bg_alpha,
                         edge_color=edge_color,
                         show_bbox=show_bbox,
+                        text_edge_color=text_edge_color,
+                        text_edge_width=text_edge_width,
                         zorder=zorder,
                         label_h_align=label_h_align,
                         label_v_align=label_v_align,
@@ -1350,6 +1367,8 @@ class Bar_tags():
                         bg_alpha=bg_alpha,
                         edge_color=edge_color,
                         show_bbox=show_bbox,
+                        text_edge_color=text_edge_color,
+                        text_edge_width=text_edge_width,
                         zorder=zorder,
                         label_h_align=label_h_align,
                         label_v_align=local_va,
@@ -1424,6 +1443,8 @@ class Bar_tags():
                 bg_alpha=1.0,
                 edge_color="none",
                 show_bbox=True,
+                text_edge_color: str | None = None,
+                text_edge_width: float = 0.0,
                 zorder=6,
         ):
             if not ticker:
@@ -1478,6 +1499,8 @@ class Bar_tags():
                         bg_alpha=bg_alpha,
                         edge_color=edge_color,
                         show_bbox=show_bbox,
+                        text_edge_color=text_edge_color,
+                        text_edge_width=text_edge_width,
                         zorder=zorder,
                         label_h_align=label_h_align,
                         label_v_align=label_v_align,
@@ -1524,6 +1547,8 @@ class Bar_tags():
                         bg_alpha=bg_alpha,
                         edge_color=edge_color,
                         show_bbox=show_bbox,
+                        text_edge_color=text_edge_color,
+                        text_edge_width=text_edge_width,
                         zorder=zorder,
                         label_h_align=label_h_align,
                         label_v_align=label_v_align,
@@ -1561,6 +1586,8 @@ class BoxW_tags():
                 bg_alpha=1.0,
                 edge_color="none",
                 show_bbox=True,
+                text_edge_color: str | None = None,
+                text_edge_width: float = 0.0,
                 zorder=6,
         ):
             # Validar que es un ticker valido
@@ -1608,6 +1635,8 @@ class BoxW_tags():
                         bg_alpha=bg_alpha,
                         edge_color=edge_color,
                         show_bbox=show_bbox,
+                        text_edge_color=text_edge_color,
+                        text_edge_width=text_edge_width,
                         zorder=zorder,
                         label_h_align=label_h_align,
                         label_v_align=label_v_align,
