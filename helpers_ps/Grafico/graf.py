@@ -2331,6 +2331,165 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, BoxW_tags):
                     bottom=0.21
                 )
 
+    def graph_pie(
+        self,
+        figsize: tuple[float, float] = (6.00, 5.00),
+        titles: dict | None = None,
+        source: str | list[str] | None = None,
+        df_index: int = 0,
+        tickers: list[str] | str = "all",
+        labels: list[str] | str | None = None,
+        colors: list[str] | str = PALETA_COLORES,
+        x_value: str | int | float | pd.Timestamp = "last",
+        donut_width: float | None = None,
+        startangle: float = 90,
+        counterclock: bool = False,
+        autopct: str | None = "%1.1f%%",
+        pctdistance: float = 0.72,
+        labeldistance: float = 1.05,
+        textprops: dict | None = None,
+        wedgeprops: dict | None = None,
+        legend: dict | None = None,
+        sort_values: bool = False,
+        normalize: bool = True,
+        text_edge_color: str | None = None,
+        text_edge_width: float = 0.0,
+    ) -> None:
+        """
+        Grafico de torta/donut para una foto puntual del dataframe.
+
+        x_value:
+        - "last": usa la ultima fila disponible
+        - cualquier valor del indice: usa esa fila
+        - entero fuera del indice: usa posicion iloc
+        """
+
+        db = self._select_df(df_idx=df_index)
+
+        if isinstance(tickers, str):
+            if tickers == "all":
+                tickers = db.columns.tolist()
+            else:
+                tickers = [tickers]
+
+        tickers = [t for t in tickers if t in db.columns]
+        if len(tickers) == 0:
+            raise ValueError("No hay tickers validos para graficar.")
+
+        db = db[tickers].copy()
+
+        if isinstance(labels, str):
+            labels = [labels]
+        elif labels is None:
+            labels = tickers.copy()
+        elif isinstance(labels, list) and len(labels) < len(tickers):
+            labels = labels + tickers[len(labels):]
+
+        if isinstance(colors, str):
+            colors = [colors]
+        elif not isinstance(colors, list):
+            colors = PALETA_COLORES.copy()
+
+        colors = [
+            colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
+            for i in range(len(tickers))
+        ]
+
+        ticker_to_label = {tickers[i]: labels[i] for i in range(len(tickers))}
+        ticker_to_color = {tickers[i]: colors[i] for i in range(len(tickers))}
+
+        if isinstance(x_value, str) and x_value == "last":
+            db_non_empty = db.dropna(how="all")
+            if db_non_empty.empty:
+                raise ValueError("No hay datos disponibles para graficar pie.")
+            serie = db_non_empty.iloc[-1]
+        else:
+            if x_value in db.index:
+                serie = db.loc[x_value, tickers]
+                if isinstance(serie, pd.DataFrame):
+                    serie = serie.iloc[-1]
+            elif isinstance(x_value, int):
+                serie = db.iloc[x_value]
+            else:
+                raise KeyError("x_value no existe en el indice del dataframe.")
+
+        serie = pd.to_numeric(serie, errors="coerce")
+        serie = serie.replace([np.inf, -np.inf], np.nan).dropna()
+
+        if serie.empty:
+            raise ValueError("La fila seleccionada no tiene valores numericos para graficar pie.")
+
+        if sort_values:
+            serie = serie.sort_values(ascending=False)
+
+        plot_tickers = serie.index.tolist()
+        plot_labels = [ticker_to_label.get(t, t) for t in plot_tickers]
+        plot_colors = [ticker_to_color.get(t, PALETA_COLORES[i % len(PALETA_COLORES)]) for i, t in enumerate(plot_tickers)]
+
+        self._ticker_label_color = [
+            (plot_tickers[i], plot_labels[i], plot_colors[i]) for i in range(len(plot_tickers))
+        ]
+
+        titles = titles if titles is not None else dict()
+        legend = legend if legend is not None else dict()
+        textprops = textprops if textprops is not None else dict()
+        wedgeprops = wedgeprops if wedgeprops is not None else dict()
+
+        if donut_width is not None:
+            wedgeprops["width"] = donut_width
+
+        if not hasattr(self, "_ax") or self._ax is None:
+            self.plot(figsize=figsize)
+
+        self._ax.clear()
+        self.set_titles(**titles)
+        if source:
+            self.add_source(source)
+
+        pie_out = self._ax.pie(
+            serie.values,
+            labels=plot_labels,
+            colors=plot_colors,
+            startangle=startangle,
+            counterclock=counterclock,
+            autopct=autopct,
+            pctdistance=pctdistance,
+            labeldistance=labeldistance,
+            textprops=textprops,
+            wedgeprops=wedgeprops,
+            normalize=normalize,
+        )
+
+        self._ax.axis("equal")
+
+        if text_edge_color is not None and text_edge_width and text_edge_width > 0:
+            for txt in pie_out[1]:
+                txt.set_path_effects([
+                    path_effects.withStroke(linewidth=text_edge_width, foreground=text_edge_color)
+                ])
+
+            if len(pie_out) > 2:
+                for txt in pie_out[2]:
+                    txt.set_path_effects([
+                        path_effects.withStroke(linewidth=text_edge_width, foreground=text_edge_color)
+                    ])
+
+        if legend.get("show", False):
+            _legend = legend.copy()
+            del _legend["show"]
+            if "loc" not in _legend:
+                _legend["loc"] = "center left"
+            if "bbox_to_anchor" not in _legend:
+                _legend["bbox_to_anchor"] = (1.02, 0.5)
+            self._ax.legend(pie_out[0], plot_labels, **_legend)
+
+        self._fig.subplots_adjust(
+            left=0.08,
+            right=0.88,
+            top=0.80,
+            bottom=0.18
+        )
+
     def graph_box_whiskers(
         self,
         # --- Configuración del gráfico ---
