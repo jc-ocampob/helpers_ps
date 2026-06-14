@@ -340,7 +340,6 @@ class Graph_base(Graph_meta_data):
         self._ax.yaxis.set_major_formatter(
             FuncFormatter(lambda x, pos: f"{x:{fmt}}")
         )
-
         self._ax.tick_params(axis='y', labelsize=fontsize)
 
         if tick_step is not None:
