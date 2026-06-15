@@ -2564,6 +2564,8 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         normalize: bool = True,
         text_edge_color: str | None = None,
         text_edge_width: float = 0.0,
+        label_color: str = "black",
+        autopct_color: str = "white",
     ) -> None:
         """
         Grafico de torta/donut para una foto puntual del dataframe.
@@ -2670,8 +2672,19 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             normalize=normalize,
         )
 
-        self._ax.axis("equal")
+        # labels (texto)
+        if len(pie_out) > 1:
+            for txt in pie_out[1]:
+                txt.set_color(label_color)
 
+        # porcentajes (números)
+        if len(pie_out) > 2:
+            for txt in pie_out[2]:
+                txt.set_color(autopct_color)
+                txt.set_fontweight("bold")
+
+        self._ax.axis("equal")
+        
         if text_edge_color is not None and text_edge_width and text_edge_width > 0:
             for txt in pie_out[1]:
                 txt.set_path_effects([
