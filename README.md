@@ -37,6 +37,7 @@ Funciones de addicionales en la grafica:
     .etiqueta_valor()        -> Para agregar etiqueta en puntos de referencia
     .punto_valor()           -> Para agregar scatter plot en puntos especificos
     .shade_x_periods()       -> Sombreo de area
+    .add_recessions()        -> Agrega sombreado de recesiones 
 
 ## Modulo Grafico.renderer
 

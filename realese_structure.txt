@@ -9,21 +9,21 @@ python -m build
 
 # 4. commit
 git add .
-git commit -m "Release v0.1.2"
+git commit -m "Release v0.1.3"
 
 # 5. push branch
 git push origin main
 
 # 6. create tag
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 
 
 # 7. Para instalaciones hacer lo siguiente reemplazando por la version v*
 pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.2"
 
 # Para instalaciones ignorando las dependencias del paquete
-pip install --no-deps "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.2"
+pip install --no-deps "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.3"
 
 # si es que la paqueteria ya esta instalada entonces usar la funcion de aquí
-pip install --upgrade "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.1"
+pip install --upgrade "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.1.3"

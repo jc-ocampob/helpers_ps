@@ -34,6 +34,7 @@ dependencies = [
   "tzdata>=2026.2",
   "xlsxwriter>=3.2.9",
   "xlwings>=0.33.6",
+  "xbbg>=1.2.7",
   "pywin32>=311; platform_system == 'Windows'"
 ]
 
