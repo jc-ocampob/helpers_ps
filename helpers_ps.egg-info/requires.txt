@@ -22,6 +22,7 @@ typing_extensions>=4.15.0
 tzdata>=2026.2
 xlsxwriter>=3.2.9
 xlwings>=0.33.6
+xbbg>=1.2.7
 
 [:platform_system == "Windows"]
 pywin32>=311

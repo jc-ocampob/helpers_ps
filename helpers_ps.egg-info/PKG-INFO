@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: helpers_ps
-Version: 0.1.4
+Version: 0.1.5
 Summary: Internal helper package
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
@@ -28,6 +28,7 @@ Requires-Dist: typing_extensions>=4.15.0
 Requires-Dist: tzdata>=2026.2
 Requires-Dist: xlsxwriter>=3.2.9
 Requires-Dist: xlwings>=0.33.6
+Requires-Dist: xbbg>=1.2.7
 Requires-Dist: pywin32>=311; platform_system == "Windows"
 
 # helpers_ps
@@ -69,6 +70,7 @@ Funciones de addicionales en la grafica:
     .etiqueta_valor()        -> Para agregar etiqueta en puntos de referencia
     .punto_valor()           -> Para agregar scatter plot en puntos especificos
     .shade_x_periods()       -> Sombreo de area
+    .add_recessions()        -> Agrega sombreado de recesiones 
 
 ## Modulo Grafico.renderer
 
