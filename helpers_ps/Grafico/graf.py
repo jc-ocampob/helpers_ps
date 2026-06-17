@@ -422,6 +422,8 @@ class Graph_base(Graph_meta_data):
             self,
             show: bool = False,
             loc: str = "upper left",
+            bbox_to_anchor: tuple = (0.5, -0.15),
+            ncol: int = 3,
             fontsize: int = 7,
             frameon: bool = True,
             edgecolor: str = "white",
@@ -431,6 +433,8 @@ class Graph_base(Graph_meta_data):
         if show:
             self._ax.legend(
                 loc=loc,
+                bbox_to_anchor=bbox_to_anchor,
+                ncol=ncol,
                 fontsize=fontsize,
                 frameon=frameon,
                 edgecolor=edgecolor,
@@ -609,7 +613,7 @@ class Graph_base(Graph_meta_data):
                 left=0.15,
                 right=0.93,
                 top=0.80,
-                bottom=0.18
+                bottom=0.30
             )
 
     # =========================
