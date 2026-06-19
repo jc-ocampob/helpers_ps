@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "helpers_ps"
-version = "0.2.1"
+version = "0.2.2"
 description = "Internal helper package"
 readme = "README.md"
 requires-python = ">=3.10"
