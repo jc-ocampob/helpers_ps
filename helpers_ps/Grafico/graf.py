@@ -782,7 +782,6 @@ class Graph_base(Graph_meta_data):
         if not hasattr(self, "_ax") or self._ax is None:
             raise RuntimeError("No axis found. Call graph_line/graph_bar first.")
 
-
         if isinstance(periods, tuple) and len(periods) == 2:
             periods = [periods]
 
@@ -792,6 +791,97 @@ class Graph_base(Graph_meta_data):
         used_label = False
         xlim = self._ax.get_xlim()
 
+        # ==========================================================
+        # Helpers locales para bar_mode="last"
+        # ==========================================================
+        def _collect_rects_for_idx(idx: int) -> list:
+            """
+            Devuelve todos los rectángulos válidos asociados a la categoría idx.
+            Funciona para barras simples, grouped y stacked.
+            """
+            rects = []
+
+            if not hasattr(self, "_bars_data") or not self._bars_data:
+                return rects
+
+            for entry in self._bars_data.values():
+                bars_obj = entry.get("bars")
+
+                # --- stacked
+                if isinstance(bars_obj, dict):
+                    for side in ("pos", "neg"):
+                        bars_side = bars_obj.get(side)
+                        if bars_side is None or idx >= len(bars_side):
+                            continue
+
+                        rect = bars_side[idx]
+                        if rect is None:
+                            continue
+
+                        try:
+                            h = rect.get_height()
+                        except Exception:
+                            h = None
+
+                        if h is None:
+                            continue
+
+                        try:
+                            if np.isnan(h):
+                                continue
+                        except Exception:
+                            pass
+
+                        rects.append(rect)
+
+                # --- grouped / single
+                else:
+                    if bars_obj is None or idx >= len(bars_obj):
+                        continue
+
+                    rect = bars_obj[idx]
+                    if rect is None:
+                        continue
+
+                    try:
+                        h = rect.get_height()
+                    except Exception:
+                        h = None
+
+                    if h is None:
+                        continue
+
+                    try:
+                        if np.isnan(h):
+                            continue
+                        # si quieres excluir barras vacías:
+                        # if abs(h) == 0:
+                        #     continue
+                    except Exception:
+                        pass
+
+                    rects.append(rect)
+
+            return rects
+
+        def _cluster_bounds(idx: int, default_half_width: float = 0.4) -> tuple[float, float]:
+            """
+            Obtiene los bordes izquierdo y derecho reales del cluster de barras
+            para la categoría idx.
+            """
+            rects = _collect_rects_for_idx(idx)
+
+            if not rects:
+                center = float(idx)
+                return center - default_half_width, center + default_half_width
+
+            left = min(r.get_x() for r in rects)
+            right = max(r.get_x() + r.get_width() for r in rects)
+            return float(left), float(right)
+
+        # ==========================================================
+        # Main
+        # ==========================================================
         for p in periods:
             if isinstance(p, dict):
                 start = p.get("start")
@@ -812,18 +902,34 @@ class Graph_base(Graph_meta_data):
                 xticklabels = [t.get_text() for t in self._ax.get_xticklabels()]
 
                 def _to_pos(val):
+                    # string => buscar en labels del eje
                     if isinstance(val, str):
                         if val not in xticklabels:
                             raise ValueError(f"{val} not found in x labels")
-                        return xticklabels.index(val)
+                        return int(xticklabels.index(val))
+
+                    # enteros => posición categórica
+                    if isinstance(val, (int, np.integer)):
+                        return int(val)
+
+                    # floats enteros => posición categórica
+                    if isinstance(val, (float, np.floating)) and float(val).is_integer():
+                        return int(val)
+
+                    # cualquier otro numérico fino => usar directo
                     return float(val)
 
-                x0 = float(_to_pos(start))
-                x1 = float(_to_pos(end))
+                p0 = _to_pos(start)
+                p1 = _to_pos(end)
 
-                width = bar_meta.get("width", 0.8)
-                x0 -= width / 2
-                x1 += width / 2
+                if isinstance(p0, (int, np.integer)) and isinstance(p1, (int, np.integer)):
+                    left0, right0 = _cluster_bounds(int(p0))
+                    left1, right1 = _cluster_bounds(int(p1))
+                    x0 = left0
+                    x1 = right1
+                else:
+                    x0 = float(p0)
+                    x1 = float(p1)
 
             else:
                 s = start
