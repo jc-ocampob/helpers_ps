@@ -2627,12 +2627,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 self.guias_horizontales(mostrar_cero=False)
 
             # --- 13. Agregar leyenda
-            if "show" not in legend:
-                if bar_mode == "last":
-                    legend["show"] = len(tickers) > 1 and (grouped or stacked)
-                else:
-                    legend["show"] = len(tickers) > 1
-
             self.add_legend(**legend)
 
             if bar_labels:
