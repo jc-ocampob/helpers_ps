@@ -320,6 +320,23 @@ class Graph_base(Graph_meta_data):
             self._x_axis_mode = "categorical"
         
         self._x_vals = x_vals
+
+        # layout adjust con el formato bbg
+        if self._x_axis_mode == "bbg":
+            self._fig.subplots_adjust(
+                left=0.15,
+                right=0.93,
+                top=0.80,
+                bottom=0.21
+            )
+        else:
+            self._fig.subplots_adjust(
+                left=0.15,
+                right=0.93,
+                top=0.80,
+                bottom=0.18
+            )
+        
         return dataframe
 
     def _prep_y_axis(
@@ -382,12 +399,12 @@ class Graph_base(Graph_meta_data):
 
     def add_source(
         self,
-        text="Source: ...",
-        x=0.02,
-        y=0.022,
-        fontsize=6,
-        color="#606060",
-        line_spacing=0.022,
+        text: str | list | None = None,
+        x: float = 0.02,
+        y: float = 0.022,
+        fontsize: float = 6,
+        color: str = "#606060",
+        line_spacing: float = 0.022,
     ):
         """
         Add source text at the bottom.
@@ -396,7 +413,9 @@ class Graph_base(Graph_meta_data):
         - string -> single line
         - list[str] -> multiple lines
         """
-
+        if text is None:
+            return None
+        
         if isinstance(text, str):
             lines = [text]
         else:
@@ -422,7 +441,7 @@ class Graph_base(Graph_meta_data):
             self,
             show: bool = False,
             loc: str = "upper left",
-            bbox_to_anchor: tuple = (0.5, -0.15),
+            bbox_to_anchor: tuple = None,
             ncol: int = 3,
             fontsize: int = 7,
             frameon: bool = True,
@@ -752,7 +771,7 @@ class Graph_base(Graph_meta_data):
             zorder=zorder
         )
 
-    def shade_x_periods(
+    def shade_x(
         self,
         periods,
         color="#B0B0B0",
@@ -988,7 +1007,7 @@ class Graph_base(Graph_meta_data):
                 hatch=hat
             )
 
-    def lineas_horizontales(
+    def horizontal_lines(
             self,
             y_values: list[float] | float | None = None,
             linestyle: str | None = None,
@@ -1034,7 +1053,7 @@ class Graph_base(Graph_meta_data):
         # agregar recesiones a la grafica
         date_list = [(f"{recesiones.loc[x,"start_date"]:%Y-%m-%d}", f"{recesiones.loc[x,"end_date"]:%Y-%m-%d}") for x in recesiones.index.tolist()]
         controles = controles if controles is not None else dict(color="grey", alpha=0.3)
-        self.shade_x_periods(periods=date_list, **controles)
+        self.shade_x(periods=date_list, **controles)
 
         return None
 
@@ -1072,28 +1091,17 @@ class Line_tags():
         def _generate(
                 ticker,
                 x_values: list[str | float | int] | str = "last",
-                template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
-                font_color: str = None,
-                fontsize: int = 7,
-                bg_color: str = "None",
                 show: str = "dot",       # dot = solo punto | dot_tag = punto + etiqueta | tag = solo etiqueta):
-                dot_color: str = None,
-                dot_size: int = 30,
-                dot_zorder: int = 5,
-                fontweight: str = "normal",
-                label_h_align="center",
-                label_v_align="center",
-                ubic_etq=(0, 17),
-                bg_alpha=1.0,
-                edge_color="none",
-                show_bbox=True,
-                text_edge_color: str | None = None,
-                text_edge_width: float = 0.0,
-                zorder=6,
+                template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
+                tag: dict | None =  None,
+                dot: dict | None = None,
         ):
             # Validar que es un ticker valido
             if ticker not in df.columns:
                 raise ValueError(f"El ticker {ticker} no es una columna disponible en el dataframe")
+            
+            tag = dict() if tag is None else tag
+            dot = dict() if dot is None else dot
             
             # obtener los valores referenciales en formato de list of tuple
             xy_pairs = []
@@ -1121,34 +1129,22 @@ class Line_tags():
                 x, y = pair
                 _ticker_label_color = [dd for dd in self._ticker_label_color if dd[0] == ticker]
                 if "tag" in show:
-                    font_color = _ticker_label_color[0][2] if font_color is None else font_color
+                    if tag.get("font_color") is None:
+                        tag["font_color"] = _ticker_label_color[0][2]
                     self.etiqueta_valor(
                         label=template.format(x_value=x, y_value=y, ticker=ticker),
                         x_value=x,          # datetime real para texto "Mar 26: 4.3"
                         y_value=y,
-                        ubic_etq=ubic_etq,
-                        bg_color=bg_color,
-                        font_color=font_color,
-                        fontsize=fontsize,
-                        fontweight=fontweight,
-                        bg_alpha=bg_alpha,
-                        edge_color=edge_color,
-                        show_bbox=show_bbox,
-                        text_edge_color=text_edge_color,
-                        text_edge_width=text_edge_width,
-                        zorder=zorder,
-                        label_h_align=label_h_align,
-                        label_v_align=label_v_align,
+                        **tag
                         )
                 
                 if "dot" in show:
-                    dot_color = _ticker_label_color[0][2] if dot_color is None else dot_color
+                    if dot.get("color") is None:
+                        dot["color"] = _ticker_label_color[0][2]
                     self.punto_valor(
                         x_value=x,
                         y_value=y,
-                        color=dot_color,
-                        size=dot_size,
-                        zorder=dot_zorder
+                        **dot
                     )
 
         for ti in control_dict.keys():
@@ -1984,7 +1980,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         figsize: tuple[float, float] = (6.00, 5.00),                        # Tamaño del grafico configuración general es (6,4.8) --> tamaño estandard
         # --- Configuración de los elementos adicionales del grafico
         titles: dict | None = None,                                         # titulo de la grafica
-        source: list[str] | str | None = None,                                          # Fuente de datos del grafico
+        source: dict | None = None,                                         # Fuente de datos del grafico
         # --- Configuración de df
         df_index: int = 0,                                                  # índice del dataframe a usar (en caso de tener varios)
         # --- Configuración de las series
@@ -2064,7 +2060,9 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         titles = titles if titles is not None else dict()
         y_axis = y_axis if y_axis is not None else dict()
         legend = legend if legend is not None else dict()
+        legend = legend if legend is not None else dict()
         hlines = hlines if hlines is not None else dict()
+        source = source if source is not None else dict()
 
         # --- 7. Generación del gráfico y el plot en caso no exista
         if not hasattr(self, "_ax") or self._ax is None:
@@ -2072,8 +2070,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
         # --- 8. Agregar titulos globales
         self.set_titles(**titles)
-        if source:
-            self.add_source(source)
+        self.add_source(**source)
 
         # --- 9. Manejo del eje x
         db = self._prep_x_axis(dataframe=db, **x_axis)
@@ -2105,7 +2102,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._prep_y_axis(**y_axis)
 
         # -- 13. Agregar lineas horizontales
-        self.lineas_horizontales(**hlines)
+        self.horizontal_lines(**hlines)
         
         # -- 14. Agregar guias horizontales
         if show_hguide:
@@ -2115,22 +2112,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # --- 15. Agregar leyenda
         self.add_legend(**legend)
 
-        # layout adjust con el formato bbg
-        if self._x_axis_mode == "bbg":
-            self._fig.subplots_adjust(
-                left=0.15,
-                right=0.93,
-                top=0.80,
-                bottom=0.21
-            )
-        else:
-            self._fig.subplots_adjust(
-                left=0.15,
-                right=0.93,
-                top=0.80,
-                bottom=0.18
-            )
-
     def graph_bar(
             self,
             # --- Configuración del grafico
@@ -2138,7 +2119,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
             # --- Configuración de los elementos adicionales del grafico
             titles: dict | None = None,
-            source: list[str] | str | None = None,
+            source: dict | None = None,
 
             # --- Configuración de df
             df_index: int = 0,
@@ -2230,6 +2211,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             x_axis = x_axis if x_axis is not None else dict()
             y_axis = y_axis if y_axis is not None else dict()
             titles = titles if titles is not None else dict()
+            source = source if source is not None else dict()
             legend = legend if legend is not None else dict()
             hlines = hlines if hlines is not None else dict()
             bar_labels = bar_labels if bar_labels is not None else dict()
@@ -2251,8 +2233,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
             # --- 9. Agregar títulos globales
             self.set_titles(**titles)
-            if source:
-                self.add_source(source)
+            self.add_source(**source)
 
             bars_data = {}
 
@@ -2620,7 +2601,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             self._prep_y_axis(**y_axis)
 
             # --- 11. Agregar lineas horizontales
-            self.lineas_horizontales(**hlines)
+            self.horizontal_lines(**hlines)
 
             # --- 12. Agregar guias horizontales
             if show_hguide:
@@ -2634,16 +2615,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
             if bar_tags:
                 self._bar_tag_generate_dict(tag_dict=bar_tags)
-
-
-            # --- 14. Ajuste de layout igual que graph_line
-            if self._x_axis_mode == "bbg":
-                self._fig.subplots_adjust(
-                    left=0.15,
-                    right=0.93,
-                    top=0.80,
-                    bottom=0.21
-                )
 
     def graph_pie(
         self,
@@ -3116,7 +3087,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # -----------------------
         # 7) Shared styling
         # -----------------------
-        self.lineas_horizontales(**hlines)
+        self.horizontal_lines(**hlines)
 
         if show_hguide:
             self.guias_horizontales(mostrar_cero=False)
