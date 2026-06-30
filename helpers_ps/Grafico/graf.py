@@ -70,6 +70,9 @@ class Graph_meta_data():
     _bar_grouped = None
     _bar_rects = None
 
+    # Meta data de leyenda
+    _custom_legend_handles: list = None
+
     def __post_init__(self):
         self.dataframe = [self.dataframe] if isinstance(self.dataframe, pd.DataFrame) else self.dataframe
 
@@ -77,6 +80,9 @@ class Graph_meta_data():
     def _set_axis(self, ax_index: int = 0) -> None:
         """
         Select active axis when working with multiple subplots.
+
+        Guarda la metadata del eje actual antes de cambiar al nuevo eje,
+        incluyendo custom legend handles por subplot.
         """
         if not hasattr(self, "_axes") or self._axes is None:
             raise RuntimeError("Axes not initialized. Call plot() first.")
@@ -86,44 +92,68 @@ class Graph_meta_data():
         
         if self._ax_idx == ax_index:
             raise ValueError(f"El subplot {ax_index} ya se encuenta seleccionado")
-        
-        #actualizar información en el _meta_data
-        self._meta_data[ax_index] = {
-                "dataframe": self._df_idx,
-                "xmeta": {
-                    "mode": self._x_axis_mode, 
-                    "fechas": self._x_axis_fechas,
-                    "x_vals": self._x_vals
-                },
-                "bar_mode": self._bar_mode,
-                "bar_stacked": self._bar_stacked,
-                "bar_grouped": self._bar_grouped,
-                "bar_rects": self._bar_rects,
-                "months": self._months,
-                "years": self._years,
-                "ticker_label_color": self._ticker_label_color
-            }
-        
-        # jalar la informacion del nuevo plot
-        self._df_idx = self._meta_data[ax_index]["dataframe"]
-        self._df = self.dataframe[self._df_idx]
 
-        self._x_axis_fechas = self._meta_data[ax_index]["xmeta"]["fechas"]
-        self._x_axis_mode = self._meta_data[ax_index]["xmeta"]["mode"]
-        self._x_vals = self._meta_data[ax_index]["xmeta"]["x_vals"]
-        self._months = self._meta_data[ax_index]["months"]
-        self._years = self._meta_data[ax_index]["years"]
+        # -------------------------------------------------
+        # 1. Guardar metadata del eje actual
+        # -------------------------------------------------
+        current_idx = self._ax_idx
 
-        self._bar_mode = self._meta_data[ax_index]["bar_mode"]
-        self._bar_stacked = self._meta_data[ax_index]["bar_stacked"]
-        self._bar_grouped = self._meta_data[ax_index]["bar_grouped"]
-        self._bar_rects = self._meta_data[ax_index]["bar_rects"]
-        
-        self._ticker_label_color = self._meta_data[ax_index]["ticker_label_color"]
+        self._meta_data[current_idx] = {
+            "dataframe": self._df_idx,
+            "xmeta": {
+                "mode": self._x_axis_mode, 
+                "fechas": self._x_axis_fechas,
+                "x_vals": self._x_vals
+            },
+            "bar_mode": self._bar_mode,
+            "bar_stacked": self._bar_stacked,
+            "bar_grouped": self._bar_grouped,
+            "bar_rects": self._bar_rects,
+            "months": self._months,
+            "years": self._years,
+            "ticker_label_color": self._ticker_label_color,
+            "custom_legend_handles": list(self._custom_legend_handles) if self._custom_legend_handles is not None else []
+        }
 
-        # Guardar el ax y jalar el nuevo
-        self._axes[self._ax_idx] = self._ax
+        # Guardar el axis actual dentro de la lista
+        self._axes[current_idx] = self._ax
+
+        # -------------------------------------------------
+        # 2. Cargar metadata del nuevo eje
+        # -------------------------------------------------
+        target_meta = self._meta_data[ax_index]
+
+        self._df_idx = target_meta["dataframe"]
+
+        if self._df_idx is not None:
+            self._df = self.dataframe[self._df_idx]
+        else:
+            self._df = None
+
+        self._x_axis_fechas = target_meta["xmeta"]["fechas"]
+        self._x_axis_mode = target_meta["xmeta"]["mode"]
+        self._x_vals = target_meta["xmeta"]["x_vals"]
+
+        self._months = target_meta["months"]
+        self._years = target_meta["years"]
+
+        self._bar_mode = target_meta["bar_mode"]
+        self._bar_stacked = target_meta["bar_stacked"]
+        self._bar_grouped = target_meta["bar_grouped"]
+        self._bar_rects = target_meta["bar_rects"]
+
+        self._ticker_label_color = target_meta["ticker_label_color"]
+
+        self._custom_legend_handles = list(
+            target_meta.get("custom_legend_handles", [])
+        )
+
+        # -------------------------------------------------
+        # 3. Activar nuevo eje
+        # -------------------------------------------------
+        self._ax_idx = ax_index
         self._ax = self._axes[ax_index]
+
         return None
 
     def _select_df(self, df_idx=0):
@@ -173,10 +203,15 @@ class Graph_meta_data():
                 "bar_rects": None,
                 "months": None,
                 "years": None,
-                "ticker_label_color": None
+                "ticker_label_color": None,
+                "custom_legend_handles": []
             }
             for i, ax in enumerate(self._axes)
         }
+
+        # Metadata activa del primer eje
+        self._custom_legend_handles = []
+
 
 class Graph_base(Graph_meta_data):
 
@@ -455,13 +490,36 @@ class Graph_base(Graph_meta_data):
 
         handles, labels = self._ax.get_legend_handles_labels()
 
-        if hasattr(self, "_custom_legend_handles"):
-            handles = handles + self._custom_legend_handles
-            labels = labels + [h.get_label() for h in self._custom_legend_handles]
+        custom_handles = getattr(self, "_custom_legend_handles", None)
+
+        if custom_handles:
+            handles = handles + custom_handles
+            labels = labels + [h.get_label() for h in custom_handles]
+
+        # -------------------------------------------------
+        # Evitar duplicados preservando orden
+        # -------------------------------------------------
+        final_handles = []
+        final_labels = []
+        seen = set()
+
+        for h, lab in zip(handles, labels):
+            if lab is None or lab == "" or lab.startswith("_"):
+                continue
+
+            if lab in seen:
+                continue
+
+            final_handles.append(h)
+            final_labels.append(lab)
+            seen.add(lab)
+
+        if len(final_handles) == 0:
+            return None
 
         self._ax.legend(
-            handles,
-            labels,
+            final_handles,
+            final_labels,
             loc=loc,
             bbox_to_anchor=bbox_to_anchor,
             ncol=ncol,
@@ -509,6 +567,7 @@ class Graph_base(Graph_meta_data):
             self._bar_meta = None
             self._months = None
             self._years = None
+            self._custom_legend_handles = None
 
     def plot(
         self,
