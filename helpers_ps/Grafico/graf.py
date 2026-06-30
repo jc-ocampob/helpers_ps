@@ -2907,7 +2907,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         figsize: tuple[float, float] = (6.00, 5.00),
         # --- Configuración de elementos adicionales ---
         titles: dict | None = None,
-        source: str | list[str] | None = None,
+        source: dict | None = None,
         # --- Configuración de df -----
         df_index: int = 0,                      # índice del dataframe a usar (en caso de tener varios)
         # --- Configuración de series ---
@@ -2997,6 +2997,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         titles = titles if titles is not None else dict()
         legend = legend if legend is not None else dict()
         hlines = hlines if hlines is not None else dict()
+        source = source if source is not None else dict()
 
         # --- 7. Generación del gráfico y el plot en caso no exista
         if not hasattr(self, "_ax") or self._ax is None:
@@ -3004,8 +3005,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
         # --- 8. Agregar titulos globales
         self.set_titles(**titles)
-        if source:
-            self.add_source(source)
+        self.add_source(**source)
 
         # --- 9. Manejo del eje x
         db = self._prep_x_axis(dataframe=db, **x_axis)
@@ -3208,12 +3208,3 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._prep_y_axis(**y_axis)
 
         self.add_legend(**legend)
-
-        # source
-        if isinstance(source, str):
-            self.add_source(source, color="#454444")
-        elif isinstance(source, list) and len(source) > 1:
-            self.add_source(source, fontsize=5, color="#454444")
-        elif isinstance(source, list) and len(source) <= 1:
-            self.add_source(source, color="#454444")
-
