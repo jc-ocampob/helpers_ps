@@ -449,17 +449,28 @@ class Graph_base(Graph_meta_data):
             facecolor: str = "white",
             framealpha: float = 0.6
     ) -> None:
-        if show:
-            self._ax.legend(
-                loc=loc,
-                bbox_to_anchor=bbox_to_anchor,
-                ncol=ncol,
-                fontsize=fontsize,
-                frameon=frameon,
-                edgecolor=edgecolor,
-                facecolor=facecolor,
-                framealpha=framealpha
-            )
+
+        if not show:
+            return None
+
+        handles, labels = self._ax.get_legend_handles_labels()
+
+        if hasattr(self, "_custom_legend_handles"):
+            handles = handles + self._custom_legend_handles
+            labels = labels + [h.get_label() for h in self._custom_legend_handles]
+
+        self._ax.legend(
+            handles,
+            labels,
+            loc=loc,
+            bbox_to_anchor=bbox_to_anchor,
+            ncol=ncol,
+            fontsize=fontsize,
+            frameon=frameon,
+            edgecolor=edgecolor,
+            facecolor=facecolor,
+            framealpha=framealpha
+        )
 
     # =========================
     # Metodos de la figura general
@@ -1086,22 +1097,31 @@ class Line_tags():
         if control_dict is None:
             return None
         df = self._df
+
+        if not hasattr(self, "_custom_legend_handles"):
+            self._custom_legend_handles = []
+
+        existing_labels = {h.get_label() for h in self._custom_legend_handles}
+
         
         # una vez validado la información generar los puntos en base a las variables de control
+
         def _generate(
                 ticker,
                 x_values: list[str | float | int] | str = "last",
-                show: str = "dot",       # dot = solo punto | dot_tag = punto + etiqueta | tag = solo etiqueta):
+                show: str = "dot",
                 template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
-                tag: dict | None =  None,
+                tag: dict | None = None,
                 dot: dict | None = None,
+                legend_label: str | None = None,
         ):
+
             # Validar que es un ticker valido
             if ticker not in df.columns:
                 raise ValueError(f"El ticker {ticker} no es una columna disponible en el dataframe")
             
-            tag = dict() if tag is None else tag
-            dot = dict() if dot is None else dot
+            tag = dict() if tag is None else tag.copy()
+            dot = dict() if dot is None else dot.copy()
             
             # obtener los valores referenciales en formato de list of tuple
             xy_pairs = []
@@ -1128,6 +1148,28 @@ class Line_tags():
             for pair in xy_pairs:
                 x, y = pair
                 _ticker_label_color = [dd for dd in self._ticker_label_color if dd[0] == ticker]
+
+                dot_color = dot.get("color")
+
+                if dot_color is None:
+                    dot_color = _ticker_label_color[0][2]
+
+                if legend_label is not None and legend_label not in existing_labels:
+                    self._custom_legend_handles.append(
+                        Line2D(
+                            [0],
+                            [0],
+                            marker="o",
+                            linestyle="None",
+                            color="none",
+                            markerfacecolor=dot_color,
+                            markeredgecolor=dot_color,
+                            markersize=np.sqrt(dot.get("size", 30)),
+                            label=legend_label,
+                        )
+                    )
+                    existing_labels.add(legend_label)
+
                 if "tag" in show:
                     if tag.get("font_color") is None:
                         tag["font_color"] = _ticker_label_color[0][2]
@@ -1880,47 +1922,125 @@ class BoxW_tags():
         
         if control_dict is None:
             return None
+
         df = self._df
         columns = df.columns.tolist()
-        # una vez validado la información generar los puntos en base a las variables de control
+
+        # ---------------------------------------------------------
+        # Custom legend handles para puntos de box & whiskers
+        # ---------------------------------------------------------
+        if not hasattr(self, "_custom_legend_handles"):
+            self._custom_legend_handles = []
+
+        existing_labels = {h.get_label() for h in self._custom_legend_handles}
+
         def _generate(
                 ticker,
                 x_values: list[str | float | int] | str = "last",
+                show: str = "dot",       # dot | tag | dot_tag
                 template: str = "{y_value:,.2f}",
-                font_color: str = None,
-                fontsize: int = 7,
-                bg_color: str = "None",
-                show: str = "dot",       # dot = solo punto | dot_tag = punto + etiqueta | tag = solo etiqueta):
-                dot_color: str = None,
-                dot_size: int = 30,
-                dot_zorder: int = 5,
-                fontweight: str = "normal",
-                label_h_align="center",
-                label_v_align="center",
-                ubic_etq=(20, 0),
-                bg_alpha=1.0,
-                edge_color="none",
-                show_bbox=True,
-                text_edge_color: str | None = None,
-                text_edge_width: float = 0.0,
-                zorder=6,
+                tag: dict | None = None,
+                dot: dict | None = None,
+                legend_label: str | None = None,
+                legend_marker: str = "o",
         ):
-            # Validar que es un ticker valido
+            """
+            Genera puntos y/o etiquetas sobre un box & whiskers.
+
+            Estructura esperada:
+            {
+                "grupo_1": {
+                    "ticker": "SPX",
+                    "x_values": "last",
+                    "show": "dot_tag",
+                    "template": "{y_value:,.1f}",
+                    "legend_label": "Último valor",
+                    "dot": {
+                        "color": "#E4572E",
+                        "size": 45,
+                        "zorder": 8
+                    },
+                    "tag": {
+                        "ubic_etq": (20, 0),
+                        "fontsize": 7,
+                        "bg_color": "white",
+                        "edge_color": "#D9D9D9",
+                        "show_bbox": True
+                    }
+                }
+            }
+            """
+
+            # -----------------------------------------------------
+            # Validaciones
+            # -----------------------------------------------------
             if ticker not in columns:
                 raise ValueError(f"El ticker {ticker} no es una columna disponible en el dataframe")
             
-            # sacar el valor z de la serie para el caso de box
+            tag = dict() if tag is None else tag.copy()
+            dot = dict() if dot is None else dot.copy()
+
+            # Posición categórica del boxplot
             z_value = columns.index(ticker) + 1
-            
-            # obtener los valores referenciales en formato de list of tuple
+
+            # Color base del ticker
+            _ticker_label_color = [dd for dd in self._ticker_label_color if dd[0] == ticker]
+
+            if len(_ticker_label_color) == 0:
+                raise ValueError(f"No se encontró metadata de color para el ticker {ticker}")
+
+            ticker_color = _ticker_label_color[0][2]
+
+            # -----------------------------------------------------
+            # Defaults heredados para tag y dot
+            # -----------------------------------------------------
+            if tag.get("font_color") is None:
+                tag["font_color"] = ticker_color
+
+            if dot.get("color") is None:
+                dot["color"] = ticker_color
+
+            if dot.get("size") is None:
+                dot["size"] = 30
+
+            if dot.get("zorder") is None:
+                dot["zorder"] = 5
+
+            # -----------------------------------------------------
+            # Handle artificial para leyenda, sin tocar punto_valor
+            # -----------------------------------------------------
+            if legend_label is not None and legend_label not in existing_labels:
+
+                self._custom_legend_handles.append(
+                    Line2D(
+                        [0],
+                        [0],
+                        marker=legend_marker,
+                        linestyle="None",
+                        color="none",
+                        markerfacecolor=dot.get("color"),
+                        markeredgecolor=dot.get("color"),
+                        markersize=np.sqrt(dot.get("size", 30)),
+                        label=legend_label,
+                    )
+                )
+
+                existing_labels.add(legend_label)
+
+            # -----------------------------------------------------
+            # Resolver pares x/y/z
+            # -----------------------------------------------------
             xyz_pairs = []
+
             if isinstance(x_values, str) and x_values == "last":
                 last_x_value = df.tail(1)
                 last_x_value = last_x_value.index.tolist()[0]
                 last_value_y = df.loc[last_x_value, ticker].item()
                 xyz_pairs.append((last_x_value, last_value_y, z_value))
+
             elif isinstance(x_values, list):
-                for i in x_values: 
+                for i in x_values:
+
                     if isinstance(i, str) and i == "last":
                         last_x_value = df.tail(1)
                         last_x_value = last_x_value.index.tolist()[0]
@@ -1931,40 +2051,33 @@ class BoxW_tags():
                     _val_x = i
                     _val_y = df.loc[i, ticker].item()
                     xyz_pairs.append((_val_x, _val_y, z_value))
-            
-            # con los pares xy generarlo en el grafico
+
+            else:
+                raise ValueError("x_values debe ser 'last' o una lista de valores del índice.")
+
+            # -----------------------------------------------------
+            # Graficar puntos y/o etiquetas
+            # -----------------------------------------------------
             for pair in xyz_pairs:
                 x, y, z = pair
-                _ticker_label_color = [dd for dd in self._ticker_label_color if dd[0] == ticker]
+
                 if "tag" in show:
-                    font_color = _ticker_label_color[0][2] if font_color is None else font_color
                     self.etiqueta_valor(
-                        label=template.format(x_value=x, y_value=y, ticker=ticker),
-                        x_value=z,          # datetime real para texto "Mar 26: 4.3"
+                        label=template.format(
+                            x_value=x,
+                            y_value=y,
+                            ticker=ticker
+                        ),
+                        x_value=z,
                         y_value=y,
-                        ubic_etq=ubic_etq,
-                        bg_color=bg_color,
-                        font_color=font_color,
-                        fontsize=fontsize,
-                        fontweight=fontweight,
-                        bg_alpha=bg_alpha,
-                        edge_color=edge_color,
-                        show_bbox=show_bbox,
-                        text_edge_color=text_edge_color,
-                        text_edge_width=text_edge_width,
-                        zorder=zorder,
-                        label_h_align=label_h_align,
-                        label_v_align=label_v_align,
-                        )
-                
+                        **tag
+                    )
+
                 if "dot" in show:
-                    dot_color = _ticker_label_color[0][2] if dot_color is None else dot_color
                     self.punto_valor(
                         x_value=z,
                         y_value=y,
-                        color=dot_color,
-                        size=dot_size,
-                        zorder=dot_zorder
+                        **dot
                     )
 
         for ti in control_dict.keys():
@@ -3093,6 +3206,8 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             self.guias_horizontales(mostrar_cero=False)
 
         self._prep_y_axis(**y_axis)
+
+        self.add_legend(**legend)
 
         # source
         if isinstance(source, str):
