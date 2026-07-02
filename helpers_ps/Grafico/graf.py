@@ -28,7 +28,6 @@ warnings.filterwarnings("ignore")
 # Rebuild font cache
 fm._load_fontmanager(try_read_cache=False)
 
-locale.setlocale(locale.LC_TIME, "es_ES.UTF-8")
 mpl.rcParams["axes.formatter.use_locale"] = True
 
 # Set matplotlib theme for all graphics
