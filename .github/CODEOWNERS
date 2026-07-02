@@ -1,0 +1,14 @@
+
+# Framework gráfico
+helpers_ps/Grafico/* @jc-ocampob
+
+# Documentación
+docs/* @jc-ocampob
+
+# Notebook oficial
+Demo_Graphs.ipynb @jc-ocampob
+
+# Archivos principales
+README.md @jc-ocampob
+mkdocs.yml @jc-ocampob
+CHANGELOG.md @jc-ocampob
