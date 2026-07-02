@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,10 +29,14 @@ jobs:
           pip install -e .
           pip install -r requirements-docs.txt
 
+      - name: Verify import
+        run: |
+          python -c "from helpers_ps.Grafico.graf import Graph_mtplt; print(Graph_mtplt)"
+
       - name: Build documentation
         run: |
-          mkdocs build --clean
+          mkdocs build --clean --verbose
 
       - name: Deploy documentation
         run: |
-          mkdocs gh-deploy --force
+          mkdocs gh-deploy --force --verbose
