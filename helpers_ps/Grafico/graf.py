@@ -3526,3 +3526,34 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._prep_y_axis(**y_axis)
 
         self.add_legend(**legend)
+
+def _box_whiskers_label_create(self, control_dict: dict | None = None):
+        """
+        Genera etiquetas de valor para los boxplots y whiskers.
+
+        control_dict: dict con configuraciones de estilo para las etiquetas.
+        """
+        if control_dict is None:
+            control_dict = {}
+
+        # Configuración por defecto
+        default_config = {
+            "label_h_align": "center",
+            "label_v_align": "center",
+            "ubic_etq": (0, 10),
+            "fontsize": 8,
+            "fontweight": "bold",
+            "font_color": "black",
+            "bg_color": "None",
+            "bg_alpha": 1.0,
+            "edge_color": "None",
+            "show_bbox": True,
+            "zorder": 20,
+            "fmt": ",.1f",
+            "show": True,
+        }
+
+        # Actualizar configuración con la proporcionada
+        config = {**default_config, **control_dict}
+
+        # Aquí se implementaría la lógica para generar las etiquetas según la configuración.
