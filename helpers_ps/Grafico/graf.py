@@ -3526,3 +3526,28 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._prep_y_axis(**y_axis)
 
         self.add_legend(**legend)
+
+def _box_whiskers_label_generate(self, control_dict: dict | None = None):
+    """
+    Genera etiquetas de valor para los boxplots.
+
+    control_dict: dict con las configuraciones de las etiquetas
+    """
+    if control_dict is None:
+        return
+
+    show = control_dict.get("show", False)
+    if not show:
+        return
+
+    # iterar sobre los tickers y generar etiquetas
+    for i, t in enumerate(self._ticker_label_color):
+        ticker, label, color = t
+        s = self._select_df(df_idx=0)[ticker].dropna()
+        stat_val = float(s.mean())
+        self.etiqueta_valor(
+            x_value=i + 1,
+            y_value=stat_val,
+            label=f"{stat_val:.2f}",
+            **control_dict
+        )
