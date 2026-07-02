@@ -1252,11 +1252,40 @@ class Line_tags():
             _temp_controls = control_dict[ti]
             _generate(**_temp_controls)
 
-class Bar_tags():
+class Bar_tags:
+    """
+    Mixin con utilidades para agregar etiquetas, tags y anotaciones sobre gráficos de barras.
+
+    Esta clase depende de metadata generada previamente por `graph_bar`, principalmente:
+    - self._bars_data: almacena los objetos BarContainer/rectángulos por ticker.
+    - self._bars_x_reference: almacena los valores originales del eje x.
+    - self._ticker_label_color: relación ticker, etiqueta visible y color.
+
+    Soporta barras:
+    - simples
+    - agrupadas
+    - stacked con componentes positivos y negativos
+    - modo time
+    - modo last/categórico
+    """
 
     def _bar_x_key_normalize(self, value):
         """
-        Normaliza fechas/categorías para comparación consistente.
+        Normaliza valores del eje x para comparaciones consistentes.
+
+        Convierte fechas compatibles a `pd.Timestamp`. Si no puede convertir el valor,
+        lo transforma a string. Esto permite comparar de forma robusta fechas, strings
+        y categorías al resolver `x_values`.
+
+        Parameters
+        ----------
+        value : Any
+            Valor del eje x a normalizar.
+
+        Returns
+        -------
+        pd.Timestamp | str
+            Valor normalizado.
         """
         try:
             if isinstance(value, (pd.Timestamp, np.datetime64)):
@@ -1265,54 +1294,100 @@ class Bar_tags():
         except Exception:
             return str(value)
 
-    def _bar_resolve_x_indices(self, ticker: str, x_values) -> list[int]:
+    def _bar_resolve_x_indices(self, ticker: str, x_values) -> list:
         """
-        Resuelve x_values a posiciones enteras del eje x usando self._bars_x_reference.
+        Resuelve valores del eje x a posiciones enteras dentro del gráfico de barras.
 
-        x_values soporta:
-        - "all"
-        - "last"
-        - lista/tupla/set de fechas/categorías
+        Soporta:
+        - "all": todas las posiciones.
+        - "last": última barra no vacía del ticker.
+        - lista/tupla/set: valores específicos del índice original.
+
+        Parameters
+        ----------
+        ticker : str
+            Columna/ticker objetivo.
+        x_values : str | list | tuple | set
+            Valores a resolver. Puede ser "all", "last" o una colección de valores.
+
+        Returns
+        -------
+        list[int]
+            Lista de posiciones enteras del eje x.
+
+        Raises
+        ------
+        ValueError
+            Si no existe metadata de barras o si `x_values` tiene formato inválido.
         """
         if not hasattr(self, "_bars_x_reference"):
-            raise ValueError("No existe self._bars_x_reference. Guarda la referencia del eje x dentro de graph_bar.")
+            raise ValueError(
+                "No existe self._bars_x_reference. Guarda la referencia del eje x dentro de graph_bar."
+            )
 
         x_ref = list(self._bars_x_reference)
         x_ref_norm = [self._bar_x_key_normalize(v) for v in x_ref]
+
+        if x_values is None:
+            x_values = "last"
 
         if x_values == "all":
             return list(range(len(x_ref)))
 
         if x_values == "last":
             bars_entry = self._bars_data.get(ticker)
+
             if bars_entry is None:
                 return []
 
             for idx in range(len(x_ref) - 1, -1, -1):
-                rect, _mode = self._bar_get_rect_for_index(bars_entry=bars_entry, idx=idx)
+                rect, _mode = self._bar_get_rect_for_index(
+                    bars_entry=bars_entry,
+                    idx=idx
+                )
+
                 if rect is None:
                     continue
 
                 h = rect.get_height()
+
                 if h is not None and not np.isnan(h) and abs(h) > 0:
                     return [idx]
 
             return [len(x_ref) - 1] if len(x_ref) > 0 else []
 
         if not isinstance(x_values, (list, tuple, set)):
-            raise ValueError("x_values debe ser 'all', 'last' o una lista/tupla/set de fechas/categorías.")
+            raise ValueError(
+                "x_values debe ser 'all', 'last' o una lista/tupla/set de fechas/categorías."
+            )
 
         requested = {self._bar_x_key_normalize(v) for v in x_values}
-        return [i for i, v in enumerate(x_ref_norm) if v in requested]
+
+        return [
+            i for i, v in enumerate(x_ref_norm)
+            if v in requested
+        ]
 
     def _bar_get_rect_for_index(self, bars_entry: dict, idx: int):
         """
-        Retorna el rectángulo útil para un ticker en la posición idx.
+        Obtiene el rectángulo asociado a un ticker y una posición del eje x.
 
-        Retorna:
-        - (rect, "grouped") si bars_entry["bars"] es BarContainer
-        - (rect, "stacked") si bars_entry["bars"] es {"pos":..., "neg":...}
-        - (None, mode) si no hay rectángulo válido
+        Para barras grouped/simples retorna directamente el rectángulo.
+        Para barras stacked revisa primero el segmento positivo y luego el negativo.
+
+        Parameters
+        ----------
+        bars_entry : dict
+            Entrada de `self._bars_data` para un ticker.
+        idx : int
+            Posición del eje x.
+
+        Returns
+        -------
+        tuple
+            `(rect, mode)` donde:
+            - rect es el Rectangle de matplotlib o None.
+            - mode es "grouped" o "stacked".
         """
         bars_obj = bars_entry["bars"]
 
@@ -1333,10 +1408,20 @@ class Bar_tags():
             h_pos = rect_pos.get_height() if rect_pos is not None else 0.0
             h_neg = rect_neg.get_height() if rect_neg is not None else 0.0
 
-            if rect_pos is not None and h_pos is not None and not np.isnan(h_pos) and abs(h_pos) > 0:
+            if (
+                rect_pos is not None
+                and h_pos is not None
+                and not np.isnan(h_pos)
+                and abs(h_pos) > 0
+            ):
                 return rect_pos, "stacked"
 
-            if rect_neg is not None and h_neg is not None and not np.isnan(h_neg) and abs(h_neg) > 0:
+            if (
+                rect_neg is not None
+                and h_neg is not None
+                and not np.isnan(h_neg)
+                and abs(h_neg) > 0
+            ):
                 return rect_neg, "stacked"
 
             return None, "stacked"
@@ -1349,13 +1434,27 @@ class Bar_tags():
 
     def _bar_get_stack_total_anchor(self, idx: int, ref_ticker: str):
         """
-        Obtiene el ancla del total del stack en la posición idx.
+        Calcula la posición de anclaje para etiquetar el total de un stack.
 
-        Retorna:
-        - x
-        - y_anchor
-        - total_value
-        - sign ("positive" | "negative")
+        Suma todos los componentes positivos y negativos de una posición.
+        El ancla se coloca arriba del stack positivo si el total es positivo,
+        o abajo del stack negativo si el total es negativo.
+
+        Parameters
+        ----------
+        idx : int
+            Posición del eje x.
+        ref_ticker : str
+            Ticker usado como referencia para obtener la posición x del stack.
+
+        Returns
+        -------
+        tuple
+            `(x, y_anchor, total_value, sign)` donde:
+            - x: posición horizontal del stack.
+            - y_anchor: punto vertical donde se ancla el tag.
+            - total_value: suma total del stack.
+            - sign: "positive" o "negative".
         """
         if ref_ticker not in self._bars_data:
             return None, None, None, None
@@ -1364,13 +1463,18 @@ class Bar_tags():
         top_positive = 0.0
         bottom_negative = 0.0
 
-        # --- usar un rect de referencia para obtener x
-        ref_rect, ref_mode = self._bar_get_rect_for_index(self._bars_data[ref_ticker], idx)
+        ref_rect, ref_mode = self._bar_get_rect_for_index(
+            self._bars_data[ref_ticker],
+            idx
+        )
+
         if ref_rect is None:
             return None, None, None, None
 
         if ref_mode != "stacked":
-            raise ValueError("El total del stack solo aplica cuando el gráfico es stacked.")
+            raise ValueError(
+                "El total del stack solo aplica cuando el gráfico es stacked."
+            )
 
         x = ref_rect.get_x() + ref_rect.get_width() / 2.0
 
@@ -1391,15 +1495,23 @@ class Bar_tags():
 
             if rect_pos is not None:
                 h = rect_pos.get_height()
+
                 if h is not None and not np.isnan(h):
                     total_value += h
-                    top_positive = max(top_positive, rect_pos.get_y() + rect_pos.get_height())
+                    top_positive = max(
+                        top_positive,
+                        rect_pos.get_y() + rect_pos.get_height()
+                    )
 
             if rect_neg is not None:
                 h = rect_neg.get_height()
+
                 if h is not None and not np.isnan(h):
                     total_value += h
-                    bottom_negative = min(bottom_negative, rect_neg.get_y() + rect_neg.get_height())
+                    bottom_negative = min(
+                        bottom_negative,
+                        rect_neg.get_y() + rect_neg.get_height()
+                    )
 
         if total_value >= 0:
             return x, top_positive, total_value, "positive"
@@ -1407,17 +1519,43 @@ class Bar_tags():
         return x, bottom_negative, total_value, "negative"
 
     def _bar_format_template(
-            self,
-            template: str,
-            ticker: str,
-            x_value,
-            y_value: float | None = None,
-            total_value: float | None = None,
-            label: str | None = None
-        ) -> str:
+        self,
+        template: str,
+        ticker: str,
+        x_value,
+        y_value: float | None = None,
+        total_value: float | None = None,
+        label: str | None = None
+    ) -> str:
         """
-        Formatea template con placeholders estilo:
-        {ticker}, {label}, {x_value}, {y_value}, {total_value}
+        Formatea el texto de una etiqueta/tag de barras.
+
+        Placeholders disponibles:
+        - {ticker}
+        - {label}
+        - {x_value}
+        - {y_value}
+        - {total_value}
+
+        Parameters
+        ----------
+        template : str
+            Template de texto.
+        ticker : str
+            Ticker original.
+        x_value : Any
+            Valor original del eje x.
+        y_value : float | None
+            Valor de la barra o segmento.
+        total_value : float | None
+            Total del stack, si aplica.
+        label : str | None
+            Etiqueta visible asociada al ticker.
+
+        Returns
+        -------
+        str
+            Texto formateado.
         """
         return template.format(
             ticker=ticker,
@@ -1427,246 +1565,109 @@ class Bar_tags():
             total_value=total_value
         )
 
-    def _bar_value_label_generate_dict(self, label_dict: dict | None = None) -> None:
+    def _bar_label_generate_dict(self, label_dict: dict | None = None) -> None:
         """
-        Genera etiquetas numéricas sobre barras usando una configuración tipo dict.
+        Genera etiquetas y tags sobre barras usando una única configuración tipo dict.
 
-        Comportamiento:
-        - grouped / single: etiqueta al final de la barra
-        - stacked: etiqueta al centro del segmento del ticker seleccionado
+        Esta función reemplaza y combina:
+        - `_bar_value_label_generate_dict`
+        - `_bar_tag_generate_dict`
 
-        Estructura esperada de label_dict:
-        {
-            "1": dict(
-                ticker="PX_LAST-SPX INDEX",
-                x_values=["last", pd.Timestamp("2025-12-31")],   # o "all" o "last"
-                template="{y_value:,.0f}",
-                fontsize=7,
-                font_color="black",
-                fontweight="normal",
-                bbox=None,
-                pad_points=2,
-                zorder=6
-            ),
-            "2": dict(
-                ticker="PX_LAST-RUO INDEX",
-                x_values=[pd.Timestamp("2023-12-31")],
-                template="{y_value:,.0f}",
-                fontsize=7,
-                font_color="blue",
-                fontweight="bold"
-            )
-        }
-        """
-
-        if not label_dict:
-            return
-
-        if not hasattr(self, "_bars_data") or not self._bars_data:
-            raise ValueError("No existe self._bars_data. Ejecuta graph_bar antes de usar este helper.")
-
-        # label -> ticker
-        ticker_to_label = {}
-        if hasattr(self, "_ticker_label_color"):
-            for t, lbl, _c in self._ticker_label_color:
-                ticker_to_label[t] = lbl
-
-        x_ref = list(self._bars_x_reference)
-
-        def _control(
-                ticker: str | None = None,
-                x_values: list[str | int | float] | str | None = None,
-                template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
-                font_color: str = "black",
-                fontsize: int = 7,
-                bg_color: str = "None",
-                fontweight: str = "normal",
-                label_h_align="center",
-                label_v_align="center",
-                ubic_etq=(0, 0),
-                bg_alpha=1.0,
-                edge_color="none",
-                show_bbox=True,
-                text_edge_color: str | None = None,
-                text_edge_width: float = 0.0,
-                zorder=6,
-
-        ):
-            # Funcion para controlar el dictionario de input
-            if not ticker:
-                return None
-
-            if ticker not in self._bars_data.keys():
-                return None
-
-            idxs = self._bar_resolve_x_indices(ticker=ticker, x_values=x_values)
-
-            for idx in idxs:
-                rect, mode = self._bar_get_rect_for_index(
-                    bars_entry=self._bars_data[ticker],
-                    idx=idx
-                )
-
-                if rect is None:
-                    continue
-
-                h = rect.get_height()
-                if h is None or np.isnan(h) or abs(h) == 0:
-                    continue
-
-                x = rect.get_x() + rect.get_width() / 2.0
-                x_value = x_ref[idx]
-                label = ticker_to_label.get(ticker, ticker)
-
-                text = self._bar_format_template(
-                    template=template,
-                    ticker=ticker,
-                    x_value=x_value,
-                    y_value=h,
-                    total_value=None,
-                    label=label
-                )
-
-                # --- stacked: centro del segmento
-                if mode == "stacked":
-                    y = rect.get_y() + rect.get_height() / 2.0
-                    
-                    self.etiqueta_valor(
-                        x_value = x_value,
-                        y_value = y,
-                        label=text,
-                        ubic_etq=ubic_etq,
-                        bg_color=bg_color,
-                        font_color=font_color,
-                        fontsize=fontsize,
-                        fontweight=fontweight,
-                        bg_alpha=bg_alpha,
-                        edge_color=edge_color,
-                        show_bbox=show_bbox,
-                        text_edge_color=text_edge_color,
-                        text_edge_width=text_edge_width,
-                        zorder=zorder,
-                        label_h_align=label_h_align,
-                        label_v_align=label_v_align,
-                    )
-
-                # --- grouped / single: final de la barra
-                else:
-                    y_end = rect.get_y() + rect.get_height()
-                    
-                    if h >= 0:
-                        local_va = "bottom" if label_v_align == "center" else label_v_align
-                        local_offset = (ubic_etq[0], abs(ubic_etq[1]))
-                    else:
-                        local_va = "top" if label_v_align == "center" else label_v_align
-                        local_offset = (ubic_etq[0], -abs(ubic_etq[1]))
-                    
-                    self.etiqueta_valor(
-                        x_value = x,
-                        y_value = y_end,
-                        label=text,
-                        ubic_etq=local_offset,
-                        bg_color=bg_color,
-                        font_color=font_color,
-                        fontsize=fontsize,
-                        fontweight=fontweight,
-                        bg_alpha=bg_alpha,
-                        edge_color=edge_color,
-                        show_bbox=show_bbox,
-                        text_edge_color=text_edge_color,
-                        text_edge_width=text_edge_width,
-                        zorder=zorder,
-                        label_h_align=label_h_align,
-                        label_v_align=local_va,
-                    )            
-
-        for _key, cfg in label_dict.items():
-            _control(**label_dict[_key])
-            
-    def _bar_tag_generate_dict(self, tag_dict: dict | None = None) -> None:
-        """
-        Genera tags sobre barras usando una configuración tipo dict.
-
-        show soporta:
-        - "bar_tag"      -> tag al centro de la barra / segmento
-        - "stack_total"  -> tag sobre el total del stack (solo si stacked)
+        Tipos soportados mediante `show`:
+        - "value_label":
+            Etiqueta numérica estándar.
+            En barras grouped/simples se ubica al final de la barra.
+            En barras stacked se ubica al centro del segmento.
+        - "bar_tag":
+            Tag libre al centro de la barra o segmento.
+        - "stack_total":
+            Tag sobre el total del stack. Solo aplica para gráficos stacked.
 
         Estructura esperada:
         {
-            "1": dict(
+            "etiqueta_1": dict(
                 ticker="PX_LAST-SPX INDEX",
-                x_values=["last", pd.Timestamp("2025-12-31")],
-                template="hola",
-                show="bar_tag",
-                fontsize=7,
-                font_color="black",
-                fontweight="normal",
-                bbox=dict(
-                    boxstyle="round,pad=0.2",
-                    facecolor="white",
-                    edgecolor="#BFBFBF",
-                    alpha=0.95
-                ),
-                zorder=7
-            ),
-            "2": dict(
-                ticker="PX_LAST-SPX INDEX",
-                x_values=[pd.Timestamp("2025-12-31")],
-                template="{total_value:,.0f}",
-                show="stack_total",
-                fontsize=7,
-                font_color="black"
+                x_values="last",                    # "last", "all" o lista de valores
+                show="value_label",                 # value_label | bar_tag | stack_total
+                template="{y_value:,.1f}",
+                tag=dict(
+                    fontsize=7,
+                    font_color="black",
+                    fontweight="normal",
+                    bg_color="white",
+                    edge_color="#D9D9D9",
+                    show_bbox=True,
+                    ubic_etq=(0, 5),
+                    zorder=7
+                )
             )
         }
-        """
 
-        if not tag_dict:
-            return
+        Parameters
+        ----------
+        label_dict : dict | None
+            Diccionario de configuración de etiquetas/tags.
+
+        Returns
+        -------
+        None
+        """
+        if not label_dict:
+            return None
 
         if not hasattr(self, "_bars_data") or not self._bars_data:
-            raise ValueError("No existe self._bars_data. Ejecuta graph_bar antes de usar este helper.")
+            raise ValueError(
+                "No existe self._bars_data. Ejecuta graph_bar antes de usar este helper."
+            )
 
-        # ticker -> label
         ticker_to_label = {}
-        if hasattr(self, "_ticker_label_color"):
+
+        if hasattr(self, "_ticker_label_color") and self._ticker_label_color is not None:
             for t, lbl, _c in self._ticker_label_color:
                 ticker_to_label[t] = lbl
 
         x_ref = list(self._bars_x_reference)
 
+        def _safe_offset(tag: dict, default: tuple[float, float]) -> tuple[float, float]:
+            """
+            Obtiene `ubic_etq` de forma segura.
+            """
+            ubic = tag.get("ubic_etq", default)
+
+            if ubic is None:
+                return default
+
+            return ubic
+
         def _control(
-                ticker: str | None = None,
-                show: dict = "stalked_total", 
-                x_values: list[str | int | float] | str | None = None,
-                template: str = "{ticker}\n{x_value:%B-%Y}: {y_value:,.2f}",
-                font_color: str = "black",
-                fontsize: int = 7,
-                bg_color: str = "None",
-                fontweight: str = "normal",
-                label_h_align="center",
-                label_v_align="center",
-                ubic_etq=(0, 0),
-                bg_alpha=1.0,
-                edge_color="none",
-                show_bbox=True,
-                text_edge_color: str | None = None,
-                text_edge_width: float = 0.0,
-                zorder=6,
+            ticker: str | None = None,
+            show: str = "value_label",
+            x_values: list[str | int | float] | str | None = "last",
+            template: str = "{y_value:,.2f}",
+            tag: dict | None = None,
         ):
+            """
+            Procesa una entrada individual del diccionario de configuración.
+            """
             if not ticker:
                 return None
 
-            if ticker not in self._bars_data.keys():
+            if ticker not in self._bars_data:
                 return None
 
-            idxs = self._bar_resolve_x_indices(ticker=ticker, x_values=x_values)
+            tag = dict() if tag is None else tag.copy()
+
+            idxs = self._bar_resolve_x_indices(
+                ticker=ticker,
+                x_values=x_values
+            )
 
             for idx in idxs:
                 x_value = x_ref[idx]
                 label = ticker_to_label.get(ticker, ticker)
 
                 # ======================================================
-                # stack_total -> total del stack
+                # 1. TAG SOBRE TOTAL DEL STACK
                 # ======================================================
                 if show == "stack_total":
                     x, y_anchor, total_value, sign = self._bar_get_stack_total_anchor(
@@ -1687,35 +1688,25 @@ class Bar_tags():
                     )
 
                     if sign == "positive":
-                        va = "bottom"
-                        ubic_etq = (ubic_etq[0], ubic_etq[1] + 5)
+                        tag["label_v_align"] = tag.get("label_v_align", "bottom")
+                        ox, oy = _safe_offset(tag, (0, 5))
+                        tag["ubic_etq"] = (ox, abs(oy))
                     else:
-                        va = "top"
-                        ubic_etq = (ubic_etq[0], ubic_etq[1] - 10)
+                        tag["label_v_align"] = tag.get("label_v_align", "top")
+                        ox, oy = _safe_offset(tag, (0, -5))
+                        tag["ubic_etq"] = (ox, -abs(oy))
 
                     self.etiqueta_valor(
-                        x_value = x,
-                        y_value = y_anchor,
-                        label = text,
-                        ubic_etq=ubic_etq,
-                        bg_color=bg_color,
-                        font_color=font_color,
-                        fontsize=fontsize,
-                        fontweight=fontweight,
-                        bg_alpha=bg_alpha,
-                        edge_color=edge_color,
-                        show_bbox=show_bbox,
-                        text_edge_color=text_edge_color,
-                        text_edge_width=text_edge_width,
-                        zorder=zorder,
-                        label_h_align=label_h_align,
-                        label_v_align=label_v_align,
+                        x_value=x,
+                        y_value=y_anchor,
+                        label=text,
+                        **tag
                     )
 
                     continue
 
                 # ======================================================
-                # bar_tag -> centro de barra / segmento
+                # 2. VALUE LABEL O BAR TAG SOBRE BARRA / SEGMENTO
                 # ======================================================
                 rect, mode = self._bar_get_rect_for_index(
                     bars_entry=self._bars_data[ticker],
@@ -1726,11 +1717,13 @@ class Bar_tags():
                     continue
 
                 h = rect.get_height()
+
                 if h is None or np.isnan(h) or abs(h) == 0:
                     continue
 
                 x = rect.get_x() + rect.get_width() / 2.0
-                y = rect.get_y() + rect.get_height() / 2.0
+                y_segment_center = rect.get_y() + rect.get_height() / 2.0
+                y_end = rect.get_y() + rect.get_height()
 
                 text = self._bar_format_template(
                     template=template,
@@ -1741,27 +1734,125 @@ class Bar_tags():
                     label=label
                 )
 
-                self.etiqueta_valor(
-                        x_value = x,
-                        y_value = y,
-                        label = text,
-                        ubic_etq=ubic_etq,
-                        bg_color=bg_color,
-                        font_color=font_color,
-                        fontsize=fontsize,
-                        fontweight=fontweight,
-                        bg_alpha=bg_alpha,
-                        edge_color=edge_color,
-                        show_bbox=show_bbox,
-                        text_edge_color=text_edge_color,
-                        text_edge_width=text_edge_width,
-                        zorder=zorder,
-                        label_h_align=label_h_align,
-                        label_v_align=label_v_align,
+                # ------------------------------------------------------
+                # 2A. Etiqueta numérica estándar
+                # ------------------------------------------------------
+                if show == "value_label":
+                    # stacked: centro del segmento
+                    if mode == "stacked":
+                        ox, oy = _safe_offset(tag, (0, 0))
+                        tag["ubic_etq"] = (ox, oy)
+
+                        self.etiqueta_valor(
+                            x_value=x,
+                            y_value=y_segment_center,
+                            label=text,
+                            **tag
+                        )
+
+                    # grouped/single: final de la barra
+                    else:
+                        if h >= 0:
+                            tag["label_v_align"] = tag.get("label_v_align", "bottom")
+                            ox, oy = _safe_offset(tag, (0, 3))
+                            tag["ubic_etq"] = (ox, abs(oy))
+                        else:
+                            tag["label_v_align"] = tag.get("label_v_align", "top")
+                            ox, oy = _safe_offset(tag, (0, -3))
+                            tag["ubic_etq"] = (ox, -abs(oy))
+
+                        self.etiqueta_valor(
+                            x_value=x,
+                            y_value=y_end,
+                            label=text,
+                            **tag
+                        )
+
+                    continue
+
+                # ------------------------------------------------------
+                # 2B. Tag libre al centro de barra / segmento
+                # ------------------------------------------------------
+                if show == "bar_tag":
+                    ox, oy = _safe_offset(tag, (0, 0))
+                    tag["ubic_etq"] = (ox, oy)
+
+                    self.etiqueta_valor(
+                        x_value=x,
+                        y_value=y_segment_center,
+                        label=text,
+                        **tag
                     )
 
-        for _key, cfg in tag_dict.items():
-            _control(**tag_dict[_key])
+                    continue
+
+                raise ValueError(
+                    "show debe ser uno de: 'value_label', 'bar_tag', 'stack_total'."
+                )
+
+        for _key, cfg in label_dict.items():
+            _control(**cfg)
+
+    # ---------------------------------------------------------------------
+    # Backward compatibility wrappers
+    # ---------------------------------------------------------------------
+    def _bar_value_label_generate_dict(self, label_dict: dict | None = None) -> None:
+        """
+        Wrapper de compatibilidad para código antiguo.
+
+        Convierte internamente cada entrada a `show='value_label'` y delega
+        la ejecución a `_bar_label_generate_dict`.
+
+        Parameters
+        ----------
+        label_dict : dict | None
+            Configuración antigua de etiquetas de valor.
+
+        Returns
+        -------
+        None
+        """
+        if not label_dict:
+            return None
+
+        new_dict = {}
+
+        for k, cfg in label_dict.items():
+            cfg_new = cfg.copy()
+            cfg_new.setdefault("show", "value_label")
+            new_dict[k] = cfg_new
+
+        return self._bar_label_generate_dict(new_dict)
+
+    def _bar_tag_generate_dict(self, tag_dict: dict | None = None) -> None:
+        """
+        Wrapper de compatibilidad para código antiguo.
+
+        Mantiene la lógica antigua de `bar_tags`, pero delega el trabajo a
+        `_bar_label_generate_dict`.
+
+        Si una entrada no trae `show`, se asume `show='bar_tag'`.
+
+        Parameters
+        ----------
+        tag_dict : dict | None
+            Configuración antigua de tags de barras.
+
+        Returns
+        -------
+        None
+        """
+        if not tag_dict:
+            return None
+
+        new_dict = {}
+
+        for k, cfg in tag_dict.items():
+            cfg_new = cfg.copy()
+            cfg_new.setdefault("show", "bar_tag")
+            new_dict[k] = cfg_new
+
+        return self._bar_label_generate_dict(new_dict)
 
 class Pie_tags():
 
@@ -2314,7 +2405,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
             # --- Etiquetas de valores
             bar_labels: dict | None = None,
-            bar_tags: dict | None = None,
 
             # --- Configuración Leyenda
             legend: dict | None = None,
@@ -2387,7 +2477,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             legend = legend if legend is not None else dict()
             hlines = hlines if hlines is not None else dict()
             bar_labels = bar_labels if bar_labels is not None else dict()
-            bar_tags = bar_tags if bar_tags is not None else dict()
 
 
             # --- 7. Generación del gráfico y el plot en caso no exista
@@ -2785,8 +2874,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             if bar_labels:
                 self._bar_value_label_generate_dict(label_dict=bar_labels)
 
-            if bar_tags:
-                self._bar_tag_generate_dict(tag_dict=bar_tags)
 
     def graph_pie(
         self,

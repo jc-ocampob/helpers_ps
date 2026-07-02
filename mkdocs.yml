@@ -1,0 +1,57 @@
+site_name: Helpers PS
+site_description: Documentación interna del paquete Helpers PS
+site_author: Equipo de Soluciones de Portafolio
+
+theme:
+  name: material
+  language: es
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.code.select
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Inicio: index.md
+  - Getting Started: getting_started.md
+  - Quick Reference: quick_reference.md
+  - Graph Line: graph_line.md
+  - Graph Bar: graph_bar.md
+  - Graph Pie: graph_pie.md
+  - Graph Box Whiskers: graph_box_whiskers.md
+  - Ejemplos:
+      - Línea último valor: examples/line_last_value.md
+      - Barras stacked: examples/bar_stacked.md
+      - Box Whiskers: examples/box_whiskers.md
+  - API Reference: api_reference.md
