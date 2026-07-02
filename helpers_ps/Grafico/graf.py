@@ -1314,10 +1314,13 @@ class Line_tags():
                 ticker: ticker en cuestion,
                 x_values: lista de valores x sobre el que se quiere poner el punto / punto y tag / tag
                 template: plantilla de tag con disponibles ticker, x_value, y_value
-                loc_offset: offset para el tag relativo al punto original
-                font_color: color de la fuente
-                font_size: tamaño de la fuente
-                bg_color: color de fondo del tag
+                tag :{
+                    loc_offset: offset para el tag relativo al punto original
+                    font_color: color de la fuente
+                    font_size: tamaño de la fuente
+                    bg_color: color de fondo del tag
+                }
+                    
                 show: dot / tag / dot_tag
                 dot_color: color del punto
                 dot_size: tamaño del punto
