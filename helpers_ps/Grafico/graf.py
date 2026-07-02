@@ -408,7 +408,7 @@ class Graph_base(Graph_meta_data):
         """
         Función para poder agregar titulos y subtitulos a las gráficas
 
-        Parametros
+        Parameters
         -----------
         title: str | None
             Titulo principal de la grafica
@@ -457,7 +457,7 @@ class Graph_base(Graph_meta_data):
         """
         Agrega la fuente al grafico
 
-        Parametros
+        Parameters
         -----------
         text: str | list | None
             Texto de la fuente. Puede ser un string o una lista de strings (como máximo 3 elementos en la lista).
@@ -511,7 +511,7 @@ class Graph_base(Graph_meta_data):
         """
         Función para agregar leyenda a la gráfica si se llama de despues de ingresar nuevos scatters y elementos a la leyenda estos se graficaran en la leyenda.
 
-        Parametros
+        Parameters
         -----------
         show: bool
             Indica si se debe mostrar la leyenda o no.
@@ -598,7 +598,7 @@ class Graph_base(Graph_meta_data):
         """
         Guarda la figura actual en un dict de buffers en memoria como BytesIO. Esto permite almacenar múltiples figuras en memoria sin escribirlas en disco.
 
-        Parametros
+        Parameters
         -----------
         dir: dict
             Diccionario donde se guardará la figura. Por defecto es el diccionario global 'buffers'.
@@ -644,35 +644,42 @@ class Graph_base(Graph_meta_data):
         wspace: float | None = None
     ) -> None:
         """
-        Función para crear una figura y ejes (subplots) con opciones de personalización.
+        Agrega título y subtítulo a nivel de figura.
 
-        Parametros
-        -----------
-        figsize: tuple
-            Tamaño de la figura (ancho, alto) en pulgadas.
-        color: str
-            Color de la las lineas para el estilo research.
-        lw: float
-            Ancho de la las lineas para el estilo research.
-        nrows: int
-            Número de filas de subplots.
-        ncols: int
-            Número de columnas de subplots.
-        sharex: bool
-            Compartir eje x entre subplots.
-        sharey: bool
-            Compartir eje y entre subplots.
-        dpi: int | None
-            Resolución de la imagen.
-        height_ratios: list[float] | None
-            Proporciones de altura para los subplots.
-        width_ratios: list[float] | None
-            Proporciones de ancho para los subplots.
-        hspace: float | None
-            Espacio vertical entre subplots.
-        wspace: float | None
-            Espacio horizontal entre subplots.
+        Este método limpia el título propio del eje activo y agrega el título
+        principal y subtítulo usando coordenadas relativas a la figura. Esto
+        permite mantener una ubicación consistente para todos los gráficos.
+
+        Parameters
+        ----------
+        title : str or None, default None
+            Título principal del gráfico. Si es ``None`` o vacío, no se agrega
+            título principal.
+
+        title_font_size : int, default 12
+            Tamaño de fuente del título principal.
+
+        subtitle : str or None, default None
+            Subtítulo del gráfico. Si es ``None`` o vacío, no se agrega subtítulo.
+
+        subtitle_font_size : int, default 9
+            Tamaño de fuente del subtítulo.
+
+        Returns
+        -------
+        None
+            Modifica la figura activa agregando texto a nivel de figura.
+
+        Examples
+        --------
+        ```python
+        g.set_titles(
+            title="Evolución del S&P 500",
+            subtitle="Índice en puntos"
+        )
+        ```
         """
+
 
         # -------------------------------------------------
         # 1. Crear figura + axes
@@ -824,7 +831,7 @@ class Graph_base(Graph_meta_data):
         """
         Función para agregar etiquetas a los graficos que maneja de manera automatica cualquier tipo de eje x
         
-        Parametros
+        Parameters
         -----------
         x_value: float | str | datetime
             Valor en el eje x donde se colocará la etiqueta.
@@ -925,7 +932,7 @@ class Graph_base(Graph_meta_data):
         """
         Función para agregar un punto en el gráfico que maneja de manera automatica cualquier tipo de eje x
 
-        Parametros
+        Parameters
         -----------
         x_value: float | str | datetime
             Valor en el eje x donde se colocará el punto.
@@ -985,7 +992,7 @@ class Graph_base(Graph_meta_data):
         """
         Función para agregar un sombreado vertical en el gráfico que maneja de manera automatica cualquier tipo de eje x.
 
-        Parametros
+        Parameters
         -----------
         periods: list[tuple] | tuple
             Lista de tuplas (start, end) que definen los periodos a sombrear. Cada tupla puede contener valores de fecha, string o numéricos.
@@ -1226,7 +1233,7 @@ class Graph_base(Graph_meta_data):
         """
         Función para agregar líneas horizontales en el gráfico.
 
-        Parametros
+        Parameters
         -----------
         y_values: list[float] | float | None
             Lista de valores y donde se dibujarán las líneas horizontales. Si es un solo valor, se convertirá en una lista.
@@ -1258,7 +1265,7 @@ class Graph_base(Graph_meta_data):
         """
         Función para agregar recesiones a la gráfica. Se puede elegir el país y si se desea obtener el DataFrame de recesiones en lugar de graficarlas.
 
-        Parametros
+        Parameters
         -----------
         country: str
             Nombre del país para el cual se desean agregar las recesiones. Por defecto es "United States".
