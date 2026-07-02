@@ -212,7 +212,6 @@ class Graph_meta_data():
         # Metadata activa del primer eje
         self._custom_legend_handles = []
 
-
 class Graph_base(Graph_meta_data):
 
     # =========================
@@ -1121,7 +1120,7 @@ class Graph_base(Graph_meta_data):
         recesiones = recesiones[recesiones["country"] == country].copy()
         
         # agregar recesiones a la grafica
-        date_list = [(f"{recesiones.loc[x,"start_date"]:%Y-%m-%d}", f"{recesiones.loc[x,"end_date"]:%Y-%m-%d}") for x in recesiones.index.tolist()]
+        date_list = [(recesiones.loc[x,"start_date"].strftime("%Y-%m-%d"), recesiones.loc[x,"end_date"].strftime("%Y-%m-%d")) for x in recesiones.index.tolist()]
         controles = controles if controles is not None else dict(color="grey", alpha=0.3)
         self.shade_x(periods=date_list, **controles)
 
