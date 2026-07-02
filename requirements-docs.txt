@@ -2,3 +2,8 @@ mkdocs-material
 mkdocstrings[python]
 mkdocs-autorefs
 mkdocs-jupyter
+pandas
+numpy
+matplotlib
+openpyxl
+python-pptx
