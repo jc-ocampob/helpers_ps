@@ -2,11 +2,7 @@
 
 Esta página genera documentación automática a partir de los docstrings del código.
 
-> Ajustar el path si la clase `Graph_mtplt` se encuentra en otro módulo.
-
-```python
-from helpers_ps.Grafico.graf import Graph_mtplt
-```
+> Esta referencia usa `mkdocstrings`. El path debe coincidir exactamente con el módulo donde están definidas las clases.
 
 ## Graph_mtplt
 
