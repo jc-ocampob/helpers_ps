@@ -405,6 +405,21 @@ class Graph_base(Graph_meta_data):
         subtitle: str | None = None,
         subtitle_font_size: int = 9
     ) -> None:
+        """
+        Función para poder agregar titulos y subtitulos a las gráficas
+
+        Parametros
+        -----------
+        title: str | None
+            Titulo principal de la grafica
+        title_font_size: int
+            Tamaño de fuente del titulo principal
+        subtitle: str | None
+            Subtitulo de la grafica
+        subtitle_font_size: int
+            Tamaño de fuente del subtitulo
+        """
+        
         # eliminar title del axis
         self._ax.set_title("")
 
@@ -440,11 +455,22 @@ class Graph_base(Graph_meta_data):
         line_spacing: float = 0.022,
     ):
         """
-        Add source text at the bottom.
+        Agrega la fuente al grafico
 
-        Supports:
-        - string -> single line
-        - list[str] -> multiple lines
+        Parametros
+        -----------
+        text: str | list | None
+            Texto de la fuente. Puede ser un string o una lista de strings (como máximo 3 elementos en la lista).
+        x: float
+            Posición horizontal de la fuente en coordenadas de la figura (0 a 1).
+        y: float
+            Posición vertical de la fuente en coordenadas de la figura (0 a 1).
+        fontsize: float
+            Tamaño de fuente de la fuente.
+        color: str
+            Color del texto de la fuente.
+        line_spacing: float
+            Espaciado entre líneas de la fuente.
         """
         if text is None:
             return None
@@ -482,6 +508,30 @@ class Graph_base(Graph_meta_data):
             facecolor: str = "white",
             framealpha: float = 0.6
     ) -> None:
+        """
+        Función para agregar leyenda a la gráfica si se llama de despues de ingresar nuevos scatters y elementos a la leyenda estos se graficaran en la leyenda.
+
+        Parametros
+        -----------
+        show: bool
+            Indica si se debe mostrar la leyenda o no.
+        loc: str
+            Ubicación de la leyenda.
+        bbox_to_anchor: tuple
+            Ancla para la posición de la leyenda.
+        ncol: int
+            Número de columnas en la leyenda.
+        fontsize: int
+            Tamaño de fuente de la leyenda.
+        frameon: bool
+            Indica si se debe mostrar el marco de la leyenda.
+        edgecolor: str
+            Color del borde de la leyenda.
+        facecolor: str
+            Color de fondo de la leyenda.
+        framealpha: float
+            Transparencia del marco de la leyenda.
+        """
 
         if not show:
             return None
@@ -533,7 +583,7 @@ class Graph_base(Graph_meta_data):
     # =========================
     def show(self) -> None:
         """
-        Si la figura existe va a mostrarlo.
+        Funcion para mostrar la figura.
         """
         if self._fig:
             return self._fig.show()
@@ -546,7 +596,18 @@ class Graph_base(Graph_meta_data):
         reset_buffers: bool = True
     ):
         """
-        Guarda la figura actual en memoria
+        Guarda la figura actual en un dict de buffers en memoria como BytesIO. Esto permite almacenar múltiples figuras en memoria sin escribirlas en disco.
+
+        Parametros
+        -----------
+        dir: dict
+            Diccionario donde se guardará la figura. Por defecto es el diccionario global 'buffers'.
+        name: str
+            Nombre con el que se guardará la figura en el diccionario.
+        dpi: int
+            Resolución de la imagen guardada.
+        reset_buffers: bool
+            Indica si se deben reiniciar los buffers y metadata de la clase después de guardar la figura.
         """
         buf = io.BytesIO()
         self._fig.savefig(buf, format="png", dpi=dpi)   # use figure-level save
@@ -583,14 +644,34 @@ class Graph_base(Graph_meta_data):
         wspace: float | None = None
     ) -> None:
         """
-        Base plot creator.
+        Función para crear una figura y ejes (subplots) con opciones de personalización.
 
-        Supports:
-        - single axis (default)
-        - multiple subplots
-        - custom GridSpec layout via height_ratios / width_ratios / hspace / wspace
-
-        Keeps backward compatibility with existing code.
+        Parametros
+        -----------
+        figsize: tuple
+            Tamaño de la figura (ancho, alto) en pulgadas.
+        color: str
+            Color de la las lineas para el estilo research.
+        lw: float
+            Ancho de la las lineas para el estilo research.
+        nrows: int
+            Número de filas de subplots.
+        ncols: int
+            Número de columnas de subplots.
+        sharex: bool
+            Compartir eje x entre subplots.
+        sharey: bool
+            Compartir eje y entre subplots.
+        dpi: int | None
+            Resolución de la imagen.
+        height_ratios: list[float] | None
+            Proporciones de altura para los subplots.
+        width_ratios: list[float] | None
+            Proporciones de ancho para los subplots.
+        hspace: float | None
+            Espacio vertical entre subplots.
+        wspace: float | None
+            Espacio horizontal entre subplots.
         """
 
         # -------------------------------------------------
@@ -707,6 +788,9 @@ class Graph_base(Graph_meta_data):
     # Metodos de as etiquetas, guias y sombras
     # =========================
     def guias_horizontales(self, mostrar_cero=True):
+        """
+        Dibujar guías horizontales en el eje y del gráfico activo. Se puede elegir si mostrar o no la línea en y=0.
+        """
         self._ax.yaxis.grid(
             True,
             linestyle='--',
@@ -720,26 +804,60 @@ class Graph_base(Graph_meta_data):
 
     def etiqueta_valor(
         self,
-        x_value,
-        y_value,
-        label,
-        label_h_align="center",
-        label_v_align="center",
-        ubic_etq=(0, 17),
-        fontsize=7,
-        fontweight="normal",
-        font_color="black",
-        bg_color="#ECEFF1",
-        bg_alpha=1.0,
-        edge_color="none",
-        show_bbox=True,
+        x_value: float | str | pd.Timestamp,
+        y_value: float,
+        label: str,
+        label_h_align: str ="center",
+        label_v_align: str ="center",
+        ubic_etq: tuple =(0, 17),
+        fontsize: int =7,
+        fontweight: str ="normal",
+        font_color: str ="black",
+        bg_color: str = "#ECEFF1",
+        bg_alpha: float = 1.0,
+        edge_color: str = "none",
+        show_bbox: bool = True,
         text_edge_color: str | None = None,
         text_edge_width: float = 0.0,
-        zorder=6,
+        zorder: int = 6,
     ):
         """
-        Adds a label at (x_value, y_value), handling any x type and
-        allowing full control of styling.
+        Función para agregar etiquetas a los graficos que maneja de manera automatica cualquier tipo de eje x
+        
+        Parametros
+        -----------
+        x_value: float | str | datetime
+            Valor en el eje x donde se colocará la etiqueta.
+        y_value: float
+            Valor en el eje y donde se colocará la etiqueta.
+        label: str
+            Texto de la etiqueta.
+        label_h_align: str
+            Alineación horizontal del texto de la etiqueta ('left', 'center', 'right').
+        label_v_align: str
+            Alineación vertical del texto de la etiqueta ('top', 'center', 'bottom').
+        ubic_etq: tuple
+            Desplazamiento de la etiqueta en puntos (x_offset, y_offset) desde (x_value, y_value).
+        fontsize: int
+            Tamaño de la fuente del texto de la etiqueta.
+        fontweight: str
+            Peso de la fuente del texto de la etiqueta.
+        font_color: str
+            Color del texto de la etiqueta.
+        bg_color: str
+            Color de fondo de la etiqueta.
+        bg_alpha: float
+            Transparencia del fondo de la etiqueta (0.0 a 1.0).
+        edge_color: str
+            Color del borde del fondo de la etiqueta.
+        show_bbox: bool
+            Indica si se debe mostrar el fondo de la etiqueta.
+        text_edge_color: str | None
+            Color del borde del texto de la etiqueta para mejorar la legibilidad sobre fondos ocupados. Si es None, no se aplica borde.
+        text_edge_width: float
+            Ancho del borde del texto de la etiqueta. Si es 0, no se aplica borde.
+        zorder: int
+            Orden de apilamiento de la etiqueta en el gráfico. Valores más altos se dibujan encima de valores más bajos.
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -805,7 +923,20 @@ class Graph_base(Graph_meta_data):
         zorder=5
     ):
         """
-        Adds a point at (x_value, y_value), handling any x type.
+        Función para agregar un punto en el gráfico que maneja de manera automatica cualquier tipo de eje x
+
+        Parametros
+        -----------
+        x_value: float | str | datetime
+            Valor en el eje x donde se colocará el punto.
+        y_value: float
+            Valor en el eje y donde se colocará el punto.
+        color: str
+            Color del punto.
+        size: float
+            Tamaño del punto.
+        zorder: int
+            Orden de apilamiento del punto en el gráfico. Valores más altos se dibujan encima de valores más bajos.
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -852,18 +983,28 @@ class Graph_base(Graph_meta_data):
         clip_to_xlim=True,
     ):
         """
-        Shade vertical regions on the active axis.
+        Función para agregar un sombreado vertical en el gráfico que maneja de manera automatica cualquier tipo de eje x.
 
-        Compatible with:
-        - line charts
-        - bar charts (time-series and snapshot)
-        - BBG format
-        - datetime / numeric / categorical axes
-
-        periods:
-        - tuple(start, end)
-        - list of tuples [(start, end), ...]
-        - list of dicts with full control
+        Parametros
+        -----------
+        periods: list[tuple] | tuple
+            Lista de tuplas (start, end) que definen los periodos a sombrear. Cada tupla puede contener valores de fecha, string o numéricos.
+        color: str
+            Color del sombreado.
+        alpha: float
+            Transparencia del sombreado (0.0 a 1.0).
+        zorder: int
+            Orden de apilamiento del sombreado en el gráfico. Valores más altos se dibujan encima de valores más bajos.
+        label: str | None
+            Etiqueta para el sombreado, que puede aparecer en la leyenda.
+        hatch: str | None
+            Patrón de sombreado (hatch) para el área sombreada.
+        ymin: float
+            Valor mínimo en el eje y para el sombreado.
+        ymax: float
+            Valor máximo en el eje y para el sombreado.
+        clip_to_xlim: bool
+            Indica si el sombreado debe recortarse a los límites actuales del eje x.
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -1082,6 +1223,20 @@ class Graph_base(Graph_meta_data):
             linewidth: float = 0.5,
             color: str = "gray",
     ) -> None:
+        """
+        Función para agregar líneas horizontales en el gráfico.
+
+        Parametros
+        -----------
+        y_values: list[float] | float | None
+            Lista de valores y donde se dibujarán las líneas horizontales. Si es un solo valor, se convertirá en una lista.
+        linestyle: str | None
+            Estilo de línea para las líneas horizontales (por ejemplo, '-', '--', '-.', ':'). Si es None, se usará el estilo predeterminado.
+        linewidth: float
+            Ancho de línea para las líneas horizontales.
+        color: str
+            Color de las líneas horizontales.
+        """
         if y_values is None:
             return None
 
@@ -1100,6 +1255,18 @@ class Graph_base(Graph_meta_data):
             data_frame: bool = False,
             controles: dict = None
     ):
+        """
+        Función para agregar recesiones a la gráfica. Se puede elegir el país y si se desea obtener el DataFrame de recesiones en lugar de graficarlas.
+
+        Parametros
+        -----------
+        country: str
+            Nombre del país para el cual se desean agregar las recesiones. Por defecto es "United States".
+        data_frame: bool
+            Si es True, la función devolverá un DataFrame con las recesiones en lugar de graficarlas. Por defecto es False.
+        controles: dict
+            Diccionario de controles para personalizar el sombreado de las recesiones. Herada todos los parametros de shade_x. Por defecto es None, lo que aplicará color gris y alpha 0.3.
+        """
         csv_path = files("helpers_ps").joinpath("Data/recessions.csv")
         recesiones = pd.read_csv(csv_path, parse_dates=["start_date", "end_date"])
         recesiones = recesiones.set_index("recesion_id")

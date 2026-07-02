@@ -27,11 +27,7 @@ pd.DataFrame
 o una lista de dataframes:
 
 ```python
-[
-    df_1,
-    df_2,
-    df_3
-]
+[ df_1, df_2, df_3,]
 ```
 
 ---
