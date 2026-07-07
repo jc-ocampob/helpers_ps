@@ -7,18 +7,14 @@ Esta página genera documentación automática a partir de los docstrings del c�
 ```python
 from helpers_ps.Grafico.graf import Graph_mtplt
 
-::: helpers_ps.Grafico.graf.Graph_mtplt
 
-::: helpers_ps.Grafico.graf.Graph_base
+# Graph_mplt
 
-
-::: helpers_ps.Grafico.graf.Line_tags
-
-
-::: helpers_ps.Grafico.graf.Bar_tags
-
-
-::: helpers_ps.Grafico.graf.Pie_tags
-
-
-::: helpers_ps.Grafico.graf.BoxW_tags
+::: helpers_ps.Grafico.graf.Graph_mplt
+    options:
+      inherited_members: false
+      members:
+        - graph_line
+        - graph_bar
+        - graph_pie
+        - graph_box_whiskers
