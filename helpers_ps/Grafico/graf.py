@@ -500,6 +500,7 @@ class Graph_base(Graph_meta_data):
             title="Evolución del S&P 500",
             subtitle="Índice en puntos"
         )
+        ```
         """
         
         # eliminar title del axis
@@ -583,6 +584,7 @@ class Graph_base(Graph_meta_data):
                 "Elaboración propia."
             ]
         )
+        ```
         """
         if text is None:
             return None
@@ -672,6 +674,7 @@ class Graph_base(Graph_meta_data):
             bbox_to_anchor=(0.5, -0.15),
             ncol=4
         )
+        ```
         """
 
         if not show:
@@ -780,6 +783,7 @@ class Graph_base(Graph_meta_data):
         ```python
         g.save(name="grafico_rendimiento")
         img_buffer = buffers["grafico_rendimiento"]
+        ```
         """
         buf = io.BytesIO()
         self._fig.savefig(buf, format="png", dpi=dpi)   # use figure-level save
@@ -876,6 +880,7 @@ class Graph_base(Graph_meta_data):
             height_ratios=[2, 1],
             hspace=0.15
         )
+        ```
         """
         # -------------------------------------------------
         # 1. Crear figura + axes
@@ -1011,6 +1016,7 @@ class Graph_base(Graph_meta_data):
         --------
         ```python
         g.guias_horizontales(mostrar_cero=False)
+        ```
         """
 
         self._ax.yaxis.grid(
@@ -1125,6 +1131,7 @@ class Graph_base(Graph_meta_data):
             bg_color="white",
             edge_color="#D9D9D9"
         )
+        ```
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -1231,6 +1238,7 @@ class Graph_base(Graph_meta_data):
             color="#E4572E",
             size=45
         )
+        ```
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -1344,6 +1352,7 @@ class Graph_base(Graph_meta_data):
             alpha=0.25,
             label="Periodo de estrés"
         )
+        ```
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -1594,6 +1603,7 @@ class Graph_base(Graph_meta_data):
             linestyle="--",
             color="gray"
         )
+        ```
         """
         if y_values is None:
             return None
@@ -2921,6 +2931,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             y_axis=dict(fmt=",.0f"),
             legend=dict(show=True)
         )
+        ```
         """
 
         # --- 1. Importación y setteo del dataframe 
@@ -3150,6 +3161,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 y_axis=dict(fmt=",.1%"),
                 legend=dict(show=True)
             )
+            ```
             """
 
             # --- 1. Importación y setteo del dataframe
@@ -3600,7 +3612,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             if bar_labels:
                 self._bar_value_label_generate_dict(label_dict=bar_labels)
 
-
     def graph_pie(
         self,
         figsize: tuple[float, float] = (6.00, 5.00),
@@ -3739,6 +3750,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             titles=dict(title="Distribución del portafolio"),
             legend=dict(show=True)
         )
+        ```
         """
 
         db = self._select_df(df_idx=df_index)
@@ -4025,6 +4037,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             y_axis=dict(fmt=",.1f"),
             legend=dict(show=True)
         )
+        ```
         """
 
         # --- 1. Importación y setteo del dataframe 
