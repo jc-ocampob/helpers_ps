@@ -9,14 +9,14 @@ python -m build
 
 # 4. commit
 git add .
-git commit -m "Release v0.2.2"
+git commit -m "Release v0.2.6"
 
 # 5. push branch
 git push origin main
 
 # 6. create tag
-git tag v0.2.2
-git push origin v0.2.2
+git tag v0.2.6
+git push origin v0.2.6
 
 
 # 7. Para instalaciones hacer lo siguiente reemplazando por la version v*
