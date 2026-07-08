@@ -10,7 +10,7 @@ from helpers_ps.Grafico.graf import Graph_mtplt
 
 # Graph_mplt
 
-::: helpers_ps.Grafico.graf.Graph_mplt
+::: helpers_ps.Grafico.graf.Graph_mtplt
     options:
       inherited_members: false
       members:

@@ -56,4 +56,4 @@ nav:
       - Barras stacked: examples/bar_stacked.md
       - Box Whiskers: examples/box_whiskers.md
   - API:
-      - Graph_mplt: api/graph_mplt.md
+      - Graph_mplt: api/graph_mtplt.md
