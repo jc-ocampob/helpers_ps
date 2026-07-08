@@ -1,6 +1,6 @@
-# graph_line
+# Grafico de Linea
 
-`graph_line` genera gráficos de línea para series temporales o cualquier dataframe indexado.
+`Graph_mtplt.graph_line()` genera gráficos de línea para series temporales o cualquier dataframe indexado.
 
 ---
 

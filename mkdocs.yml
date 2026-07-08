@@ -47,7 +47,9 @@ nav:
   - Inicio: index.md
   - Getting Started: getting_started.md
   - Quick Reference: quick_reference.md
-  - Graph Line: graph_line.md
+  - Graph Line: 
+      - Graficar: Line/graph.md
+      - Etiquetas: Line/tags.md
   - Graph Bar: graph_bar.md
   - Graph Pie: graph_pie.md
   - Graph Box Whiskers: graph_box_whiskers.md
@@ -56,4 +58,4 @@ nav:
       - Barras stacked: examples/bar_stacked.md
       - Box Whiskers: examples/box_whiskers.md
   - API:
-      - Graph_mplt: api/graph_mtplt.md
+      - Graph_mtplt: api/graph_mtplt.md

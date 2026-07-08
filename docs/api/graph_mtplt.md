@@ -6,7 +6,7 @@ Esta página genera documentación automática a partir de los docstrings del c�
 
 ```python
 from helpers_ps.Grafico.graf import Graph_mtplt
-
+```
 
 # Graph_mplt
 
