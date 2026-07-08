@@ -117,7 +117,7 @@ graph.graph_line(
 g.show()
 ```
 
-..images/line_graph.png
+../images/line_graph.png
 
 ---
 
