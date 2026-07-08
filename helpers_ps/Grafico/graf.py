@@ -1717,9 +1717,6 @@ class Line_tags():
                 }
                     
                 show: dot / tag / dot_tag
-                dot_color: color del punto
-                dot_size: tamaño del punto
-                dot_zorder: zorder del punto
             }
         }
         """
