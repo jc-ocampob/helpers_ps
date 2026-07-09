@@ -11,40 +11,16 @@ from helpers_ps.Grafico.graf import Graph_mtplt
 
 ## Grafico de lineas
 
-::: helpers_ps.Grafico.graf.Graph_mtplt
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      inherited_members: false
-      members:
-        - graph_line
+::: helpers_ps.Grafico.graf.Graph_mtplt.graph_line
 
 ## Grafico de barras
 
-::: helpers_ps.Grafico.graf.Graph_mtplt
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      inherited_members: false
-      members:
-        - graph_bar
+::: helpers_ps.Grafico.graf.Graph_mtplt.graph_bar
 
 ## Grafico Pie
 
-::: helpers_ps.Grafico.graf.Graph_mtplt
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      inherited_members: false
-      members:
-        - graph_pie
+::: helpers_ps.Grafico.graf.Graph_mtplt.graph_pie
 
 ## Grafico Box Whiskers
 
-::: helpers_ps.Grafico.graf.Graph_mtplt
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      inherited_members: false
-      members:
-        - graph_box_whiskers
+::: helpers_ps.Grafico.graf.Graph_mtplt.graph_box_whiskers
