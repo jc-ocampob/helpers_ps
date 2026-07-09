@@ -16,29 +16,32 @@ tag_dot = {
         # ticker: str referencia el ticker sobre el cual se van a hacer las etiquetas
         "ticker": "SPX",
 
-        # Valores x sobre el cual se quieren las etiquetas puede ser el ultimo, todos o una lista de las posiciones que se quieren
+        # Valores x sobre el cual se quieren las etiquetas puede ser el ultimo,
+        # todos o una lista de las posiciones que se quieren
         "x_values":"all" | "last" | ["2025-12-31", "last", "2026-04-05"],
         
         # template gestiona la etiqueta como una plantilla con las variables
         # de x, y  disponibles para uso
-        "template": "{y_value:,.0f}" | "{x_value:,%b-%Y}: {y_value:,.0f}" | "{x_value:,%b-%Y}",
+        "template": "{x_value:,%b-%Y}: {y_value:,.0f}",
         
         # Show es un str que gestiona que se quiere mostrar
         # se puede mostrar la etiqueta y punto o solo alguno
         "show": "dot_tag" | "tag" | "dot",
 
-        # En caso es distinto de None se genera una referencia en la leyenda para estos puntos con el nombre de la serie
-        # siendo el que se le asigue aqui
+        # En caso es distinto de None se genera una referencia en la leyenda 
+        # para estos puntos con el nombre de la serie siendo el que se le asigne
         "legend_label": "Momentos Claves",
 
-        # Diccionario de control de los puntos del subgrupo que hereda toda la funcionalidad de
+        # Diccionario de control de los puntos del subgrupo 
+        # que hereda toda la funcionalidad de
         # .punto_valor()
         "dot": {
             "color": "green",
             "size": 22,
         },
 
-        # Diccionario de control de las etiquetas del subgrupo que hereda toda la funcionalidad de
+        # Diccionario de control de las etiquetas del subgrupo 
+        # que hereda toda la funcionalidad de
         # .etiqueta_valor()
         "tag": {
                 "bg_color": "none",

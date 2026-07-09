@@ -1,6 +1,7 @@
 # API Reference
 
-Esta página genera documentación automática a partir de los docstrings del código.
+
+## Importación de la clase
 
 > Ajustar el path si la clase `Graph_mtplt` se encuentra en otro módulo.
 
@@ -8,13 +9,34 @@ Esta página genera documentación automática a partir de los docstrings del c�
 from helpers_ps.Grafico.graf import Graph_mtplt
 ```
 
-# Graph_mplt
+## Grafico de lineas
 
 ::: helpers_ps.Grafico.graf.Graph_mtplt
     options:
       inherited_members: false
       members:
         - graph_line
+
+## Grafico de barras
+
+::: helpers_ps.Grafico.graf.Graph_mtplt
+    options:
+      inherited_members: false
+      members:
         - graph_bar
+
+## Grafico Pie
+
+::: helpers_ps.Grafico.graf.Graph_mtplt
+    options:
+      inherited_members: false
+      members:
         - graph_pie
+
+## Grafico Box Whiskers
+
+::: helpers_ps.Grafico.graf.Graph_mtplt
+    options:
+      inherited_members: false
+      members:
         - graph_box_whiskers
