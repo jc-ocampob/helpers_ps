@@ -19,33 +19,38 @@ g = Graph_mtplt(dataframe = df | [df_1, df_2,...])
 --------
 ::: helpers_ps.Grafico.graf.Graph_mtplt.graph_line
     options:
-          heading_level: 3
-          show_root_heading: true
-          show_root_full_path: false
-          separate_signature: true
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+
 
 
 ---------
 ::: helpers_ps.Grafico.graf.Graph_mtplt.graph_bar
     options:
-          heading_level: 3
-          show_root_heading: true
-          show_root_full_path: false
-          separate_signature: true
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
 
 ----------
 
 ::: helpers_ps.Grafico.graf.Graph_mtplt.graph_pie
     options:
-          heading_level: 3
-          show_root_heading: true
-          show_root_full_path: false
-          separate_signature: true
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
 ---------
 
 ::: helpers_ps.Grafico.graf.Graph_mtplt.graph_box_whiskers
     options:
-          heading_level: 3
-          show_root_heading: true
-          show_root_full_path: false
-          separate_signature: true
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
