@@ -2,50 +2,54 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/getting_started/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/graph_bar/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/graph_box_whiskers/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/graph_pie/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/quick_reference/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/Line/graph/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/Line/tags/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/api/graph_mtplt/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
+    </url>
+    <url>
+         <loc>https://jc-ocampob.github.io/Helpers_PS/api/helpers/</loc>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/examples/bar_stacked/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/examples/box_whiskers/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/examples/line_last_value/</loc>
-         <lastmod>2026-07-08</lastmod>
+         <lastmod>2026-07-09</lastmod>
     </url>
 </urlset>
