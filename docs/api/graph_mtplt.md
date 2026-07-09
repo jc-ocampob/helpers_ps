@@ -13,6 +13,7 @@ from helpers_ps.Grafico.graf import Graph_mtplt
 
 ::: helpers_ps.Grafico.graf.Graph_mtplt
     options:
+      show_root_heading: false
       inherited_members: false
       members:
         - graph_line
@@ -21,6 +22,7 @@ from helpers_ps.Grafico.graf import Graph_mtplt
 
 ::: helpers_ps.Grafico.graf.Graph_mtplt
     options:
+      show_root_heading: false
       inherited_members: false
       members:
         - graph_bar
@@ -29,6 +31,7 @@ from helpers_ps.Grafico.graf import Graph_mtplt
 
 ::: helpers_ps.Grafico.graf.Graph_mtplt
     options:
+      show_root_heading: false
       inherited_members: false
       members:
         - graph_pie
@@ -37,6 +40,7 @@ from helpers_ps.Grafico.graf import Graph_mtplt
 
 ::: helpers_ps.Grafico.graf.Graph_mtplt
     options:
+      show_root_heading: false
       inherited_members: false
       members:
         - graph_box_whiskers
