@@ -7,7 +7,7 @@ helpers_ps.egg-info/dependency_links.txt
 helpers_ps.egg-info/requires.txt
 helpers_ps.egg-info/top_level.txt
 helpers_ps/Calculo/__init__.py
-helpers_ps/Calculo/helper_metricas.py
+helpers_ps/Calculo/metricas.py
 helpers_ps/Config/__init__.py
 helpers_ps/Config/var_globs.py
 helpers_ps/Data/recessions.csv

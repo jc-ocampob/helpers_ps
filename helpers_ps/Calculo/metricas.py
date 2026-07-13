@@ -538,6 +538,145 @@ class Metrics():
             f"VaR_{method}_{int(confidence * 100)}"
         )
 
+    # Tracking error
+    def tracking_error(
+        self,
+        benchmark: str,
+        method: str = "simple",
+        annualize: bool = True,
+        periods_per_year: int = 252,
+    ) -> pd.Series:
+        """
+        Calculate tracking error relative to a benchmark.
+
+        Parameters
+        ----------
+        benchmark : str
+            Benchmark column name.
+
+        method : {"simple", "log"}
+            Return calculation method.
+
+        annualize : bool, default True
+            Annualize the result.
+
+        periods_per_year : int, default 252
+            Periods per year.
+
+        Returns
+        -------
+        pd.Series
+            Tracking error by asset.
+        """
+
+        px = self.data_frame.sort_index()
+
+        if method == "simple":
+            rets = px.pct_change().dropna()
+
+        elif method == "log":
+            rets = np.log(px / px.shift(1)).dropna()
+
+        else:
+            raise ValueError(
+                "method must be 'simple' or 'log'"
+            )
+
+        benchmark_returns = rets[benchmark]
+
+        active_returns = rets.sub(
+            benchmark_returns,
+            axis=0
+        )
+
+        te = active_returns.std()
+
+        if annualize:
+            te *= np.sqrt(periods_per_year)
+
+        return te.rename("Tracking Error")
+
+    # Information Ratio
+    def information_ratio(
+        self,
+        benchmark: str,
+        method: str = "simple",
+        annualize: bool = True,
+        periods_per_year: int = 252,
+    ) -> pd.Series:
+
+        px = self.data_frame.sort_index()
+
+        if method == "simple":
+            rets = px.pct_change().dropna()
+        elif method == "log":
+            rets = np.log(px / px.shift(1)).dropna()
+        else:
+            raise ValueError(
+                "method must be 'simple' or 'log'"
+            )
+
+        active_returns = rets.sub(
+            rets[benchmark],
+            axis=0
+        )
+
+        active_return = active_returns.mean()
+        tracking_error = active_returns.std()
+
+        ir = active_return / tracking_error
+
+        if annualize:
+            ir *= np.sqrt(periods_per_year)
+
+        return ir.rename("Information Ratio")
+
+    # Excess return
+    def excess_return(
+        self,
+        benchmark: str,
+        period: str = "qtd"
+    ) -> pd.DataFrame:
+        
+        if period == "ytd":
+            _d = self.ytd()
+        elif period == "mtd":
+            _d = self.mtd()
+        elif period == "qtd":
+            _d = self.qtd()
+        else:
+            raise NotImplementedError(f"{period} no esta implementado")
+        
+        _d = _d.sub(_d[benchmark], axis=0)
+        
+        return _d
+
+    # Constsitencia de excess return
+    def consistency(
+        self,
+        benchmark: str,
+        period: str = "qtd"
+    ) -> pd.Series:
+        """
+        Percentage of periods in which the asset outperformed
+        the benchmark.
+
+        Returns
+        -------
+        pd.Series
+            Ticker | Consistency
+        """
+
+        exre = self.excess_return(
+            benchmark=benchmark,
+            period=period
+        )
+
+        consistency = exre.gt(0).sum() / exre.notna().sum()
+
+        return consistency.rename("Consistency")
+
+
     # Función para calcular el RSI de un DataFrame
     def rsi (self, window: int = 14, prefix: str = "RSI{w}_") -> pd.DataFrame:
         """
