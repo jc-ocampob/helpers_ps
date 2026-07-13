@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
+from scipy.stats import norm
 from collections import Counter
 
 @dataclass
@@ -255,7 +256,7 @@ class Metrics():
             DataFrame con los drawdowns calculados para cada serie de precios
         """
         # Ordenar el Data frame por indice de fecha ascendente
-        df = self.data_frame.sort_index()
+        px = self.data_frame.sort_index()
 
         # Limpiar invalido/cero valores a evitar problemas con la división por 0
         px = px.where(px > min_price)
@@ -274,6 +275,268 @@ class Metrics():
             raise ValueError("method must be 'simple' or 'log'")
 
         return dd
+
+    # Calculo de la desviación estandard al downside
+    def std_downside(
+        self,
+        method: str = "simple",
+        target_return: float = 0.0,
+        annualize: bool = False,
+        periods_per_year: int = 252,
+    ) -> pd.DataFrame:
+        """
+        Downside standard deviation by asset.
+        """
+
+        px = self.data_frame.sort_index()
+
+        if method == "simple":
+            rets = px.pct_change()
+        elif method == "log":
+            rets = np.log(px / px.shift(1))
+        else:
+            raise ValueError("method must be 'simple' or 'log'")
+
+        downside = (rets - target_return).where(rets < target_return, 0.0)
+
+        dsd = np.sqrt((downside**2).mean())
+
+        if annualize:
+            dsd *= np.sqrt(periods_per_year)
+
+        return dsd.to_frame(name="std_downside")
+
+    # Calculo del beta (rolling / historico)
+    def beta(
+        self,
+        benchmark: str,
+        window: int | None = None,
+        method: str = "simple",
+    ) -> pd.Series | pd.DataFrame:
+        """
+        Calculate historical or rolling beta relative to a benchmark.
+
+        Parameters
+        ----------
+        benchmark : str
+            Benchmark column name.
+
+        window : int, optional
+            Rolling window size.
+            If None, computes historical beta.
+            If provided, computes rolling beta.
+
+        method : {"simple", "log"}
+            Return calculation method.
+
+        Returns
+        -------
+        pd.Series
+            Historical beta for each asset when window is None.
+
+        pd.DataFrame
+            Rolling betas through time when window is provided.
+        """
+
+        px = self.data_frame.sort_index()
+
+        if method == "simple":
+            rets = px.pct_change()
+        elif method == "log":
+            rets = np.log(px / px.shift(1))
+        else:
+            raise ValueError("method must be 'simple' or 'log'")
+
+        benchmark_returns = rets[benchmark]
+
+        # Historical beta
+        if window is None:
+            bench_var = benchmark_returns.var()
+
+            beta = rets.apply(
+                lambda col: col.cov(benchmark_returns) / bench_var
+            )
+
+            return beta
+
+        # Rolling beta
+        bench_var = benchmark_returns.rolling(window).var()
+
+        rolling_beta = (
+            rets.rolling(window)
+            .cov(benchmark_returns)
+            .divide(bench_var, axis=0)
+        )
+
+        return rolling_beta
+
+    # Upisde capture
+    def upside_capture(
+        self,
+        benchmark: str,
+        method: str = "simple",
+    ) -> pd.Series:
+        """
+        Calculate upside capture ratio relative to a benchmark.
+        """
+
+        px = self.data_frame.sort_index()
+
+        if method == "simple":
+            rets = px.pct_change()
+        elif method == "log":
+            rets = np.log(px / px.shift(1))
+        else:
+            raise ValueError("method must be 'simple' or 'log'")
+
+        bench = rets[benchmark]
+
+        mask = bench > 0
+
+        asset_up = (1 + rets[mask]).prod() - 1
+        bench_up = (1 + bench[mask]).prod() - 1
+
+        return asset_up / bench_up
+
+    # Downside Capture
+    def downside_capture(
+        self,
+        benchmark: str,
+        method: str = "simple",
+    ) -> pd.Series:
+        """
+        Calculate downside capture ratio relative to a benchmark.
+        """
+
+        px = self.data_frame.sort_index()
+
+        if method == "simple":
+            rets = px.pct_change()
+        elif method == "log":
+            rets = np.log(px / px.shift(1))
+        else:
+            raise ValueError("method must be 'simple' or 'log'")
+
+        bench = rets[benchmark]
+
+        mask = bench < 0
+
+        asset_down = (1 + rets[mask]).prod() - 1
+        bench_down = (1 + bench[mask]).prod() - 1
+
+        return asset_down / bench_down
+
+    # UC /DC ratio
+    def capture_ratio(
+        self,
+        benchmark: str,
+        method: str = "simple",
+    ) -> pd.Series:
+        """
+        Calculate upside/downside capture ratio.
+        """
+
+        uc = self.upside_capture(
+            benchmark=benchmark,
+            method=method,
+        )
+
+        dc = self.downside_capture(
+            benchmark=benchmark,
+            method=method,
+        )
+
+        return uc / dc
+
+    # Value at risk 
+    def var(
+        self,
+        confidence: float = 0.95,
+        method: str = "historical",
+        returns_method: str = "simple",
+        horizon: int = 1,
+    ) -> pd.Series:
+        """
+        Calculate Value at Risk (VaR) for all assets.
+
+        Parameters
+        ----------
+        confidence : float, default 0.95
+            Confidence level.
+
+        method : {"historical", "gaussian", "cornish_fisher"}
+            VaR methodology:
+                - historical: non-parametric historical simulation
+                - gaussian: parametric normal VaR
+                - cornish_fisher: skewness/kurtosis adjusted VaR
+
+        returns_method : {"simple", "log"}
+            Return calculation method.
+
+        horizon : int, default 1
+            Holding period in return periods.
+
+        Returns
+        -------
+        pd.Series
+            VaR expressed as a positive loss.
+        """
+
+        px = self.data_frame.sort_index()
+
+        if returns_method == "simple":
+            rets = px.pct_change().dropna()
+
+        elif returns_method == "log":
+            rets = np.log(px / px.shift(1)).dropna()
+
+        else:
+            raise ValueError(
+                "returns_method must be 'simple' or 'log'"
+            )
+
+        alpha = 1 - confidence
+
+        if method == "historical":
+
+            # Non-parametric Historical Simulation VaR
+            var = -rets.quantile(alpha)
+
+        elif method == "gaussian":
+
+            # Parametric Normal VaR
+            z = norm.ppf(alpha)
+
+            var = -(rets.mean() + z * rets.std())
+
+        elif method == "cornish_fisher":
+
+            # Modified VaR accounting for skewness and kurtosis
+            z = norm.ppf(alpha)
+
+            s = rets.skew()
+            k = rets.kurtosis()
+
+            z_cf = (
+                z
+                + ((z**2 - 1) * s / 6)
+                + ((z**3 - 3 * z) * k / 24)
+                - ((2 * z**3 - 5 * z) * s**2 / 36)
+            )
+
+            var = -(rets.mean() + z_cf * rets.std())
+
+        else:
+            raise ValueError(
+                "method must be 'historical', 'gaussian', or 'cornish_fisher'"
+            )
+
+        if horizon > 1:
+            var *= np.sqrt(horizon)
+
+        return var.rename(
+            f"VaR_{method}_{int(confidence * 100)}"
+        )
 
     # Función para calcular el RSI de un DataFrame
     def rsi (self, window: int = 14, prefix: str = "RSI{w}_") -> pd.DataFrame:
@@ -515,7 +778,7 @@ class Metrics():
 
         #for col in _data_price.columns:
 
-    def rank_percentile(self, value: int | None = None):
+    def rank_percentile(self):
         percentile_last = (
             self.data_frame
             .rank(pct=True)
