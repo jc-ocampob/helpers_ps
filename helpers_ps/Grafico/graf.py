@@ -722,6 +722,39 @@ class Graph_base(Graph_meta_data):
             framealpha=framealpha
         )
 
+    def add_legend_point(
+        self,
+        label: str,
+        color: str,
+        marker: str = "o",
+        markersize: float = 6,
+    ):
+        
+        if not hasattr(self, "_custom_legend_handles"):
+            self._custom_legend_handles = []
+
+        existing_labels = {
+            h.get_label()
+            for h in self._custom_legend_handles
+        }
+
+        if label in existing_labels:
+            return None
+
+        self._custom_legend_handles.append(
+            Line2D(
+                [0],
+                [0],
+                marker=marker,
+                linestyle="None",
+                color="none",
+                markerfacecolor=color,
+                markeredgecolor=color,
+                markersize=markersize,
+                label=label,
+            )
+        )
+
     # =========================
     # Metodos de la figura general
     # =========================

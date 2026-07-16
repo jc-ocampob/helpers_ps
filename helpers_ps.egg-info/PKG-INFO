@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: helpers_ps
-Version: 0.2.8
+Version: 0.2.9
 Summary: Internal helper package
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown

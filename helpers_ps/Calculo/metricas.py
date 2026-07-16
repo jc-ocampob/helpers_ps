@@ -676,7 +676,6 @@ class Metrics():
 
         return consistency.rename("Consistency")
 
-
     # Función para calcular el RSI de un DataFrame
     def rsi (self, window: int = 14, prefix: str = "RSI{w}_") -> pd.DataFrame:
         """
