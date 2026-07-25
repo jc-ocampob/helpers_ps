@@ -975,9 +975,9 @@
 
 <h1 id="ultimo-valor-en-grafico-de-linea">Último valor en gráfico de línea<a class="headerlink" href="#ultimo-valor-en-grafico-de-linea" title="Permanent link">&para;</a></h1>
 <p>Este ejemplo muestra cómo destacar el último valor de una serie con punto y etiqueta.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">helpers_ps.Grafico.graf</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph_mtplt</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">helpers_ps</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">hp</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">g</span> <span class="o">=</span> <span class="n">Graph_mtplt</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">g</span> <span class="o">=</span> <span class="n">hp</span><span class="o">.</span><span class="n">GraphMtplt</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">g</span><span class="o">.</span><span class="n">graph_line</span><span class="p">(</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">tickers</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SPX&quot;</span><span class="p">],</span>
