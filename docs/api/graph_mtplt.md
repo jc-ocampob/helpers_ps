@@ -3,7 +3,6 @@
 
 ## Importación de la clase
 
-> Ajustar el path si la clase `Graph_mtplt` se encuentra en otro módulo.
 
 ```python
 import helpers_ps as hp
@@ -17,7 +16,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 ## Graficos
 --------
-::: helpers_ps.Grafico.chart.Graph_mtplt.graph_line
+::: helpers_ps.Grafico.charts.GraphMtplt.graph_line
     options:
       heading_level: 3
       show_root_heading: true
@@ -28,7 +27,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 
 ---------
-::: helpers_ps.Grafico.chart.Graph_mtplt.graph_bar
+::: helpers_ps.Grafico.charts.GraphMtplt.graph_bar
     options:
       heading_level: 3
       show_root_heading: true
@@ -38,7 +37,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 ----------
 
-::: helpers_ps.Grafico.chart.Graph_mtplt.graph_pie
+::: helpers_ps.Grafico.charts.GraphMtplt.graph_pie
     options:
       heading_level: 3
       show_root_heading: true
@@ -47,7 +46,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.chart.Graph_mtplt.graph_box_whiskers
+::: helpers_ps.Grafico.charts.GraphMtplt.graph_box_whiskers
     options:
       heading_level: 3
       show_root_heading: true

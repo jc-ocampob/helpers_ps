@@ -12,7 +12,7 @@ from .tags_line import Line_tags
 from .tags_bar import Bar_tags
 from .tags_pie import Pie_tags
 from .tags_box import BoxW_tags
-from .charts import Graph_mtplt
+from .charts import GraphMtplt
 
 # Preferred public aliases
 GraphMetadata = Graph_meta_data
@@ -21,8 +21,6 @@ LineTags = Line_tags
 BarTags = Bar_tags
 PieTags = Pie_tags
 BoxWhiskerTags = BoxW_tags
-
-GraphMtplt = Graph_mtplt
 
 __all__ = [
     "PALETA_COLORES",

@@ -32,7 +32,7 @@ from .tags_pie import Pie_tags
 from .tags_box import BoxW_tags
 
 @dataclass
-class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
+class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
     """
     Main public chart builder that combines base plotting utilities and chart-specific methods.
 
