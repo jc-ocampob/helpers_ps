@@ -124,7 +124,6 @@ def find_shape_by_name(slide, target_name: str):
         raise KeyError(f"No se encontró el shape con nombre: {target_name}")
     return shp
 
-
 def get_layout_by_name(prs, layout_name):
     for layout in prs.slide_layouts:
         if layout.name == layout_name:

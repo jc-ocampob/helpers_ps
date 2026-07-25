@@ -18,7 +18,7 @@ Fecha         SPX_PE   NDX_PE   EUROSTOXX_PE
 ## Ejemplo básico
 
 ```python
-g = Graph_mtplt(df)
+g = hp.GraphMtplt(df)
 
 g.graph_box_whiskers(
     tickers="all"

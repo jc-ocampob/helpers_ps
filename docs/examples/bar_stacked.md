@@ -3,9 +3,9 @@
 Este ejemplo muestra cómo construir un gráfico de barras stacked y agregar el total del stack.
 
 ```python
-from helpers_ps.Grafico.graf import Graph_mtplt
+import helpers_ps as hp
 
-g = Graph_mtplt(df)
+g = hp.GraphMtplt(df)
 
 g.graph_bar(
     tickers=[

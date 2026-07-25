@@ -3,7 +3,7 @@
 ## Importar la clase principal
 
 ```python
-from helpers_ps.Grafico.graf import Graph_mtplt
+import helpers_ps as hp
 ```
 
 > Ajustar el path de importación si la clase se mueve a otro módulo.
@@ -13,7 +13,7 @@ from helpers_ps.Grafico.graf import Graph_mtplt
 ## Crear una instancia
 
 ```python
-g = Graph_mtplt(
+g = hp.GraphMtplt(
     dataframe=df
 )
 ```
@@ -84,7 +84,7 @@ Esto guarda el gráfico en memoria dentro del diccionario global de buffers.
 ## Flujo habitual
 
 ```python
-g = Graph_mtplt(df)
+g = hp.Graph_mtplt(df)
 
 g.graph_line(
     tickers="all",

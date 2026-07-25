@@ -3,9 +3,9 @@
 Este ejemplo muestra cómo agregar el último valor observado sobre un gráfico Box & Whiskers.
 
 ```python
-from helpers_ps.Grafico.graf import Graph_mtplt
+import helpers_ps as hp
 
-g = Graph_mtplt(df)
+g = hp.GraphMtplt(df)
 
 g.graph_box_whiskers(
     tickers="all",

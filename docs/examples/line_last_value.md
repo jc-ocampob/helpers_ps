@@ -3,9 +3,9 @@
 Este ejemplo muestra cómo destacar el último valor de una serie con punto y etiqueta.
 
 ```python
-from helpers_ps.Grafico.graf import Graph_mtplt
+import helpers_ps as hp
 
-g = Graph_mtplt(df)
+g = hp.GraphMtplt(df)
 
 g.graph_line(
     tickers=["SPX"],

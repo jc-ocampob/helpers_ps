@@ -21,7 +21,7 @@ Fecha         SPX      NASDAQ
 ## Ejemplo básico
 
 ```python
-g = Graph_mtplt(df)
+g = GraphMtplt(df)
 
 g.graph_line(
     tickers=["SPX"]

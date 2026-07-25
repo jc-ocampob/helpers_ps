@@ -16,7 +16,7 @@ Fecha         Equity   Bonds   Cash
 ## Ejemplo básico
 
 ```python
-g = Graph_mtplt(df)
+g = hp.GraphMtplt(df)
 
 g.graph_pie(
     tickers="all",

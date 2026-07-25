@@ -60,7 +60,7 @@ tag_dot = {
 En este primer ejemplo se usa información del SPX y RTY en la que se genera 2 grupos de etiqutas uno para cada serie
 
 ```python
-graph = Graph_mtplt(dataframe = _data)
+graph = GraphMtplt(dataframe = _data)
 graph.graph_line(
     figsize=(6,5),                                                                                                  # Configuración del tamaño de la figura sobre el cual se construye el grafico
     tickers = "all",                                                                                                # Tickers (nombre de columnas) que se van a mostrar: "all" = Todos | "ticker" | ["ticker1", "ticker2",..., "tickerN"]

@@ -20,13 +20,13 @@ except Exception:
 # API pública - Gráficos
 # ============================================================
 
-from helpers_ps.Grafico.graf import (
-    Graph_mtplt,
+from helpers_ps.Grafico import (
+    GraphMtplt,
+    set_graph_theme,
+    buffers,
+    PALETA_COLORES,
 )
 
-from helpers_ps.Config.var_globs import (
-    PALETA_COLORES
-)
 
 # ============================================================
 # API pública - Cálculo / métricas
@@ -58,7 +58,13 @@ from helpers_ps.Calculo.metricas import (
     rank_percentile,
 )
 
-Graph = Graph_mtplt
+# ============================================================
+# API pública - Presentación
+# ============================================================
+
+from helpers_ps.Presentacion import (
+    ppt_grafs
+)
 
 # ============================================================
 # Control explícito de objetos públicos
@@ -68,7 +74,10 @@ __all__ = [
     "__version__",
 
     # Gráficos
-    "Graph",
+    "GraphMtplt",
+    "set_graph_theme",
+    "buffers",
+    "PALETA_COLORES",
 
     # Métricas
     "Metrics",
