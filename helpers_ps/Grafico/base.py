@@ -29,14 +29,23 @@ from .metadata import Graph_meta_data
 from .config import buffers
 
 @dataclass
-class Graph_base(Graph_meta_data):  
+class Graph_base(Graph_meta_data):
     """
-    Provide shared plotting utilities for axes, titles, legends, guides, saving, and layout.
+    Base class that provides shared Matplotlib utilities for chart construction.
+
+    This class centralizes the common functionality used by higher-level chart
+    builders, including axis preparation, title and subtitle handling, source
+    notes, legends, horizontal guides, value annotations, shaded regions,
+    recession overlays, figure creation, and figure export.
+
+    It is intended to be inherited by chart-specific classes so that line, bar,
+    pie, boxplot, and other chart types can reuse a consistent plotting style
+    and metadata management workflow.
 
     Notes
     -----
-    This docstring was added during the modular refactor to make the API easier
-    to understand for new users and maintainers.
+    This class assumes that figure and axis metadata are managed through
+    `Graph_meta_data`, particularly via `_generate_metadata`.
     """
 
     # =========================
@@ -44,12 +53,20 @@ class Graph_base(Graph_meta_data):
     # =========================
     def _months_years(self, fechas):
         """
-        Extract month and year labels from a date-like sequence.
+        Extract Spanish month abbreviations and years from a date-like index.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        This helper stores month labels and year values in the instance so they can
+        be reused when creating Bloomberg-style x-axis labels.
+
+        Parameters
+        ----------
+        fechas : sequence of datetime-like values
+            Date-like sequence used to extract month abbreviations and years.
+
+        Returns
+        -------
+        None
+            The extracted values are stored internally in `_months` and `_years`.
         """
         mes_es = {
             1: 'Ene', 2: 'Feb', 3: 'Mar', 4: 'Abr',
@@ -60,14 +77,27 @@ class Graph_base(Graph_meta_data):
         self._months = [mes_es[d.month] for d in fechas]
         self._years = np.array([d.year for d in fechas])
 
-    def años_eje_x(self, y_offset=-0.08, fontsize=None, color='black'):     
+    def _years_xaxis(self, y_offset=-0.08, fontsize=None, color='black'):
         """
-        Add year labels below the x-axis for date-based charts.
+        Add year labels below the x-axis for Bloomberg-style date charts.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        This method uses the internally stored `_years` array to place one centered
+        year label below each group of monthly x-axis labels.
+
+        Parameters
+        ----------
+        y_offset : float, default -0.08
+            Vertical offset of the year labels relative to the x-axis transform.
+        fontsize : float or None, optional
+            Font size of the year labels. If None, the method uses the internal
+            tick font size when available.
+        color : str, default "black"
+            Text color of the year labels.
+
+        Returns
+        -------
+        None
+            Year labels are added directly to the active axis.
         """
 
         years = getattr(self, "_years", None)
@@ -90,12 +120,26 @@ class Graph_base(Graph_meta_data):
 
     def _coerce_to_bbg_x(self, x):
         """
-        Convert incoming x values into the internal Bloomberg-style x-axis representation.
+        Convert an x-axis input value into the internal Bloomberg-style position.
+
+        Bloomberg-style charts use integer positions instead of the original
+        datetime values. This helper converts dates, timestamps, or numeric values
+        into the corresponding numeric x-coordinate used by the active axis.
+
+        Parameters
+        ----------
+        x : int, float, str, pandas.Timestamp, or datetime-like
+            Input x-axis value to convert.
+
+        Returns
+        -------
+        float
+            Numeric x-axis position compatible with the Bloomberg-style axis.
 
         Notes
         -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        If the internal Bloomberg date index is not available, the function attempts
+        to return the input value as a float.
         """
 
         fechas = self._x_axis_fechas
@@ -121,22 +165,52 @@ class Graph_base(Graph_meta_data):
     def prep_x_axis(
             self,
             dataframe: pd.DataFrame = None,
-            bbg_format: bool = False, 
-            tick_step: int = 6, 
-            fmt: str = None, 
-            year_y_offset:float = -0.08, 
+            bbg_format: bool = False,
+            tick_step: int = 6,
+            fmt: str = None,
+            year_y_offset: float = -0.08,
             lim: tuple[float, float] = None,
             fontsize: float = 8,
             return_dataframe: bool = True,
         ) -> pd.DataFrame:
-
         """
-        Prepare the x-axis format, labels, ticks, and internal x-axis metadata.
+        Prepare the x-axis format, ticks, labels, limits, and internal metadata.
+
+        This method detects whether the DataFrame index is datetime-like, numeric,
+        or categorical, and applies the appropriate x-axis formatting. It also
+        supports a Bloomberg-style date axis, where dates are represented as
+        sequential integer positions with month labels and year labels.
+
+        Parameters
+        ----------
+        dataframe : pandas.DataFrame or None, optional
+            DataFrame used to configure the x-axis. If None, the active internal
+            DataFrame `_df` is used.
+        bbg_format : bool, default False
+            Whether to use the Bloomberg-style x-axis format for datetime indexes.
+        tick_step : int, default 6
+            Step used to determine the frequency of visible x-axis tick labels.
+        fmt : str or None, optional
+            Format string used for datetime or numeric tick labels.
+        year_y_offset : float, default -0.08
+            Vertical offset used for year labels when `bbg_format=True`.
+        lim : tuple[float, float] or None, optional
+            Optional lower and upper x-axis filter applied to the DataFrame index.
+        fontsize : float, default 8
+            Font size used for x-axis tick labels.
+        return_dataframe : bool, default True
+            Kept for API compatibility. The method returns the transformed or
+            filtered DataFrame.
+
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame after applying the optional x-axis limits.
 
         Notes
         -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        The method updates internal x-axis metadata such as `_x_axis_mode`,
+        `_x_axis_fechas`, `_x_vals`, `_months`, and `_years`.
         """
         if dataframe is None:
             dataframe = self._df
@@ -167,7 +241,7 @@ class Graph_base(Graph_meta_data):
             tick_idx = month_idx[::tick_step]
             self._ax.set_xticks(tick_idx)
             self._ax.set_xticklabels([self._months[i] for i in tick_idx], fontsize=fontsize)
-            self.años_eje_x(y_offset=year_y_offset, fontsize=fontsize)
+            self._years_xaxis(y_offset=year_y_offset, fontsize=fontsize)
             self._x_axis_mode = "bbg"
             self._x_axis_fechas = fechas
 
@@ -228,15 +302,26 @@ class Graph_base(Graph_meta_data):
         fontsize: float = 7,
         tick_step: int = None
     ) -> None:
-        
-        # --- Configuración del limite y ---
         """
-        Prepare the y-axis format, labels, limits, tick spacing, and number formatting.
+        Prepare the y-axis limits, tick labels, formatting, and spacing.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        Parameters
+        ----------
+        lim : tuple[float, float] or None, optional
+            Lower and upper y-axis limits. If None, Matplotlib determines the limits
+            automatically.
+        fmt : str or None, optional
+            Numeric format string used for y-axis labels. If None, `",.0f"` is used.
+        fontsize : float, default 7
+            Font size used for y-axis tick labels.
+        tick_step : int or None, optional
+            Fixed interval between y-axis ticks. If None, Matplotlib determines the
+            tick spacing automatically.
+
+        Returns
+        -------
+        None
+            The y-axis configuration is applied directly to the active axis.
         """
         if lim is not None:
             self._ax.set_ylim(*lim)
@@ -263,12 +348,27 @@ class Graph_base(Graph_meta_data):
         subtitle_font_size: int = 9
     ) -> None:
         """
-        Add and format main title, subtitle, and related textual headers for the active figure.
+        Add a main title and subtitle to the active figure.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        This method places figure-level text elements instead of using the default
+        axis title, allowing for a consistent institutional layout across different
+        chart types.
+
+        Parameters
+        ----------
+        title : str or None, optional
+            Main chart title.
+        title_font_size : int, default 12
+            Font size of the main title.
+        subtitle : str or None, optional
+            Subtitle displayed below the main title.
+        subtitle_font_size : int, default 9
+            Font size of the subtitle.
+
+        Returns
+        -------
+        None
+            Title and subtitle are added directly to the active figure.
         """
         
         # eliminar title del axis
@@ -308,10 +408,34 @@ class Graph_base(Graph_meta_data):
         """
         Add a source note or footer text to the active figure.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        The source can be provided as a single string or as a list of lines. The
+        method supports up to four lines and places them in the lower section of the
+        figure.
+
+        Parameters
+        ----------
+        text : str, list, or None, optional
+            Source text to display. If None, no source note is added.
+        x : float, default 0.02
+            Horizontal figure coordinate for the source text.
+        y : float, default 0.022
+            Vertical figure coordinate for the first source line.
+        fontsize : float, default 6
+            Font size of the source note.
+        color : str, default "#606060"
+            Text color of the source note.
+        line_spacing : float, default 0.022
+            Vertical spacing between source lines.
+
+        Returns
+        -------
+        None
+            Source text is added directly to the active figure.
+
+        Raises
+        ------
+        ValueError
+            If more than four source lines are provided.
         """
         if text is None:
             return None
@@ -350,12 +474,37 @@ class Graph_base(Graph_meta_data):
             framealpha: float = 0.6
     ) -> None:
         """
-        Create and style the legend using chart series and custom legend handles.
+        Add and style a legend for the active axis.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        This method combines legend handles generated by Matplotlib with optional
+        custom legend handles registered through helper methods. Duplicate labels
+        are removed while preserving their original order.
+
+        Parameters
+        ----------
+        show : bool, default False
+            Whether to display the legend.
+        loc : str, default "upper left"
+            Legend location.
+        bbox_to_anchor : tuple or None, optional
+            Optional bounding box anchor used to position the legend.
+        ncol : int, default 3
+            Number of legend columns.
+        fontsize : int, default 7
+            Legend font size.
+        frameon : bool, default True
+            Whether to display the legend frame.
+        edgecolor : str, default "white"
+            Legend frame edge color.
+        facecolor : str, default "white"
+            Legend frame background color.
+        framealpha : float, default 0.6
+            Legend frame transparency.
+
+        Returns
+        -------
+        None
+            The legend is added directly to the active axis when available.
         """
 
         if not show:
@@ -451,10 +600,10 @@ class Graph_base(Graph_meta_data):
         """
         Display the active Matplotlib figure.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        Returns
+        -------
+        None
+            The active figure is displayed if it exists.
         """
         if self._fig:
             return self._fig.show()
@@ -467,12 +616,34 @@ class Graph_base(Graph_meta_data):
         reset_buffers: bool = True
     ):
         """
-        Save the active figure into an in-memory PNG buffer or custom buffer store.
+        Save the active figure into an in-memory PNG buffer.
+
+        This method exports the current figure as a PNG image into a `BytesIO`
+        buffer and stores it in the provided dictionary-like object using `name`
+        as the key. It is useful when charts need to be passed to PowerPoint,
+        reports, dashboards, or other downstream workflows without writing files
+        to disk.
+
+        Parameters
+        ----------
+        dir : dict, default buffers
+            Dictionary-like object where the image buffer will be stored.
+        name : str, default "graph_1"
+            Key assigned to the saved image buffer.
+        dpi : int, default 400
+            Resolution used when exporting the figure.
+        reset_buffers : bool, default True
+            Whether to reset internal figure, axis, layout, and metadata references
+            after saving.
+
+        Returns
+        -------
+        None
+            The image buffer is stored in `dir[name]`.
 
         Notes
         -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        The Matplotlib figure is closed after being saved.
         """
         buf = io.BytesIO()
         self._fig.savefig(buf, format="png", dpi=dpi)   # use figure-level save
@@ -496,7 +667,7 @@ class Graph_base(Graph_meta_data):
     def plot(
         self,
         figsize: tuple[float, float] = (6.00, 4.80),
-        color: str ="#D5D5D5",
+        color: str = "#D5D5D5",
         lw: float = 0.8,
         nrows: int = 1,
         ncols: int = 1,
@@ -509,12 +680,49 @@ class Graph_base(Graph_meta_data):
         wspace: float | None = None
     ) -> None:
         """
-        Create the base Matplotlib figure and axes layout used by chart methods.
+        Create the base Matplotlib figure and axes layout.
+
+        This method initializes the figure and axes used by all chart methods. It
+        supports standard subplot creation as well as custom GridSpec layouts when
+        height ratios, width ratios, spacing, or DPI are provided.
+
+        Parameters
+        ----------
+        figsize : tuple[float, float], default (6.00, 4.80)
+            Figure size in inches.
+        color : str, default "#D5D5D5"
+            Color of the decorative horizontal divider lines.
+        lw : float, default 0.8
+            Line width of the decorative figure dividers.
+        nrows : int, default 1
+            Number of subplot rows.
+        ncols : int, default 1
+            Number of subplot columns.
+        sharex : bool, default False
+            Whether subplots should share the x-axis.
+        sharey : bool, default False
+            Whether subplots should share the y-axis.
+        dpi : int or None, optional
+            Figure DPI. If provided, a custom GridSpec layout is used.
+        height_ratios : list[float] or None, optional
+            Relative height ratios for GridSpec rows.
+        width_ratios : list[float] or None, optional
+            Relative width ratios for GridSpec columns.
+        hspace : float or None, optional
+            Vertical spacing between GridSpec rows.
+        wspace : float or None, optional
+            Horizontal spacing between GridSpec columns.
+
+        Returns
+        -------
+        None
+            The figure and axes are created and stored internally.
 
         Notes
         -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        The method also adds institutional-style decorative horizontal lines to the
+        figure and applies default subplot spacing when no custom GridSpec settings
+        are used.
         """
         # -------------------------------------------------
         # 1. Crear figura + axes
@@ -629,14 +837,19 @@ class Graph_base(Graph_meta_data):
     # =========================
     # Metodos de as etiquetas, guias y sombras
     # =========================
-    def guias_horizontales(self, mostrar_cero=True):
+    def horizontal_guides(self, mostrar_cero=True):
         """
-        Add horizontal guide lines to improve chart readability.
+        Add horizontal guide lines to the active axis.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        Parameters
+        ----------
+        mostrar_cero : bool, default True
+            Whether to add a highlighted horizontal line at y=0.
+
+        Returns
+        -------
+        None
+            Grid lines are applied directly to the active axis.
         """
 
         self._ax.yaxis.grid(
@@ -650,17 +863,17 @@ class Graph_base(Graph_meta_data):
         if mostrar_cero:
             self._ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
 
-    def etiqueta_valor(
+    def tag(
         self,
         x_value: float | str | pd.Timestamp,
         y_value: float,
         label: str,
-        label_h_align: str ="center",
-        label_v_align: str ="center",
-        ubic_etq: tuple =(0, 17),
-        fontsize: int =7,
-        fontweight: str ="normal",
-        font_color: str ="black",
+        label_h_align: str = "center",
+        label_v_align: str = "center",
+        ubic_etq: tuple = (0, 17),
+        fontsize: int = 7,
+        fontweight: str = "normal",
+        font_color: str = "black",
         bg_color: str = "#ECEFF1",
         bg_alpha: float = 1.0,
         edge_color: str = "none",
@@ -670,12 +883,56 @@ class Graph_base(Graph_meta_data):
         zorder: int = 6,
     ):
         """
-        Add a value label annotation to a selected chart point or coordinate.
+        Add a text annotation to a specific chart coordinate.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        This method supports standard datetime, numeric, categorical, and
+        Bloomberg-style x-axis modes. It can optionally display the label inside a
+        rounded bounding box and apply a text stroke to improve readability.
+
+        Parameters
+        ----------
+        x_value : float, str, pandas.Timestamp, or datetime-like
+            X-axis value where the annotation should be placed.
+        y_value : float
+            Y-axis value where the annotation should be placed.
+        label : str
+            Text displayed in the annotation.
+        label_h_align : str, default "center"
+            Horizontal alignment of the annotation text.
+        label_v_align : str, default "center"
+            Vertical alignment of the annotation text.
+        ubic_etq : tuple, default (0, 17)
+            Offset in points from the annotated coordinate.
+        fontsize : int, default 7
+            Font size of the annotation.
+        fontweight : str, default "normal"
+            Font weight of the annotation.
+        font_color : str, default "black"
+            Text color.
+        bg_color : str, default "#ECEFF1"
+            Background color of the annotation box.
+        bg_alpha : float, default 1.0
+            Transparency of the annotation box.
+        edge_color : str, default "none"
+            Edge color of the annotation box.
+        show_bbox : bool, default True
+            Whether to display a background box behind the annotation.
+        text_edge_color : str or None, optional
+            Optional stroke color applied to the annotation text.
+        text_edge_width : float, default 0.0
+            Width of the optional text stroke.
+        zorder : int, default 6
+            Drawing order of the annotation.
+
+        Returns
+        -------
+        None
+            The annotation is added directly to the active axis.
+
+        Raises
+        ------
+        RuntimeError
+            If the active axis has not been initialized.
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -732,7 +989,7 @@ class Graph_base(Graph_meta_data):
                 path_effects.withStroke(linewidth=text_edge_width, foreground=text_edge_color)
             ])
     
-    def punto_valor(
+    def dot(
         self,
         x_value,
         y_value,
@@ -741,12 +998,33 @@ class Graph_base(Graph_meta_data):
         zorder=5
     ):
         """
-        Add a highlighted point marker and optional label to the chart.
+        Add a highlighted point marker to the active chart.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        This method supports standard datetime, numeric, categorical, and
+        Bloomberg-style x-axis modes.
+
+        Parameters
+        ----------
+        x_value : any
+            X-axis value where the marker should be placed.
+        y_value : float
+            Y-axis value where the marker should be placed.
+        color : str, default "red"
+            Marker color.
+        size : float, default 30
+            Marker size.
+        zorder : int, default 5
+            Drawing order of the marker.
+
+        Returns
+        -------
+        None
+            The marker is added directly to the active axis.
+
+        Raises
+        ------
+        RuntimeError
+            If the active axis has not been initialized.
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -793,12 +1071,51 @@ class Graph_base(Graph_meta_data):
         clip_to_xlim=True,
     ):
         """
-        Add shaded x-axis regions to highlight periods or ranges.
+        Add shaded vertical regions to the active chart.
+
+        This method highlights one or multiple x-axis periods using vertical shaded
+        spans. It supports datetime, numeric, categorical, Bloomberg-style, and bar
+        chart x-axis modes. For categorical bar charts in `bar_mode="last"`, the
+        method can shade entire bar clusters instead of only individual x positions.
+
+        Parameters
+        ----------
+        periods : tuple, list[tuple], or list[dict]
+            Period or periods to shade. A simple period can be provided as
+            `(start, end)`. Multiple periods can be provided as a list of tuples.
+            Each period can also be a dictionary with keys such as `start`, `end`,
+            `color`, `alpha`, `label`, and `hatch`.
+        color : str, default "#B0B0B0"
+            Default fill color of the shaded region.
+        alpha : float, default 0.25
+            Default transparency of the shaded region.
+        zorder : int, default 0
+            Drawing order of the shaded region.
+        label : str or None, optional
+            Optional legend label for the shaded region.
+        hatch : str or None, optional
+            Optional hatch pattern for the shaded region.
+        ymin : float, default 0.0
+            Lower vertical bound of the shaded region in axis-relative coordinates.
+        ymax : float, default 1.0
+            Upper vertical bound of the shaded region in axis-relative coordinates.
+        clip_to_xlim : bool, default True
+            Whether to clip shaded regions to the current x-axis limits.
+
+        Returns
+        -------
+        None
+            Shaded regions are added directly to the active axis.
+
+        Raises
+        ------
+        RuntimeError
+            If the active axis has not been initialized.
 
         Notes
         -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        When multiple periods are provided and `label` is used, the default label is
+        applied only once to avoid duplicate legend entries.
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -1036,10 +1353,22 @@ class Graph_base(Graph_meta_data):
         """
         Add one or more horizontal reference lines to the active axis.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        Parameters
+        ----------
+        y_values : float, list[float], or None, optional
+            Y-axis value or values where horizontal lines should be drawn. If None,
+            no lines are added.
+        linestyle : str or None, optional
+            Matplotlib line style used for the reference lines.
+        linewidth : float, default 0.5
+            Width of the reference lines.
+        color : str, default "gray"
+            Color of the reference lines.
+
+        Returns
+        -------
+        None
+            Horizontal lines are added directly to the active axis.
         """
         if y_values is None:
             return None
@@ -1060,12 +1389,38 @@ class Graph_base(Graph_meta_data):
             controles: dict = None
     ):
         """
-        Add recession or event-shading regions over a date-based x-axis.
+        Add recession shading to a date-based chart.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        This method reads recession periods from the package's recession dataset and
+        shades the corresponding date ranges on the active chart. It only works with
+        date-based x-axis modes, including standard datetime axes and
+        Bloomberg-style axes.
+
+        Parameters
+        ----------
+        country : str, default "United States"
+            Country used to filter the recession dataset.
+        data_frame : bool, default False
+            If True, return the recession dataset instead of plotting the shaded
+            regions.
+        controles : dict or None, optional
+            Styling parameters passed to `shade_x`, such as `color`, `alpha`,
+            `label`, or `hatch`.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            Returns the recession DataFrame when `data_frame=True`; otherwise,
+            returns None after adding the shaded regions.
+
+        Raises
+        ------
+        RuntimeError
+            If no active chart exists.
+        TypeError
+            If the active chart does not use a date-based x-axis.
+        NotImplementedError
+            If the selected country is not available in the recession dataset.
         """
         csv_path = files("helpers_ps").joinpath("Data/recessions.csv")
         recesiones = pd.read_csv(csv_path, parse_dates=["start_date", "end_date"])

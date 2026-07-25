@@ -116,7 +116,7 @@ class BoxW_tags():
                 dot["zorder"] = 5
 
             # -----------------------------------------------------
-            # Handle artificial para leyenda, sin tocar punto_valor
+            # Handle artificial para leyenda, sin tocar dot
             # -----------------------------------------------------
             if legend_label is not None and legend_label not in existing_labels:
 
@@ -183,7 +183,7 @@ class BoxW_tags():
                     )
 
                 if "dot" in show:
-                    self.punto_valor(
+                    self.dot(
                         x_value=z,
                         y_value=y,
                         **dot

@@ -285,7 +285,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         
         # -- 14. Agregar guias horizontales
         if show_hguide:
-            self.guias_horizontales(mostrar_cero=False)
+            self.horizontal_guides(mostrar_cero=False)
             
 
         # --- 15. Agregar leyenda
@@ -844,7 +844,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
         # --- 12. Agregar guias horizontales
         if show_hguide:
-            self.guias_horizontales(mostrar_cero=False)
+            self.horizontal_guides(mostrar_cero=False)
 
         # --- 13. Agregar leyenda
         self.add_legend(**legend)
@@ -1434,7 +1434,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             Returns
             -------
             dict
-                Label configuration parameters used by `etiqueta_valor`.
+                Label configuration parameters used by `tag`.
             """
             return locals()
         
@@ -1490,7 +1490,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                     x_high = float(np.max(high_whisker.get_xdata()))
 
                 if range_tag_low_show:
-                    self.etiqueta_valor(
+                    self.tag(
                         x_value=x_low,
                         y_value=y_low,
                         label=f"{y_low:{range_tag_low_fmt}}",
@@ -1498,7 +1498,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                     )
 
                 if range_tag_high_show:
-                    self.etiqueta_valor(
+                    self.tag(
                         x_value=x_high,
                         y_value=y_high,
                         label=f"{y_high:{range_tag_high_fmt}}",
@@ -1506,7 +1506,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                     )
                 
                 if mean_tag_show:
-                    self.etiqueta_valor(
+                    self.tag(
                         x_value=i+1,
                         y_value=stat_val,
                         label=f"{stat_val:{mean_tag_fmt}}",
@@ -1522,7 +1522,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self.horizontal_lines(**hlines)
 
         if show_hguide:
-            self.guias_horizontales(mostrar_cero=False)
+            self.horizontal_guides(mostrar_cero=False)
 
         self.prep_y_axis(**y_axis)
 

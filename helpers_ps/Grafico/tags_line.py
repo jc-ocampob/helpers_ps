@@ -144,7 +144,7 @@ class Line_tags():
                 if "dot" in show:
                     if dot.get("color") is None:
                         dot["color"] = _ticker_label_color[0][2]
-                    self.punto_valor(
+                    self.dot(
                         x_value=x,
                         y_value=y,
                         **dot
