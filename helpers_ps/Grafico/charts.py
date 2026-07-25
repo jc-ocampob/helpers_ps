@@ -34,21 +34,56 @@ from .tags_box import BoxW_tags
 @dataclass
 class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
     """
-    Main public chart builder that combines base plotting utilities and chart-specific methods.
+    High-level Matplotlib chart builder for institutional reporting.
 
-    Notes
-    -----
-    This docstring was added during the modular refactor to make the API easier
-    to understand for new users and maintainers.
+    This class combines the base plotting utilities with chart-specific mixins
+    for line, bar, pie, and box-and-whisker charts. It is designed to provide a
+    consistent API for creating presentation-ready graphs using one or multiple
+    pandas DataFrames.
+
+    The class manages internal figure, axis, dataframe, x-axis, bar, and legend
+    metadata so that chart methods can share common formatting, annotation, and
+    layout logic.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame, list[pandas.DataFrame], or None, optional
+        Dataset used by the chart methods. A single DataFrame is internally
+        converted into a list to keep a consistent dataframe selection interface.
+
+    Attributes
+    ----------
+    dataframe : list[pandas.DataFrame] or None
+        DataFrame collection available for plotting.
+    _fig : matplotlib.figure.Figure or None
+        Current Matplotlib figure.
+    _ax : matplotlib.axes.Axes or None
+        Active Matplotlib axis.
+    _axes : matplotlib.axes.Axes or array-like or None
+        Axis collection when using subplots.
+    _df : pandas.DataFrame or None
+        Active DataFrame selected for the current chart.
+    _ticker_label_color : list[tuple]
+        Internal mapping of ticker, display label, and color used by legends
+        and annotations.
     """
+
     def __init__(self, dataframe: pd.DataFrame | list[pd.DataFrame] | None = None):
         """
-        Initialize the graph object with one dataframe or a list of dataframes.
+        Initialize the chart builder with one or multiple DataFrames.
 
         Parameters
         ----------
-        dataframe:
-            DataFrame or list of DataFrames used by the chart methods.
+        dataframe : pandas.DataFrame, list[pandas.DataFrame], or None, optional
+            DataFrame or list of DataFrames used as input data for the chart methods.
+            If a single DataFrame is provided, it is converted into a one-element
+            list to standardize dataframe selection by index.
+
+        Notes
+        -----
+        This initializer also resets all internal plotting metadata, including the
+        active figure, axes, selected dataframe, x-axis configuration, bar metadata,
+        and custom legend handles.
         """
         self.dataframe = [dataframe] if isinstance(dataframe, pd.DataFrame) else dataframe
 
@@ -107,14 +142,58 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         hlines: dict | None = None,                           # agregar lineas horizontales en el grafico
         # --- Mostrar guias horizontales
         show_hguide: bool = False
-        ) -> None:
+    ) -> None:
+
         """
-        Create an institutional line chart from dataframe columns and optional annotations.
+        Create an institutional line chart from selected DataFrame columns.
+
+        This method plots one or multiple time series or indexed series from the
+        selected DataFrame. It supports custom titles, source notes, labels, colors,
+        line widths, x-axis and y-axis formatting, horizontal reference lines,
+        optional horizontal guides, legends, and line-end value annotations.
+
+        Parameters
+        ----------
+        figsize : tuple[float, float], default (6.00, 5.00)
+            Figure size in inches.
+        titles : dict or None, optional
+            Configuration passed to `set_titles` to define chart titles and subtitles.
+        source : dict or None, optional
+            Configuration passed to `add_source` to display the data source note.
+        df_index : int, default 0
+            Index of the DataFrame to use when multiple DataFrames are available.
+        tickers : list[str] or str, default "all"
+            Columns to plot. Use `"all"` to plot every column in the selected
+            DataFrame.
+        labels : list[str], str, or None, optional
+            Display labels for the selected series. If not provided, column names
+            are used as labels.
+        colors : list[str] or str, default PALETA_COLORES
+            Colors assigned to each plotted series.
+        lw : float, default 1.6
+            Line width.
+        tag_dot : dict or None, optional
+            Configuration for line-end labels or point annotations.
+        y_axis : dict or None, optional
+            Configuration passed to `prep_y_axis`.
+        x_axis : dict or None, optional
+            Configuration passed to `prep_x_axis`.
+        legend : dict or None, optional
+            Legend configuration passed to `add_legend`.
+        hlines : dict or None, optional
+            Horizontal reference line configuration passed to `horizontal_lines`.
+        show_hguide : bool, default False
+            Whether to display horizontal guide lines.
+
+        Returns
+        -------
+        None
+            The chart is drawn on the active Matplotlib axis.
 
         Notes
         -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        If no active axis exists, the method automatically creates a new figure and
+        axis using `plot()`.
         """
 
         # --- 1. Importación y setteo del dataframe 
@@ -213,187 +292,304 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self.add_legend(**legend)
 
     def graph_bar(
-            self,
-            # --- Configuración del grafico
-            figsize: tuple[float, float] = (6.00, 5.00),
+        self,
+        # --- Configuración del grafico
+        figsize: tuple[float, float] = (6.00, 5.00),
 
-            # --- Configuración de los elementos adicionales del grafico
-            titles: dict | None = None,
-            source: dict | None = None,
+        # --- Configuración de los elementos adicionales del grafico
+        titles: dict | None = None,
+        source: dict | None = None,
 
-            # --- Configuración de df
-            df_index: int = 0,
+        # --- Configuración de df
+        df_index: int = 0,
 
-            # --- Configuración de las series
-            tickers: list[str] | str = "all",
-            labels: list[str] | str | None = None,
-            colors: list[str] | str = PALETA_COLORES,
+        # --- Configuración de las series
+        tickers: list[str] | str = "all",
+        labels: list[str] | str | None = None,
+        colors: list[str] | str = PALETA_COLORES,
 
-            # --- Configuración del eje x / y
-            x_axis: dict | None = None,
-            y_axis: dict | None = None,
+        # --- Configuración del eje x / y
+        x_axis: dict | None = None,
+        y_axis: dict | None = None,
 
-            # --- Configuración de barras
-            bar_mode: str = "auto",       # "auto" | "time" | "last"
-            stacked: bool = False,
-            grouped: bool = False,
-            bar_width: float = 0.8,
-            alpha: float = 0.95,
+        # --- Configuración de barras
+        bar_mode: str = "auto",       # "auto" | "time" | "last"
+        stacked: bool = False,
+        grouped: bool = False,
+        bar_width: float = 0.8,
+        alpha: float = 0.95,
 
-            # --- Etiquetas de valores
-            bar_labels: dict | None = None,
+        # --- Etiquetas de valores
+        bar_labels: dict | None = None,
 
-            # --- Configuración Leyenda
-            legend: dict | None = None,
+        # --- Configuración Leyenda
+        legend: dict | None = None,
 
-            # --- Configuración lineas horizontales
-            hlines: dict | None = None,
+        # --- Configuración lineas horizontales
+        hlines: dict | None = None,
 
-            # --- Mostrar guias horizontales
-            show_hguide: bool = False
-        ) -> None:
-            """
-            Create an institutional bar chart supporting grouped, stacked, and custom formats.
+        # --- Mostrar guias horizontales
+        show_hguide: bool = False
+    ) -> None:
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
-            """
+        """
+        Create an institutional bar chart from selected DataFrame columns.
 
-            # --- 1. Importación y setteo del dataframe
-            db = self._select_df(df_idx=df_index)
+        This method supports time-series bars, categorical bars, grouped bars,
+        stacked bars, and charts based on the latest or full set of available
+        observations. It also supports custom titles, source notes, axis formatting,
+        value labels, horizontal reference lines, horizontal guides, and legends.
 
-            # --- 2. Normalización de los tickers
-            if isinstance(tickers, str):
-                if tickers == "all":
-                    tickers = db.columns.tolist()
-                else:
-                    tickers = [tickers]
+        Parameters
+        ----------
+        figsize : tuple[float, float], default (6.00, 5.00)
+            Figure size in inches.
+        titles : dict or None, optional
+            Configuration passed to `set_titles` to define chart titles and subtitles.
+        source : dict or None, optional
+            Configuration passed to `add_source` to display the data source note.
+        df_index : int, default 0
+            Index of the DataFrame to use when multiple DataFrames are available.
+        tickers : list[str] or str, default "all"
+            Columns to plot. Use `"all"` to plot every column in the selected
+            DataFrame.
+        labels : list[str], str, or None, optional
+            Display labels for each selected series. If not provided, column names
+            are used.
+        colors : list[str] or str, default PALETA_COLORES
+            Colors assigned to each plotted series.
+        x_axis : dict or None, optional
+            Configuration passed to `prep_x_axis`.
+        y_axis : dict or None, optional
+            Configuration passed to `prep_y_axis`.
+        bar_mode : {"auto", "time", "last"}, default "auto"
+            Bar chart mode.
 
-            tickers = [t for t in tickers if t in db.columns]
-            if len(tickers) == 0:
-                raise ValueError("No hay tickers válidos para graficar.")
+            - `"auto"`: selects the mode automatically based on the number of series
+            and whether the chart is grouped or stacked.
+            - `"time"`: plots bars across the DataFrame index.
+            - `"last"`: treats the DataFrame index as categories and plots the
+            selected values directly.
+        stacked : bool, default False
+            Whether to create a stacked bar chart.
+        grouped : bool, default False
+            Whether to create a grouped bar chart.
+        bar_width : float, default 0.8
+            Width of the bars.
+        alpha : float, default 0.95
+            Bar transparency.
+        bar_labels : dict or None, optional
+            Configuration for bar value labels.
+        legend : dict or None, optional
+            Legend configuration passed to `add_legend`.
+        hlines : dict or None, optional
+            Horizontal reference line configuration passed to `horizontal_lines`.
+        show_hguide : bool, default False
+            Whether to display horizontal guide lines.
+
+        Returns
+        -------
+        None
+            The chart is drawn on the active Matplotlib axis.
+
+        Raises
+        ------
+        ValueError
+            If none of the selected tickers exists in the DataFrame, or if
+            `bar_mode` is not one of `"auto"`, `"time"`, or `"last"`.
+
+        Notes
+        -----
+        Positive and negative values are stacked separately when `stacked=True`,
+        allowing charts to correctly represent series with mixed signs.
+        """
+
+        # --- 1. Importación y setteo del dataframe
+        db = self._select_df(df_idx=df_index)
+
+        # --- 2. Normalización de los tickers
+        if isinstance(tickers, str):
+            if tickers == "all":
+                tickers = db.columns.tolist()
+            else:
+                tickers = [tickers]
+
+        tickers = [t for t in tickers if t in db.columns]
+        if len(tickers) == 0:
+            raise ValueError("No hay tickers válidos para graficar.")
+        
+        db = db[tickers].copy()  # filtrar solo los tickers seleccionados
+
+        # --- 3. Asignación de etiquetas
+        if isinstance(labels, str):
+            labels = [labels]
+        elif isinstance(labels, list):
+            if len(labels) < len(tickers):
+                labels = labels + tickers[len(labels):]
+        else:
+            labels = tickers.copy()
+
+        # --- 4. Normalización de los colores
+        if isinstance(colors, str):
+            colors = [colors]
+        elif isinstance(colors, list):
+            if len(colors) < len(tickers):
+                add = PALETA_COLORES.copy()
+                colors = colors + add[:max(0, len(tickers) - len(colors))]
+        else:
+            colors = PALETA_COLORES.copy()
+
+        colors = [
+            colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
+            for i in range(len(tickers))
+        ]
+
+        # --- 5. Asignación de ticker label color
+        self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i in range(len(tickers))]
+
+        # --- 6. Revisión de dicts
+        x_axis = x_axis if x_axis is not None else dict()
+        y_axis = y_axis if y_axis is not None else dict()
+        titles = titles if titles is not None else dict()
+        source = source if source is not None else dict()
+        legend = legend if legend is not None else dict()
+        hlines = hlines if hlines is not None else dict()
+        bar_labels = bar_labels if bar_labels is not None else dict()
+
+
+        # --- 7. Generación del gráfico y el plot en caso no exista
+        if not hasattr(self, "_ax") or self._ax is None:
+            self.plot(figsize=figsize)
+
+        # --- 8. Definición automática del modo
+        if bar_mode == "auto":
+            if len(tickers) == 1:
+                bar_mode = "time"
+            else:
+                bar_mode = "time" if (grouped or stacked) else "last"
+
+        self._bar_mode = bar_mode
+
+        # --- 9. Agregar títulos globales
+        self.set_titles(**titles)
+        self.add_source(**source)
+
+        bars_data = {}
+
+        # ==========================================================
+        # MODE: TIME
+        # ==========================================================
+        if bar_mode == "time":
+            # preparar eje x usando helper base (igual lógica que graph_line)
+            db = self.prep_x_axis(dataframe=db, **x_axis)
             
-            db = db[tickers].copy()  # filtrar solo los tickers seleccionados
-
-            # --- 3. Asignación de etiquetas
-            if isinstance(labels, str):
-                labels = [labels]
-            elif isinstance(labels, list):
-                if len(labels) < len(tickers):
-                    labels = labels + tickers[len(labels):]
+            if self._x_axis_mode == "bbg":
+                self._bars_x_reference = list(self._x_axis_fechas)
             else:
-                labels = tickers.copy()
-
-            # --- 4. Normalización de los colores
-            if isinstance(colors, str):
-                colors = [colors]
-            elif isinstance(colors, list):
-                if len(colors) < len(tickers):
-                    add = PALETA_COLORES.copy()
-                    colors = colors + add[:max(0, len(tickers) - len(colors))]
-            else:
-                colors = PALETA_COLORES.copy()
-
-            colors = [
-                colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
-                for i in range(len(tickers))
-            ]
-
-            # --- 5. Asignación de ticker label color
-            self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i in range(len(tickers))]
-
-            # --- 6. Revisión de dicts
-            x_axis = x_axis if x_axis is not None else dict()
-            y_axis = y_axis if y_axis is not None else dict()
-            titles = titles if titles is not None else dict()
-            source = source if source is not None else dict()
-            legend = legend if legend is not None else dict()
-            hlines = hlines if hlines is not None else dict()
-            bar_labels = bar_labels if bar_labels is not None else dict()
+                self._bars_x_reference = list(db.index)
 
 
-            # --- 7. Generación del gráfico y el plot en caso no exista
-            if not hasattr(self, "_ax") or self._ax is None:
-                self.plot(figsize=figsize)
+            m = len(tickers)
 
-            # --- 8. Definición automática del modo
-            if bar_mode == "auto":
-                if len(tickers) == 1:
-                    bar_mode = "time"
-                else:
-                    bar_mode = "time" if (grouped or stacked) else "last"
+            # --- A. Un ticker
+            if m == 1:
+                t = tickers[0]
+                s = db[[t]].copy()
 
-            self._bar_mode = bar_mode
-
-            # --- 9. Agregar títulos globales
-            self.set_titles(**titles)
-            self.add_source(**source)
-
-            bars_data = {}
-
-            # ==========================================================
-            # MODE: TIME
-            # ==========================================================
-            if bar_mode == "time":
-                # preparar eje x usando helper base (igual lógica que graph_line)
-                db = self.prep_x_axis(dataframe=db, **x_axis)
-                
                 if self._x_axis_mode == "bbg":
-                    self._bars_x_reference = list(self._x_axis_fechas)
+                    serie = s.reindex(self._x_axis_fechas)[t]
+                    bars = self._ax.bar(
+                        self._x_vals,
+                        serie.to_numpy(),
+                        width=min(bar_width, 0.85),
+                        color=colors[0],
+                        alpha=alpha,
+                        label=labels[0],
+                        zorder=3
+                    )
                 else:
-                    self._bars_x_reference = list(db.index)
+                    bars = self._ax.bar(
+                        s.index,
+                        s[t],
+                        width=min(bar_width, 0.85),
+                        color=colors[0],
+                        alpha=alpha,
+                        label=labels[0],
+                        zorder=3
+                    )
+                
+                bars_data[t] = {
+                    "bars": bars
+                }
 
-
-                m = len(tickers)
-
-                # --- A. Un ticker
-                if m == 1:
-                    t = tickers[0]
-                    s = db[[t]].copy()
-
+            # --- B. Multiples tickers
+            else:
+                # -------- grouped --------
+                if grouped and not stacked:
                     if self._x_axis_mode == "bbg":
-                        serie = s.reindex(self._x_axis_fechas)[t]
-                        bars = self._ax.bar(
-                            self._x_vals,
-                            serie.to_numpy(),
-                            width=min(bar_width, 0.85),
-                            color=colors[0],
-                            alpha=alpha,
-                            label=labels[0],
-                            zorder=3
-                        )
-                    else:
-                        bars = self._ax.bar(
-                            s.index,
-                            s[t],
-                            width=min(bar_width, 0.85),
-                            color=colors[0],
-                            alpha=alpha,
-                            label=labels[0],
-                            zorder=3
-                        )
-                    
-                    bars_data[t] = {
-                        "bars": bars
-                    }
+                        base_x = self._x_vals.astype(float)
+                        width = min(bar_width / m, 0.8 / m)
 
-                # --- B. Multiples tickers
-                else:
-                    # -------- grouped --------
-                    if grouped and not stacked:
-                        if self._x_axis_mode == "bbg":
-                            base_x = self._x_vals.astype(float)
-                            width = min(bar_width / m, 0.8 / m)
+                        for i, t in enumerate(tickers):
+                            serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
+                            offset = (i - (m - 1) / 2) * width
+
+                            bars = self._ax.bar(
+                                base_x + offset,
+                                serie.to_numpy(),
+                                width=width,
+                                color=colors[i],
+                                alpha=alpha,
+                                label=labels[i],
+                                zorder=3
+                            )
+
+                            bars_data[t] = {
+                                "bars": bars
+                            }
+
+                    else:
+                        x_index = db.index
+                        is_datetime = pd.api.types.is_datetime64_any_dtype(x_index)
+                        is_numeric = pd.api.types.is_numeric_dtype(x_index)
+
+                        if is_datetime:
+                            x_num = mdates.date2num(pd.to_datetime(x_index).to_pydatetime())
+                            diffs = np.diff(np.sort(np.unique(x_num)))
+                            base_step = np.median(diffs) if len(diffs) else 30.0
+                            group_total = base_step * 0.8
+                            width = group_total / m
 
                             for i, t in enumerate(tickers):
-                                serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
                                 offset = (i - (m - 1) / 2) * width
-
                                 bars = self._ax.bar(
-                                    base_x + offset,
-                                    serie.to_numpy(),
+                                    x_num + offset,
+                                    np.asarray(db[t].values, dtype=float),
+                                    width=width,
+                                    color=colors[i],
+                                    alpha=alpha,
+                                    label=labels[i],
+                                    zorder=3
+                                )
+
+                                bars_data[t] = {
+                                    "bars": bars
+                                }
+
+                            self._ax.xaxis_date()
+
+                        elif is_numeric:
+                            x_num = np.asarray(x_index.values, dtype=float)
+                            diffs = np.diff(np.sort(np.unique(x_num)))
+                            base_step = np.median(diffs) if len(diffs) else 1.0
+                            group_total = base_step * 0.8
+                            width = group_total / m
+
+                            for i, t in enumerate(tickers):
+                                offset = (i - (m - 1) / 2) * width
+                                bars = self._ax.bar(
+                                    x_num + offset,
+                                    np.asarray(db[t].values, dtype=float),
                                     width=width,
                                     color=colors[i],
                                     alpha=alpha,
@@ -406,308 +602,255 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                                 }
 
                         else:
-                            x_index = db.index
-                            is_datetime = pd.api.types.is_datetime64_any_dtype(x_index)
-                            is_numeric = pd.api.types.is_numeric_dtype(x_index)
+                            # categórico en modo time
+                            x = np.arange(len(db.index), dtype=float)
+                            width = min(bar_width / m, 0.8 / m)
 
-                            if is_datetime:
-                                x_num = mdates.date2num(pd.to_datetime(x_index).to_pydatetime())
-                                diffs = np.diff(np.sort(np.unique(x_num)))
-                                base_step = np.median(diffs) if len(diffs) else 30.0
-                                group_total = base_step * 0.8
-                                width = group_total / m
+                            for i, t in enumerate(tickers):
+                                offset = (i - (m - 1) / 2) * width
+                                bars = self._ax.bar(
+                                    x + offset,
+                                    np.asarray(db[t].values, dtype=float),
+                                    width=width,
+                                    color=colors[i],
+                                    alpha=alpha,
+                                    label=labels[i],
+                                    zorder=3
+                                )
 
-                                for i, t in enumerate(tickers):
-                                    offset = (i - (m - 1) / 2) * width
-                                    bars = self._ax.bar(
-                                        x_num + offset,
-                                        np.asarray(db[t].values, dtype=float),
-                                        width=width,
-                                        color=colors[i],
-                                        alpha=alpha,
-                                        label=labels[i],
-                                        zorder=3
-                                    )
+                                bars_data[t] = {
+                                    "bars": bars
+                                }
 
-                                    bars_data[t] = {
-                                        "bars": bars
-                                    }
+                            self._ax.set_xticks(x)
+                            _x_font = x_axis.get("fontsize", 8)
+                            self._ax.set_xticklabels([str(v) for v in db.index], fontsize=_x_font)
 
-                                self._ax.xaxis_date()
+                # -------- stacked --------
+                else:
+                    if self._x_axis_mode == "bbg":
+                        bottom_pos = np.zeros(len(self._x_vals), dtype=float)
+                        bottom_neg = np.zeros(len(self._x_vals), dtype=float)
 
-                            elif is_numeric:
-                                x_num = np.asarray(x_index.values, dtype=float)
-                                diffs = np.diff(np.sort(np.unique(x_num)))
-                                base_step = np.median(diffs) if len(diffs) else 1.0
-                                group_total = base_step * 0.8
-                                width = group_total / m
+                        for i, t in enumerate(tickers):
+                            serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
+                            y = np.asarray(serie.values, dtype=float)
 
-                                for i, t in enumerate(tickers):
-                                    offset = (i - (m - 1) / 2) * width
-                                    bars = self._ax.bar(
-                                        x_num + offset,
-                                        np.asarray(db[t].values, dtype=float),
-                                        width=width,
-                                        color=colors[i],
-                                        alpha=alpha,
-                                        label=labels[i],
-                                        zorder=3
-                                    )
+                            y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
+                            y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
 
-                                    bars_data[t] = {
-                                        "bars": bars
-                                    }
+                            bars_pos = None
+                            bars_neg = None
 
-                            else:
-                                # categórico en modo time
-                                x = np.arange(len(db.index), dtype=float)
-                                width = min(bar_width / m, 0.8 / m)
+                            if np.any(y_pos != 0):
+                                bars_pos = self._ax.bar(
+                                    self._x_vals,
+                                    y_pos,
+                                    width=min(bar_width, 0.85),
+                                    bottom=bottom_pos,
+                                    color=colors[i],
+                                    alpha=alpha,
+                                    label=labels[i],
+                                    zorder=3
+                                )
+                                bottom_pos = bottom_pos + y_pos
 
-                                for i, t in enumerate(tickers):
-                                    offset = (i - (m - 1) / 2) * width
-                                    bars = self._ax.bar(
-                                        x + offset,
-                                        np.asarray(db[t].values, dtype=float),
-                                        width=width,
-                                        color=colors[i],
-                                        alpha=alpha,
-                                        label=labels[i],
-                                        zorder=3
-                                    )
+                            if np.any(y_neg != 0):
+                                bars_neg = self._ax.bar(
+                                    self._x_vals,
+                                    y_neg,
+                                    width=min(bar_width, 0.85),
+                                    bottom=bottom_neg,
+                                    color=colors[i],
+                                    alpha=alpha,
+                                    zorder=3
+                                )
+                                bottom_neg = bottom_neg + y_neg
 
-                                    bars_data[t] = {
-                                        "bars": bars
-                                    }
+                            bars_data[t] = {
+                                "bars": {
+                                    "pos": bars_pos,
+                                    "neg": bars_neg
+                                }
+                            }
 
-                                self._ax.set_xticks(x)
-                                _x_font = x_axis.get("fontsize", 8)
-                                self._ax.set_xticklabels([str(v) for v in db.index], fontsize=_x_font)
-
-                    # -------- stacked --------
                     else:
-                        if self._x_axis_mode == "bbg":
-                            bottom_pos = np.zeros(len(self._x_vals), dtype=float)
-                            bottom_neg = np.zeros(len(self._x_vals), dtype=float)
+                        x_plot = db.index
+                        bottom_pos = np.zeros(len(db.index), dtype=float)
+                        bottom_neg = np.zeros(len(db.index), dtype=float)
 
-                            for i, t in enumerate(tickers):
-                                serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
-                                y = np.asarray(serie.values, dtype=float)
+                        for i, t in enumerate(tickers):
+                            y = np.asarray(db[t].values, dtype=float)
 
-                                y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
-                                y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
+                            y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
+                            y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
 
-                                bars_pos = None
-                                bars_neg = None
+                            bars_pos = None
+                            bars_neg = None
 
-                                if np.any(y_pos != 0):
-                                    bars_pos = self._ax.bar(
-                                        self._x_vals,
-                                        y_pos,
-                                        width=min(bar_width, 0.85),
-                                        bottom=bottom_pos,
-                                        color=colors[i],
-                                        alpha=alpha,
-                                        label=labels[i],
-                                        zorder=3
-                                    )
-                                    bottom_pos = bottom_pos + y_pos
+                            if np.any(y_pos != 0):
+                                bars_pos = self._ax.bar(
+                                    x_plot,
+                                    y_pos,
+                                    width=min(bar_width, 0.85),
+                                    bottom=bottom_pos,
+                                    color=colors[i],
+                                    alpha=alpha,
+                                    label=labels[i],
+                                    zorder=3
+                                )
+                                bottom_pos = bottom_pos + y_pos
 
-                                if np.any(y_neg != 0):
-                                    bars_neg = self._ax.bar(
-                                        self._x_vals,
-                                        y_neg,
-                                        width=min(bar_width, 0.85),
-                                        bottom=bottom_neg,
-                                        color=colors[i],
-                                        alpha=alpha,
-                                        zorder=3
-                                    )
-                                    bottom_neg = bottom_neg + y_neg
+                            if np.any(y_neg != 0):
+                                bars_neg = self._ax.bar(
+                                    x_plot,
+                                    y_neg,
+                                    width=min(bar_width, 0.85),
+                                    bottom=bottom_neg,
+                                    color=colors[i],
+                                    alpha=alpha,
+                                    zorder=3
+                                )
+                                bottom_neg = bottom_neg + y_neg
 
-                                bars_data[t] = {
-                                    "bars": {
-                                        "pos": bars_pos,
-                                        "neg": bars_neg
-                                    }
+                            bars_data[t] = {
+                                "bars": {
+                                    "pos": bars_pos,
+                                    "neg": bars_neg
                                 }
+                            }
 
-                        else:
-                            x_plot = db.index
-                            bottom_pos = np.zeros(len(db.index), dtype=float)
-                            bottom_neg = np.zeros(len(db.index), dtype=float)
+        # ==========================================================
+        # MODE: LAST
+        # ==========================================================
+        elif bar_mode == "last":
+            
+            db = db[tickers].copy()
+            self._bars_x_reference = list(db.index)
+            x = np.arange(len(db.index), dtype=float)
+            cats = [str(v) for v in db.index]
+            m = len(tickers)
 
-                            for i, t in enumerate(tickers):
-                                y = np.asarray(db[t].values, dtype=float)
+            vals_matrix = np.column_stack([
+                np.asarray(db[t].values, dtype=float) for t in tickers
+            ])
 
-                                y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
-                                y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
+            # guardar metadata básica del eje x
+            self._x_axis_mode = "categorical"
+            self._x_axis_fechas = None
+            self._x_vals = x
 
-                                bars_pos = None
-                                bars_neg = None
+            # -------- grouped --------
+            if grouped and not stacked:
+                width = min(bar_width / max(m, 1), 0.8 / max(m, 1))
 
-                                if np.any(y_pos != 0):
-                                    bars_pos = self._ax.bar(
-                                        x_plot,
-                                        y_pos,
-                                        width=min(bar_width, 0.85),
-                                        bottom=bottom_pos,
-                                        color=colors[i],
-                                        alpha=alpha,
-                                        label=labels[i],
-                                        zorder=3
-                                    )
-                                    bottom_pos = bottom_pos + y_pos
+                for i, t in enumerate(tickers):
+                    offset = (i - (m - 1) / 2) * width
+                    y = vals_matrix[:, i]
 
-                                if np.any(y_neg != 0):
-                                    bars_neg = self._ax.bar(
-                                        x_plot,
-                                        y_neg,
-                                        width=min(bar_width, 0.85),
-                                        bottom=bottom_neg,
-                                        color=colors[i],
-                                        alpha=alpha,
-                                        zorder=3
-                                    )
-                                    bottom_neg = bottom_neg + y_neg
+                    bars = self._ax.bar(
+                        x + offset,
+                        y,
+                        width=width,
+                        color=colors[i],
+                        alpha=alpha,
+                        label=labels[i],
+                        zorder=3
+                    )
 
-                                bars_data[t] = {
-                                    "bars": {
-                                        "pos": bars_pos,
-                                        "neg": bars_neg
-                                    }
-                                }
+                    bars_data[t] = {
+                        "bars": bars
+                    }
 
-            # ==========================================================
-            # MODE: LAST
-            # ==========================================================
-            elif bar_mode == "last":
-                
-                db = db[tickers].copy()
-                self._bars_x_reference = list(db.index)
-                x = np.arange(len(db.index), dtype=float)
-                cats = [str(v) for v in db.index]
-                m = len(tickers)
+            # -------- stacked --------
+            elif stacked:
+                bottom_pos = np.zeros(len(x), dtype=float)
+                bottom_neg = np.zeros(len(x), dtype=float)
 
-                vals_matrix = np.column_stack([
-                    np.asarray(db[t].values, dtype=float) for t in tickers
-                ])
+                for i, t in enumerate(tickers):
+                    y = vals_matrix[:, i]
 
-                # guardar metadata básica del eje x
-                self._x_axis_mode = "categorical"
-                self._x_axis_fechas = None
-                self._x_vals = x
+                    y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
+                    y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
 
-                # -------- grouped --------
-                if grouped and not stacked:
-                    width = min(bar_width / max(m, 1), 0.8 / max(m, 1))
+                    bars_pos = None
+                    bars_neg = None
 
-                    for i, t in enumerate(tickers):
-                        offset = (i - (m - 1) / 2) * width
-                        y = vals_matrix[:, i]
-
-                        bars = self._ax.bar(
-                            x + offset,
-                            y,
-                            width=width,
+                    if np.any(y_pos != 0):
+                        bars_pos = self._ax.bar(
+                            x,
+                            y_pos,
+                            width=min(bar_width, 0.85),
+                            bottom=bottom_pos,
                             color=colors[i],
                             alpha=alpha,
                             label=labels[i],
                             zorder=3
                         )
+                        bottom_pos = bottom_pos + y_pos
 
-                        bars_data[t] = {
-                            "bars": bars
+                    if np.any(y_neg != 0):
+                        bars_neg = self._ax.bar(
+                            x,
+                            y_neg,
+                            width=min(bar_width, 0.85),
+                            bottom=bottom_neg,
+                            color=colors[i],
+                            alpha=alpha,
+                            zorder=3
+                        )
+                        bottom_neg = bottom_neg + y_neg
+
+                    bars_data[t] = {
+                        "bars": {
+                            "pos": bars_pos,
+                            "neg": bars_neg
                         }
-
-                # -------- stacked --------
-                elif stacked:
-                    bottom_pos = np.zeros(len(x), dtype=float)
-                    bottom_neg = np.zeros(len(x), dtype=float)
-
-                    for i, t in enumerate(tickers):
-                        y = vals_matrix[:, i]
-
-                        y_pos = np.where(np.isnan(y), 0.0, np.where(y > 0, y, 0.0))
-                        y_neg = np.where(np.isnan(y), 0.0, np.where(y < 0, y, 0.0))
-
-                        bars_pos = None
-                        bars_neg = None
-
-                        if np.any(y_pos != 0):
-                            bars_pos = self._ax.bar(
-                                x,
-                                y_pos,
-                                width=min(bar_width, 0.85),
-                                bottom=bottom_pos,
-                                color=colors[i],
-                                alpha=alpha,
-                                label=labels[i],
-                                zorder=3
-                            )
-                            bottom_pos = bottom_pos + y_pos
-
-                        if np.any(y_neg != 0):
-                            bars_neg = self._ax.bar(
-                                x,
-                                y_neg,
-                                width=min(bar_width, 0.85),
-                                bottom=bottom_neg,
-                                color=colors[i],
-                                alpha=alpha,
-                                zorder=3
-                            )
-                            bottom_neg = bottom_neg + y_neg
-
-                        bars_data[t] = {
-                            "bars": {
-                                "pos": bars_pos,
-                                "neg": bars_neg
-                            }
-                        }
-                # -------- default: first ticker only --------
-                else:
-                    y = vals_matrix[:, 0]
-
-                    bars = self._ax.bar(
-                        x,
-                        y,
-                        width=min(bar_width, 0.85),
-                        color=colors[0],
-                        alpha=alpha,
-                        label=labels[0],
-                        zorder=3
-                    )
-
-                    bars_data[tickers[0]] = {
-                        "bars": bars
                     }
-
-                self._ax.set_xticks(x)
-                _x_font = x_axis.get("fontsize", 8)
-                self._ax.set_xticklabels(cats, fontsize=_x_font)
-
+            # -------- default: first ticker only --------
             else:
-                raise ValueError("bar_mode must be one of: 'auto', 'time', 'last'")
+                y = vals_matrix[:, 0]
 
-            # --- guardar referencia para uso posterior
-            self._bars_data = bars_data
-            self._bars_stacked = stacked
+                bars = self._ax.bar(
+                    x,
+                    y,
+                    width=min(bar_width, 0.85),
+                    color=colors[0],
+                    alpha=alpha,
+                    label=labels[0],
+                    zorder=3
+                )
 
-            # --- 10. Configuración del eje y
-            self.prep_y_axis(**y_axis)
+                bars_data[tickers[0]] = {
+                    "bars": bars
+                }
 
-            # --- 11. Agregar lineas horizontales
-            self.horizontal_lines(**hlines)
+            self._ax.set_xticks(x)
+            _x_font = x_axis.get("fontsize", 8)
+            self._ax.set_xticklabels(cats, fontsize=_x_font)
 
-            # --- 12. Agregar guias horizontales
-            if show_hguide:
-                self.guias_horizontales(mostrar_cero=False)
+        else:
+            raise ValueError("bar_mode must be one of: 'auto', 'time', 'last'")
 
-            # --- 13. Agregar leyenda
-            self.add_legend(**legend)
+        # --- guardar referencia para uso posterior
+        self._bars_data = bars_data
+        self._bars_stacked = stacked
 
-            if bar_labels:
-                self._bar_value_label_generate_dict(label_dict=bar_labels)
+        # --- 10. Configuración del eje y
+        self.prep_y_axis(**y_axis)
+
+        # --- 11. Agregar lineas horizontales
+        self.horizontal_lines(**hlines)
+
+        # --- 12. Agregar guias horizontales
+        if show_hguide:
+            self.guias_horizontales(mostrar_cero=False)
+
+        # --- 13. Agregar leyenda
+        self.add_legend(**legend)
+
+        if bar_labels:
+            self._bar_value_label_generate_dict(label_dict=bar_labels)
 
     def graph_pie(
         self,
@@ -735,13 +878,81 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         label_color: str = "black",
         autopct_color: str = "white",
     ) -> None:
-        """
-        Create an institutional pie chart with configurable labels, tags, and legend.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        """
+        Create an institutional pie or donut chart from a selected DataFrame row.
+
+        This method builds a pie chart using the values of selected columns for a
+        specific index value, row position, or the last available non-empty row. It
+        supports custom labels, colors, sorting, donut-style charts, percentage
+        labels, legend placement, text styling, and optional text stroke effects.
+
+        Parameters
+        ----------
+        figsize : tuple[float, float], default (6.00, 5.00)
+            Figure size in inches.
+        titles : dict or None, optional
+            Configuration passed to `set_titles` to define chart titles and subtitles.
+        source : str, list[str], or None, optional
+            Source note displayed below the chart.
+        df_index : int, default 0
+            Index of the DataFrame to use when multiple DataFrames are available.
+        tickers : list[str] or str, default "all"
+            Columns to include in the pie chart. Use `"all"` to include every column.
+        labels : list[str], str, or None, optional
+            Display labels for each selected segment. If not provided, column names
+            are used.
+        colors : list[str] or str, default PALETA_COLORES
+            Colors assigned to each pie segment.
+        x_value : str, int, float, or pandas.Timestamp, default "last"
+            Row used to extract pie values. Use `"last"` to select the last
+            non-empty row, an index value to select a specific row, or an integer
+            to select by positional index.
+        donut_width : float or None, optional
+            Width of the donut ring. If provided, the pie chart is rendered as a
+            donut chart.
+        startangle : float, default 90
+            Starting angle of the pie chart.
+        counterclock : bool, default False
+            Whether segments are drawn counterclockwise.
+        autopct : str or None, default "%1.1f%%"
+            Format string for percentage labels. Use None to hide them.
+        pctdistance : float, default 0.72
+            Radial distance of percentage labels from the center.
+        labeldistance : float, default 1.05
+            Radial distance of segment labels from the center.
+        textprops : dict or None, optional
+            Text properties passed to Matplotlib pie labels.
+        wedgeprops : dict or None, optional
+            Wedge properties passed to Matplotlib pie segments.
+        legend : dict or None, optional
+            Legend configuration. If `show=True`, a legend is displayed.
+        sort_values : bool, default False
+            Whether to sort segments in descending order before plotting.
+        normalize : bool, default True
+            Whether Matplotlib should normalize values to sum to one.
+        text_edge_color : str or None, optional
+            Stroke color applied to labels and percentage texts.
+        text_edge_width : float, default 0.0
+            Stroke width applied to labels and percentage texts.
+        label_color : str, default "black"
+            Color used for segment labels.
+        autopct_color : str, default "white"
+            Color used for percentage labels.
+
+        Returns
+        -------
+        None
+            The chart is drawn on the active Matplotlib axis.
+
+        Raises
+        ------
+        ValueError
+            If no valid tickers are found, if the selected row has no numeric data,
+            or if the DataFrame has no available data for plotting.
+        KeyError
+            If `x_value` is not `"last"`, not an integer position, and does not
+            exist in the DataFrame index.
         """
 
         db = self._select_df(df_idx=df_index)
@@ -920,13 +1131,78 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         hlines: dict | None = None,
         show_hguide: bool = False,
     ):
+
         """
-        Create an institutional box-and-whisker chart from dataframe columns.
+        Create an institutional box-and-whisker chart from selected DataFrame columns.
+
+        This method creates a distribution chart for one or multiple series,
+        supporting customized box, median, whisker, cap, flier, and mean styles.
+        It also supports range labels, mean labels, point annotations, horizontal
+        reference lines, axis formatting, source notes, titles, legends, and
+        horizontal guide lines.
+
+        Parameters
+        ----------
+        figsize : tuple[float, float], default (6.00, 5.00)
+            Figure size in inches.
+        titles : dict or None, optional
+            Configuration passed to `set_titles` to define chart titles and subtitles.
+        source : dict or None, optional
+            Configuration passed to `add_source` to display the data source note.
+        df_index : int, default 0
+            Index of the DataFrame to use when multiple DataFrames are available.
+        tickers : list[str] or str, default "all"
+            Columns to include in the boxplot. Use `"all"` to include every column.
+        labels : list[str], str, or None, optional
+            Display labels for each selected series. If not provided, column names
+            are used.
+        colors : list[str] or str, default PALETA_COLORES
+            Fill colors assigned to each box.
+        box_face_alpha : float, default 0.5
+            Transparency applied to box fill colors.
+        box_config : dict or None, optional
+            General Matplotlib boxplot configuration, such as whisker range,
+            mean visibility, outlier visibility, widths, notch, and orientation.
+        box_style : dict or None, optional
+            Styling configuration for box borders.
+        median_style : dict or None, optional
+            Styling configuration for median lines.
+        whisker_style : dict or None, optional
+            Styling configuration for whisker lines.
+        cap_style : dict or None, optional
+            Styling configuration for whisker caps.
+        flier_style : dict or None, optional
+            Styling configuration for outlier markers.
+        mean_style : dict or None, optional
+            Styling configuration for mean lines or markers.
+        y_axis : dict or None, optional
+            Configuration passed to `prep_y_axis`.
+        x_axis : dict or None, optional
+            Configuration passed to `prep_x_axis`.
+        range_tag_high : dict or None, optional
+            Configuration for labels shown at the upper whisker values.
+        range_tag_low : dict or None, optional
+            Configuration for labels shown at the lower whisker values.
+        mean_tag : dict or None, optional
+            Configuration for labels shown at the mean values.
+        legend : dict or None, optional
+            Legend configuration passed to `add_legend`.
+        tag_dot : dict or None, optional
+            Configuration for additional boxplot annotations.
+        hlines : dict or None, optional
+            Horizontal reference line configuration passed to `horizontal_lines`.
+        show_hguide : bool, default False
+            Whether to display horizontal guide lines.
+
+        Returns
+        -------
+        None
+            The chart is drawn on the active Matplotlib axis.
 
         Notes
         -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        The x-axis is forced to categorical mode because box-and-whisker charts
+        represent distributions by category rather than continuous x-axis values.
         """
 
         # --- 1. Importación y setteo del dataframe 
@@ -997,12 +1273,12 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 lw: float = 1.5,
         ):
             """
-            Execute `_median` as part of the chart-building workflow.
+            Build the default style dictionary for median lines in the boxplot.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            Returns
+            -------
+            dict
+                Local style parameters to be passed as `medianprops` to Matplotlib.
             """
             return locals()
         
@@ -1011,12 +1287,12 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 lw: float = 0.5,
         ):
             """
-            Execute `_whisker` as part of the chart-building workflow.
+            Build the default style dictionary for whisker lines in the boxplot.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            Returns
+            -------
+            dict
+                Local style parameters to be passed as `whiskerprops` to Matplotlib.
             """
             return locals()
 
@@ -1025,12 +1301,12 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 lw: float = 0.5,
         ):
             """
-            Execute `_cap` as part of the chart-building workflow.
+            Build the default style dictionary for whisker caps in the boxplot.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            Returns
+            -------
+            dict
+                Local style parameters to be passed as `capprops` to Matplotlib.
             """
             return locals()
 
@@ -1039,12 +1315,12 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 lw: float = 0.5,
         ):
             """
-            Execute `_box` as part of the chart-building workflow.
+            Build the default style dictionary for box borders in the boxplot.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            Returns
+            -------
+            dict
+                Local style parameters to be passed as `boxprops` to Matplotlib.
             """
             return locals()
 
@@ -1056,12 +1332,12 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 alpha: float = 0.85,
         ):
             """
-            Execute `_fliers` as part of the chart-building workflow.
+            Build the default style dictionary for outlier markers in the boxplot.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            Returns
+            -------
+            dict
+                Local style parameters to be passed as `flierprops` to Matplotlib.
             """
             return locals()         
         
@@ -1071,12 +1347,12 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 linestyle: str = "--"
         ):
             """
-            Execute `_mean` as part of the chart-building workflow.
+            Build the default style dictionary for mean indicators in the boxplot.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            Returns
+            -------
+            dict
+                Local style parameters to be passed as `meanprops` to Matplotlib.
             """
             return locals()
         
@@ -1090,12 +1366,13 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             vert: bool = True, 
         ):
             """
-            Execute `_box_config` as part of the chart-building workflow.
+            Build the default configuration dictionary for the Matplotlib boxplot.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            Returns
+            -------
+            dict
+                Boxplot configuration parameters, including whisker range, visibility
+                options, width, notch setting, and orientation.
             """
             return locals()
         
@@ -1149,12 +1426,15 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             show: bool = True,
         ):
             """
-            Execute `_tag` as part of the chart-building workflow.
+            Build the default configuration dictionary for statistic value labels.
 
-            Notes
-            -----
-            This docstring was added during the modular refactor to make the API easier
-            to understand for new users and maintainers.
+            This helper defines the visual and formatting parameters used to annotate
+            whisker values or mean values on the box-and-whisker chart.
+
+            Returns
+            -------
+            dict
+                Label configuration parameters used by `etiqueta_valor`.
             """
             return locals()
         
