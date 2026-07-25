@@ -38,7 +38,7 @@ jobs:
 
       - name: Verify import
         run: |
-          python -c "from helpers_ps.Grafico.graf import Graph_mtplt; print(Graph_mtplt)"
+          python -c "import helpers_ps as hp import hp.GraphMtplt; print(GraphMtplt)"
 
       - name: Build documentation
         run: |
