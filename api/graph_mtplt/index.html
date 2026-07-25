@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -1386,7 +1386,7 @@ líneas.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parámetros para configurar el eje y mediante <code>_prep_y_axis</code>.</p>
+                <p>Parámetros para configurar el eje y mediante <code>prep_y_axis</code>.</p>
               </div>
             </td>
             <td>
@@ -1402,7 +1402,7 @@ líneas.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parámetros para configurar el eje x mediante <code>_prep_x_axis</code>.</p>
+                <p>Parámetros para configurar el eje x mediante <code>prep_x_axis</code>.</p>
               </div>
             </td>
             <td>
@@ -1772,10 +1772,10 @@ líneas.</p>
 <a id="__codelineno-0-2926" name="__codelineno-0-2926"></a><span class="sd">        líneas.</span>
 <a id="__codelineno-0-2927" name="__codelineno-0-2927"></a>
 <a id="__codelineno-0-2928" name="__codelineno-0-2928"></a><span class="sd">    y_axis : dict or None, default None</span>
-<a id="__codelineno-0-2929" name="__codelineno-0-2929"></a><span class="sd">        Parámetros para configurar el eje y mediante `_prep_y_axis`.</span>
+<a id="__codelineno-0-2929" name="__codelineno-0-2929"></a><span class="sd">        Parámetros para configurar el eje y mediante `prep_y_axis`.</span>
 <a id="__codelineno-0-2930" name="__codelineno-0-2930"></a>
 <a id="__codelineno-0-2931" name="__codelineno-0-2931"></a><span class="sd">    x_axis : dict or None, default None</span>
-<a id="__codelineno-0-2932" name="__codelineno-0-2932"></a><span class="sd">        Parámetros para configurar el eje x mediante `_prep_x_axis`.</span>
+<a id="__codelineno-0-2932" name="__codelineno-0-2932"></a><span class="sd">        Parámetros para configurar el eje x mediante `prep_x_axis`.</span>
 <a id="__codelineno-0-2933" name="__codelineno-0-2933"></a>
 <a id="__codelineno-0-2934" name="__codelineno-0-2934"></a><span class="sd">    legend : dict or None, default None</span>
 <a id="__codelineno-0-2935" name="__codelineno-0-2935"></a><span class="sd">        Parámetros para `add_legend`.</span>
@@ -1866,7 +1866,7 @@ líneas.</p>
 <a id="__codelineno-0-3020" name="__codelineno-0-3020"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">add_source</span><span class="p">(</span><span class="o">**</span><span class="n">source</span><span class="p">)</span>
 <a id="__codelineno-0-3021" name="__codelineno-0-3021"></a>
 <a id="__codelineno-0-3022" name="__codelineno-0-3022"></a>    <span class="c1"># --- 9. Manejo del eje x</span>
-<a id="__codelineno-0-3023" name="__codelineno-0-3023"></a>    <span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prep_x_axis</span><span class="p">(</span><span class="n">dataframe</span><span class="o">=</span><span class="n">db</span><span class="p">,</span> <span class="o">**</span><span class="n">x_axis</span><span class="p">)</span>
+<a id="__codelineno-0-3023" name="__codelineno-0-3023"></a>    <span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_x_axis</span><span class="p">(</span><span class="n">dataframe</span><span class="o">=</span><span class="n">db</span><span class="p">,</span> <span class="o">**</span><span class="n">x_axis</span><span class="p">)</span>
 <a id="__codelineno-0-3024" name="__codelineno-0-3024"></a>
 <a id="__codelineno-0-3025" name="__codelineno-0-3025"></a>    <span class="c1"># --- 10 Graficar las lineas</span>
 <a id="__codelineno-0-3026" name="__codelineno-0-3026"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">tickers</span><span class="p">):</span>
@@ -1892,7 +1892,7 @@ líneas.</p>
 <a id="__codelineno-0-3046" name="__codelineno-0-3046"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_line_label_generate</span><span class="p">(</span><span class="n">tag_dot</span><span class="p">)</span>
 <a id="__codelineno-0-3047" name="__codelineno-0-3047"></a>
 <a id="__codelineno-0-3048" name="__codelineno-0-3048"></a>    <span class="c1"># --- 12. Configuración del eje y</span>
-<a id="__codelineno-0-3049" name="__codelineno-0-3049"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_prep_y_axis</span><span class="p">(</span><span class="o">**</span><span class="n">y_axis</span><span class="p">)</span>
+<a id="__codelineno-0-3049" name="__codelineno-0-3049"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">prep_y_axis</span><span class="p">(</span><span class="o">**</span><span class="n">y_axis</span><span class="p">)</span>
 <a id="__codelineno-0-3050" name="__codelineno-0-3050"></a>
 <a id="__codelineno-0-3051" name="__codelineno-0-3051"></a>    <span class="c1"># -- 13. Agregar lineas horizontales</span>
 <a id="__codelineno-0-3052" name="__codelineno-0-3052"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">horizontal_lines</span><span class="p">(</span><span class="o">**</span><span class="n">hlines</span><span class="p">)</span>
@@ -3094,7 +3094,7 @@ columnas.</p>
 <a id="__codelineno-0-3271" name="__codelineno-0-3271"></a>        <span class="c1"># ==========================================================</span>
 <a id="__codelineno-0-3272" name="__codelineno-0-3272"></a>        <span class="k">if</span> <span class="n">bar_mode</span> <span class="o">==</span> <span class="s2">&quot;time&quot;</span><span class="p">:</span>
 <a id="__codelineno-0-3273" name="__codelineno-0-3273"></a>            <span class="c1"># preparar eje x usando helper base (igual lógica que graph_line)</span>
-<a id="__codelineno-0-3274" name="__codelineno-0-3274"></a>            <span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prep_x_axis</span><span class="p">(</span><span class="n">dataframe</span><span class="o">=</span><span class="n">db</span><span class="p">,</span> <span class="o">**</span><span class="n">x_axis</span><span class="p">)</span>
+<a id="__codelineno-0-3274" name="__codelineno-0-3274"></a>            <span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_x_axis</span><span class="p">(</span><span class="n">dataframe</span><span class="o">=</span><span class="n">db</span><span class="p">,</span> <span class="o">**</span><span class="n">x_axis</span><span class="p">)</span>
 <a id="__codelineno-0-3275" name="__codelineno-0-3275"></a>
 <a id="__codelineno-0-3276" name="__codelineno-0-3276"></a>            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_axis_mode</span> <span class="o">==</span> <span class="s2">&quot;bbg&quot;</span><span class="p">:</span>
 <a id="__codelineno-0-3277" name="__codelineno-0-3277"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_bars_x_reference</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_axis_fechas</span><span class="p">)</span>
@@ -3450,7 +3450,7 @@ columnas.</p>
 <a id="__codelineno-0-3627" name="__codelineno-0-3627"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_bars_stacked</span> <span class="o">=</span> <span class="n">stacked</span>
 <a id="__codelineno-0-3628" name="__codelineno-0-3628"></a>
 <a id="__codelineno-0-3629" name="__codelineno-0-3629"></a>        <span class="c1"># --- 10. Configuración del eje y</span>
-<a id="__codelineno-0-3630" name="__codelineno-0-3630"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_prep_y_axis</span><span class="p">(</span><span class="o">**</span><span class="n">y_axis</span><span class="p">)</span>
+<a id="__codelineno-0-3630" name="__codelineno-0-3630"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">prep_y_axis</span><span class="p">(</span><span class="o">**</span><span class="n">y_axis</span><span class="p">)</span>
 <a id="__codelineno-0-3631" name="__codelineno-0-3631"></a>
 <a id="__codelineno-0-3632" name="__codelineno-0-3632"></a>        <span class="c1"># --- 11. Agregar lineas horizontales</span>
 <a id="__codelineno-0-3633" name="__codelineno-0-3633"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">horizontal_lines</span><span class="p">(</span><span class="o">**</span><span class="n">hlines</span><span class="p">)</span>
@@ -4797,7 +4797,7 @@ columnas.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parámetros para configurar el eje y mediante <code>_prep_y_axis</code>.</p>
+                <p>Parámetros para configurar el eje y mediante <code>prep_y_axis</code>.</p>
               </div>
             </td>
             <td>
@@ -4813,7 +4813,7 @@ columnas.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parámetros para configurar el eje x mediante <code>_prep_x_axis</code>.</p>
+                <p>Parámetros para configurar el eje x mediante <code>prep_x_axis</code>.</p>
               </div>
             </td>
             <td>
@@ -5481,10 +5481,10 @@ cajas, por ejemplo el último valor histórico.</p>
 <a id="__codelineno-0-4019" name="__codelineno-0-4019"></a><span class="sd">        Estilo de la media, si se muestra.</span>
 <a id="__codelineno-0-4020" name="__codelineno-0-4020"></a>
 <a id="__codelineno-0-4021" name="__codelineno-0-4021"></a><span class="sd">    y_axis : dict or None, default None</span>
-<a id="__codelineno-0-4022" name="__codelineno-0-4022"></a><span class="sd">        Parámetros para configurar el eje y mediante `_prep_y_axis`.</span>
+<a id="__codelineno-0-4022" name="__codelineno-0-4022"></a><span class="sd">        Parámetros para configurar el eje y mediante `prep_y_axis`.</span>
 <a id="__codelineno-0-4023" name="__codelineno-0-4023"></a>
 <a id="__codelineno-0-4024" name="__codelineno-0-4024"></a><span class="sd">    x_axis : dict or None, default None</span>
-<a id="__codelineno-0-4025" name="__codelineno-0-4025"></a><span class="sd">        Parámetros para configurar el eje x mediante `_prep_x_axis`.</span>
+<a id="__codelineno-0-4025" name="__codelineno-0-4025"></a><span class="sd">        Parámetros para configurar el eje x mediante `prep_x_axis`.</span>
 <a id="__codelineno-0-4026" name="__codelineno-0-4026"></a>
 <a id="__codelineno-0-4027" name="__codelineno-0-4027"></a><span class="sd">    range_tag_high : dict or None, default None</span>
 <a id="__codelineno-0-4028" name="__codelineno-0-4028"></a><span class="sd">        Configuración de etiquetas para el extremo superior del rango.</span>
@@ -5586,7 +5586,7 @@ cajas, por ejemplo el último valor histórico.</p>
 <a id="__codelineno-0-4124" name="__codelineno-0-4124"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">add_source</span><span class="p">(</span><span class="o">**</span><span class="n">source</span><span class="p">)</span>
 <a id="__codelineno-0-4125" name="__codelineno-0-4125"></a>
 <a id="__codelineno-0-4126" name="__codelineno-0-4126"></a>    <span class="c1"># --- 9. Manejo del eje x</span>
-<a id="__codelineno-0-4127" name="__codelineno-0-4127"></a>    <span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prep_x_axis</span><span class="p">(</span><span class="n">dataframe</span><span class="o">=</span><span class="n">db</span><span class="p">,</span> <span class="o">**</span><span class="n">x_axis</span><span class="p">)</span>
+<a id="__codelineno-0-4127" name="__codelineno-0-4127"></a>    <span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_x_axis</span><span class="p">(</span><span class="n">dataframe</span><span class="o">=</span><span class="n">db</span><span class="p">,</span> <span class="o">**</span><span class="n">x_axis</span><span class="p">)</span>
 <a id="__codelineno-0-4128" name="__codelineno-0-4128"></a>
 <a id="__codelineno-0-4129" name="__codelineno-0-4129"></a>    <span class="c1">#overide el eje a categorico para este tipo de grafico</span>
 <a id="__codelineno-0-4130" name="__codelineno-0-4130"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_x_axis_mode</span> <span class="o">=</span> <span class="s2">&quot;categorical&quot;</span>
@@ -5783,7 +5783,7 @@ cajas, por ejemplo el último valor histórico.</p>
 <a id="__codelineno-0-4321" name="__codelineno-0-4321"></a>    <span class="k">if</span> <span class="n">show_hguide</span><span class="p">:</span>
 <a id="__codelineno-0-4322" name="__codelineno-0-4322"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">guias_horizontales</span><span class="p">(</span><span class="n">mostrar_cero</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <a id="__codelineno-0-4323" name="__codelineno-0-4323"></a>
-<a id="__codelineno-0-4324" name="__codelineno-0-4324"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_prep_y_axis</span><span class="p">(</span><span class="o">**</span><span class="n">y_axis</span><span class="p">)</span>
+<a id="__codelineno-0-4324" name="__codelineno-0-4324"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">prep_y_axis</span><span class="p">(</span><span class="o">**</span><span class="n">y_axis</span><span class="p">)</span>
 <a id="__codelineno-0-4325" name="__codelineno-0-4325"></a>
 <a id="__codelineno-0-4326" name="__codelineno-0-4326"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">add_legend</span><span class="p">(</span><span class="o">**</span><span class="n">legend</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -5849,7 +5849,7 @@ cajas, por ejemplo el último valor histórico.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.suggest", "content.code.copy", "content.code.select"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
