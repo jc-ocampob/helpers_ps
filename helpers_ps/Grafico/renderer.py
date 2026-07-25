@@ -3,7 +3,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-def render_and_save_bytesio_dict(
+def render_from_dict(
         images_dict: dict[str: BytesIO], output_dir="saved_plots", figsize=(6, 4)):
     """
     images_dict: dict[str, BytesIO]

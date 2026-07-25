@@ -338,7 +338,7 @@ class Graph_base(Graph_meta_data):
     # =========================
     # Metodos de los ejes
     # =========================
-    def _prep_x_axis(
+    def prep_x_axis(
             self,
             dataframe: pd.DataFrame = None,
             bbg_format: bool = False, 
@@ -433,7 +433,7 @@ class Graph_base(Graph_meta_data):
         
         return dataframe
 
-    def _prep_y_axis(
+    def prep_y_axis(
         self,
         lim: tuple[float, float] | None = None,
         fmt: str | None = None,
@@ -2926,10 +2926,10 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             líneas.
 
         y_axis : dict or None, default None
-            Parámetros para configurar el eje y mediante `_prep_y_axis`.
+            Parámetros para configurar el eje y mediante `prep_y_axis`.
 
         x_axis : dict or None, default None
-            Parámetros para configurar el eje x mediante `_prep_x_axis`.
+            Parámetros para configurar el eje x mediante `prep_x_axis`.
 
         legend : dict or None, default None
             Parámetros para `add_legend`.
@@ -3020,7 +3020,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self.add_source(**source)
 
         # --- 9. Manejo del eje x
-        db = self._prep_x_axis(dataframe=db, **x_axis)
+        db = self.prep_x_axis(dataframe=db, **x_axis)
 
         # --- 10 Graficar las lineas
         for i, t in enumerate(tickers):
@@ -3046,7 +3046,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._line_label_generate(tag_dot)
 
         # --- 12. Configuración del eje y
-        self._prep_y_axis(**y_axis)
+        self.prep_y_axis(**y_axis)
 
         # -- 13. Agregar lineas horizontales
         self.horizontal_lines(**hlines)
@@ -3271,7 +3271,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             # ==========================================================
             if bar_mode == "time":
                 # preparar eje x usando helper base (igual lógica que graph_line)
-                db = self._prep_x_axis(dataframe=db, **x_axis)
+                db = self.prep_x_axis(dataframe=db, **x_axis)
                 
                 if self._x_axis_mode == "bbg":
                     self._bars_x_reference = list(self._x_axis_fechas)
@@ -3627,7 +3627,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             self._bars_stacked = stacked
 
             # --- 10. Configuración del eje y
-            self._prep_y_axis(**y_axis)
+            self.prep_y_axis(**y_axis)
 
             # --- 11. Agregar lineas horizontales
             self.horizontal_lines(**hlines)
@@ -4019,10 +4019,10 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             Estilo de la media, si se muestra.
 
         y_axis : dict or None, default None
-            Parámetros para configurar el eje y mediante `_prep_y_axis`.
+            Parámetros para configurar el eje y mediante `prep_y_axis`.
 
         x_axis : dict or None, default None
-            Parámetros para configurar el eje x mediante `_prep_x_axis`.
+            Parámetros para configurar el eje x mediante `prep_x_axis`.
 
         range_tag_high : dict or None, default None
             Configuración de etiquetas para el extremo superior del rango.
@@ -4124,7 +4124,7 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self.add_source(**source)
 
         # --- 9. Manejo del eje x
-        db = self._prep_x_axis(dataframe=db, **x_axis)
+        db = self.prep_x_axis(dataframe=db, **x_axis)
         
         #overide el eje a categorico para este tipo de grafico
         self._x_axis_mode = "categorical"
@@ -4321,6 +4321,6 @@ class Graph_mtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         if show_hguide:
             self.guias_horizontales(mostrar_cero=False)
 
-        self._prep_y_axis(**y_axis)
+        self.prep_y_axis(**y_axis)
 
         self.add_legend(**legend)
