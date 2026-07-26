@@ -17,53 +17,21 @@ except Exception:
 
 
 # ============================================================
-# API pública - Gráficos
+# API pública - paquetes alternos
 # ============================================================
 
-from helpers_ps.Grafico import (
+from helpers_ps import (
+    FinCalculations,
+    BBGHelper,
+    Powerpoint
+)
+
+# ============================================================
+# API pública - Paquete principal
+# ============================================================
+from helpers_ps.MtpltGraph import (
     GraphMtplt,
-    set_graph_theme,
-    buffers,
-    PALETA_COLORES,
-)
-
-
-# ============================================================
-# API pública - Cálculo / métricas
-# ============================================================
-
-from helpers_ps.Calculo.metricas import (
-    Metrics,
-    ytd,
-    mtd,
-    qtd,
-    drawdown,
-    downside_std,
-    beta,
-    upside_capture,
-    downside_capture,
-    capture_ratio,
-    var,
-    tracking_error,
-    information_ratio,
-    excess_return,
-    consistency,
-    rsi,
-    sma,
-    ema,
-    ranges,
-    relative,
-    momentum,
-    momentum_sma,
-    rank_percentile,
-)
-
-# ============================================================
-# API pública - Presentación
-# ============================================================
-
-from helpers_ps.Presentacion import (
-    ppt_grafs
+    set_graph_theme
 )
 
 # ============================================================
@@ -76,31 +44,9 @@ __all__ = [
     # Gráficos
     "GraphMtplt",
     "set_graph_theme",
-    "buffers",
-    "PALETA_COLORES",
 
-    # Métricas
-    "Metrics",
-    "ytd",
-    "mtd",
-    "qtd",
-    "drawdown",
-    "downside_std",
-    "beta",
-    "upside_capture",
-    "downside_capture",
-    "capture_ratio",
-    "var",
-    "tracking_error",
-    "information_ratio",
-    "excess_return",
-    "consistency",
-    "rsi",
-    "sma",
-    "ema",
-    "ranges",
-    "relative",
-    "momentum",
-    "momentum_sma",
-    "rank_percentile",
+    #Alternate packages
+    "FinCalculations",
+    "BBGHelper"
+    "Powerpoint"
 ]

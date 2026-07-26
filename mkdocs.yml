@@ -44,19 +44,28 @@ markdown_extensions:
       alternate_style: true
 
 nav:
-  - Inicio: index.md
-  - Getting Started: getting_started.md
-  - Quick Reference: quick_reference.md
-  - Graph Line: 
-      - Graficar: Line/graph.md
-      - Etiquetas: Line/tags.md
-  - Graph Bar: graph_bar.md
-  - Graph Pie: graph_pie.md
-  - Graph Box Whiskers: graph_box_whiskers.md
+  - Index: index.md
+  
+  - Instalation: install_guide.md
+  
+  - GraphMtplt:
+    - Getting_started: GraphMtplt/getting_started.md
+    
+    - Graph Types:
+      - Line Chart: 
+        - Chart: GraphMtplt/Line/graph.md
+        - Tags: GraphMtplt/Line/tags.md
+      
+      - Graph Bar: GraphMtplt/Bar/graph_bar.md
+      
+      - Graph Pie: GraphMtplt/Pie/graph_pie.md
+
+      - Graph Box Whiskers: GraphMtplt/Box/graph_box_whiskers.md
+
   - Ejemplos:
-      - Línea último valor: examples/line_last_value.md
-      - Barras stacked: examples/bar_stacked.md
-      - Box Whiskers: examples/box_whiskers.md
+    - Línea último valor: examples/line_last_value.md
+    - Barras stacked: examples/bar_stacked.md
+    - Box Whiskers: examples/box_whiskers.md
   - API:
-      - Gráficos: api/graph_mtplt.md
-      - Funciones de Ayuda: api/helpers.md
+    - Gráficos: api/graph_mtplt.md
+    - Funciones de Ayuda: api/helpers.md

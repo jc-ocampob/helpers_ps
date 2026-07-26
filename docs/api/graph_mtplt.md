@@ -16,7 +16,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 ## Graphs
 --------
-::: helpers_ps.Grafico.charts.GraphMtplt.graph_line
+::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_line
     options:
       heading_level: 3
       show_root_heading: true
@@ -27,7 +27,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 
 ---------
-::: helpers_ps.Grafico.charts.GraphMtplt.graph_bar
+::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_bar
     options:
       heading_level: 3
       show_root_heading: true
@@ -37,7 +37,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 ----------
 
-::: helpers_ps.Grafico.charts.GraphMtplt.graph_pie
+::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_pie
     options:
       heading_level: 3
       show_root_heading: true
@@ -46,7 +46,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.charts.GraphMtplt.graph_box_whiskers
+::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_box_whiskers
     options:
       heading_level: 3
       show_root_heading: true
@@ -58,7 +58,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 ## Axis
 --------
 
-::: helpers_ps.Grafico.base.Graph_base.prep_x_axis
+::: helpers_ps.MtpltGraph.base.Graph_base.prep_x_axis
     options:
       heading_level: 3
       show_root_heading: true
@@ -67,7 +67,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.prep_y_axis
+::: helpers_ps.MtpltGraph.base.Graph_base.prep_y_axis
     options:
       heading_level: 3
       show_root_heading: true
@@ -78,7 +78,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 --------
 ## Titles
 --------
-::: helpers_ps.Grafico.base.Graph_base.set_titles
+::: helpers_ps.MtpltGraph.base.Graph_base.set_titles
     options:
       heading_level: 3
       show_root_heading: true
@@ -87,7 +87,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.add_source
+::: helpers_ps.MtpltGraph.base.Graph_base.add_source
     options:
       heading_level: 3
       show_root_heading: true
@@ -96,7 +96,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.add_legend
+::: helpers_ps.MtpltGraph.base.Graph_base.add_legend
     options:
       heading_level: 3
       show_root_heading: true
@@ -105,7 +105,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.add_legend_point
+::: helpers_ps.MtpltGraph.base.Graph_base.add_legend_point
     options:
       heading_level: 3
       show_root_heading: true
@@ -117,7 +117,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 --------
 ## Tags, dots and shades
 --------
-::: helpers_ps.Grafico.base.Graph_base.horizontal_guides
+::: helpers_ps.MtpltGraph.base.Graph_base.horizontal_guides
     options:
       heading_level: 3
       show_root_heading: true
@@ -126,7 +126,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.tag
+::: helpers_ps.MtpltGraph.base.Graph_base.tag
     options:
       heading_level: 3
       show_root_heading: true
@@ -135,7 +135,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.dot
+::: helpers_ps.MtpltGraph.base.Graph_base.dot
     options:
       heading_level: 3
       show_root_heading: true
@@ -144,7 +144,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.shade_x
+::: helpers_ps.MtpltGraph.base.Graph_base.shade_x
     options:
       heading_level: 3
       show_root_heading: true
@@ -153,7 +153,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.Grafico.base.Graph_base.horizontal_lines
+::: helpers_ps.MtpltGraph.base.Graph_base.horizontal_lines
     options:
       heading_level: 3
       show_root_heading: true
