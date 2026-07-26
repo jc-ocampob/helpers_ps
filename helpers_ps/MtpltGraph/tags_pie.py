@@ -169,7 +169,7 @@ class Pie_tags():
                 label=label,
             )
 
-            self.etiqueta_valor(
+            self.tag(
                 x_value=x,
                 y_value=y,
                 label=text,
@@ -269,7 +269,7 @@ class Pie_tags():
                 label=label,
             )
 
-            self.etiqueta_valor(
+            self.tag(
                 x_value=x,
                 y_value=y,
                 label=text,

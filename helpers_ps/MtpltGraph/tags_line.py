@@ -134,7 +134,7 @@ class Line_tags():
                 if "tag" in show:
                     if tag.get("font_color") is None:
                         tag["font_color"] = _ticker_label_color[0][2]
-                    self.etiqueta_valor(
+                    self.tag(
                         label=template.format(x_value=x, y_value=y, ticker=ticker),
                         x_value=x,          # datetime real para texto "Mar 26: 4.3"
                         y_value=y,

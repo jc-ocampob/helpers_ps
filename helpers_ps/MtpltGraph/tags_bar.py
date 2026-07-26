@@ -359,7 +359,7 @@ class Bar_tags:
                         ox, oy = _safe_offset(tag, (0, -5))
                         tag["ubic_etq"] = (ox, -abs(oy))
 
-                    self.etiqueta_valor(
+                    self.tag(
                         x_value=x,
                         y_value=y_anchor,
                         label=text,
@@ -406,7 +406,7 @@ class Bar_tags:
                         ox, oy = _safe_offset(tag, (0, 0))
                         tag["ubic_etq"] = (ox, oy)
 
-                        self.etiqueta_valor(
+                        self.tag(
                             x_value=x,
                             y_value=y_segment_center,
                             label=text,
@@ -424,7 +424,7 @@ class Bar_tags:
                             ox, oy = _safe_offset(tag, (0, -3))
                             tag["ubic_etq"] = (ox, -abs(oy))
 
-                        self.etiqueta_valor(
+                        self.tag(
                             x_value=x,
                             y_value=y_end,
                             label=text,
@@ -440,7 +440,7 @@ class Bar_tags:
                     ox, oy = _safe_offset(tag, (0, 0))
                     tag["ubic_etq"] = (ox, oy)
 
-                    self.etiqueta_valor(
+                    self.tag(
                         x_value=x,
                         y_value=y_segment_center,
                         label=text,

@@ -32,6 +32,8 @@ theme:
 
 plugins:
   - search
+  - mkdocs-jupyter:
+    - execute: false
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -68,6 +70,8 @@ nav:
     - Line Chart: 
       - Graph: GraphMtplt/Line/graph.md
       - Tags: GraphMtplt/Line/tags.md
+      - Examples:
+        - Basic Line: GraphMtplt/Line/examples/tags.ipynb
       
     - Bar Chart:
       - Graph: GraphMtplt/Bar/graph.md

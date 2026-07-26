@@ -171,7 +171,7 @@ class BoxW_tags():
                 x, y, z = pair
 
                 if "tag" in show:
-                    self.etiqueta_valor(
+                    self.tag(
                         label=template.format(
                             x_value=x,
                             y_value=y,
