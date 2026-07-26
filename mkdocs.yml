@@ -32,8 +32,7 @@ theme:
 
 plugins:
   - search
-  - mkdocs-jupyter:
-    - execute: false
+  - mkdocs-jupyter
   - mkdocstrings:
       default_handler: python
       handlers:
