@@ -18,10 +18,10 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 | Method | Description |
 |---|---|
-| `graph_line()` | Time series and indicator evolution |
-| `graph_bar()` | Bars (simple, stacked, grouped) |
-| `graph_pie()` | Pie y Donut charts |
-| `graph_box_whiskers()` | Historical distribution by series |
+| [`graph_line()`](Line/graph.md) | Time series and indicator evolution |
+| [`graph_bar()`](Bar/graph.md) | Bars (simple, stacked, grouped) |
+| [`graph_pie()`](Pie/graph.md) | Pie y Donut charts |
+| [`graph_box_whiskers()`](Box/graph.md) | Historical distribution by series |
 
 ---
 ## Next Step
