@@ -70,7 +70,8 @@ nav:
       - Graph: GraphMtplt/Line/graph.md
       - Tags: GraphMtplt/Line/tags.md
       - Examples:
-        - Basic Line: GraphMtplt/Line/examples/tags.ipynb
+        - Simple Line: GraphMtplt/Line/examples/simple_line.ipynb 
+        - Tags Usage: GraphMtplt/Line/examples/tags.ipynb
       
     - Bar Chart:
       - Graph: GraphMtplt/Bar/graph.md
@@ -80,14 +81,9 @@ nav:
 
     - Box Whiskers Chart:
       - Graph: GraphMtplt/Box/graph.md
+    
+    - Utils: GraphMtplt/Utils/Utils.md
 
   - FinCalculations:
     - Getting Started: FinCalculations/getting_started.md
   
-  - Ejemplos:
-    - Línea último valor: examples/line_last_value.md
-    - Barras stacked: examples/bar_stacked.md
-    - Box Whiskers: examples/box_whiskers.md
-  - API:
-    - Gráficos: api/graph_mtplt.md
-    - Funciones de Ayuda: api/helpers.md
