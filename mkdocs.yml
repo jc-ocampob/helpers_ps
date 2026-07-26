@@ -6,6 +6,20 @@ site_author: Equipo de Soluciones de Portafolio
 theme:
   name: material
   language: es
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    - scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
   features:
     - navigation.tabs
     - navigation.sections
