@@ -3,7 +3,7 @@
 `FinCalculations` provides a range of functions that simplify the calculation of different metrics
 
 -----
-::: helpers_ps.FinCalculations.charts.metrics.ytd
+::: helpers_ps.FinCalculations.metrics.ytd
     options:
       heading_level: 3
       show_root_heading: true
@@ -12,7 +12,7 @@
       show_signature_annotations: true
 
 -----
-::: helpers_ps.FinCalculations.charts.metrics.mtd
+::: helpers_ps.FinCalculations.metrics.mtd
     options:
       heading_level: 3
       show_root_heading: true
