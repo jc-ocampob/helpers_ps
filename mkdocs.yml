@@ -49,18 +49,21 @@ nav:
   - Instalation: install_guide.md
   
   - GraphMtplt:
-    - Getting_started: GraphMtplt/getting_started.md
+    - Getting Started: GraphMtplt/getting_started.md
     
     - Graph Types:
       - Line Chart: 
-        - Chart: GraphMtplt/Line/graph.md
+        - Graph: GraphMtplt/Line/graph.md
         - Tags: GraphMtplt/Line/tags.md
       
-      - Graph Bar: GraphMtplt/Bar/graph_bar.md
+      - Graph Bar:
+        - Graph: GraphMtplt/Bar/graph.md
       
-      - Graph Pie: GraphMtplt/Pie/graph_pie.md
+      - Graph Pie:
+        - Graph: GraphMtplt/Pie/graph.md
 
-      - Graph Box Whiskers: GraphMtplt/Box/graph_box_whiskers.md
+      - Graph Box Whiskers:
+        - Graph: GraphMtplt/Box/graph.md
 
   - Ejemplos:
     - Línea último valor: examples/line_last_value.md

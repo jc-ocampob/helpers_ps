@@ -1,6 +1,6 @@
-# Grafico de Linea
+# Line Chart
 
-`GraphMtplt.graph_line()` genera gráficos de línea para series temporales o cualquier dataframe indexado.
+`GraphMtplt.graph_line()` generates line charts for time series or any indexed dataframe.
 
 ::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_line
     options:
@@ -13,21 +13,21 @@
 
 ---
 
-## Dataframe esperado
+## Expected DataFrame
 
 ```text
-Fecha         SPX      NASDAQ
+Date          SPX      NASDAQ
 2024-01-31    100      150
 2024-02-29    105      152
 2024-03-31    108      160
 ```
 
-- El índice representa el eje X.
-- Las columnas representan las series.
+- The index represents the X-axis.
+- The columns represent the data series.
 
 ---
 
-## Ejemplo básico
+## Basic Example
 
 ```python
 g = GraphMtplt(df)
@@ -41,7 +41,7 @@ g.show()
 
 ---
 
-## Múltiples series
+## Multiple Series
 
 ```python
 g.graph_line(
@@ -63,7 +63,7 @@ g.graph_line(
 
 ---
 
-## Personalizar colores
+## Customize Colors
 
 ```python
 g.graph_line(
@@ -75,24 +75,24 @@ g.graph_line(
 
 ---
 
-## Título, subtítulo y fuente
+## Title, Subtitle, and Source
 
 ```python
 g.graph_line(
     tickers=["SPX"],
     titles=dict(
-        title="Mercado Accionario",
-        subtitle="Evolución del S&P 500"
+        title="Equity Market",
+        subtitle="S&P 500 Evolution"
     ),
     source=dict(
-        text="Fuente: Bloomberg."
+        text="Source: Bloomberg."
     )
 )
 ```
 
 ---
 
-## Formato Bloomberg en eje X
+## Bloomberg Format on X-Axis
 
 ```python
 g.graph_line(
@@ -107,7 +107,7 @@ g.graph_line(
 
 ---
 
-## Mostrar último valor
+## Show Last Value
 
 ```python
 g.graph_line(
@@ -138,7 +138,7 @@ g.graph_line(
 
 ---
 
-## Agregar líneas horizontales
+## Add Horizontal Lines
 
 ```python
 g.graph_line(
@@ -154,7 +154,7 @@ g.graph_line(
 
 ---
 
-## Agregar guías horizontales
+## Add Horizontal Guides
 
 ```python
 g.graph_line(
@@ -165,9 +165,9 @@ g.graph_line(
 
 ---
 
-## Agregar recesiones
+## Add Recession Periods
 
-Después de crear el gráfico:
+After creating the chart:
 
 ```python
 g.add_recesiones(
@@ -177,11 +177,11 @@ g.add_recesiones(
 
 ---
 
-## Casos de uso típicos
+## Typical Use Cases
 
-- Índices bursátiles.
-- Tipo de cambio.
-- Inflación.
-- Tasas y yields.
-- Indicadores macroeconómicos.
-- Performance acumulada de portafolios.
+- Equity indices.
+- Exchange rates.
+- Inflation.
+- Rates and yields.
+- Macroeconomic indicators.
+- Cumulative portfolio performance.

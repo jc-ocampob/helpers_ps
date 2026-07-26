@@ -1,19 +1,19 @@
 # graph_pie
 
-`graph_pie` genera gráficos Pie y Donut a partir de una fotografía puntual del dataframe.
+`graph_pie` generates Pie and Donut charts from a point-in-time snapshot of the dataframe.
 
 ---
 
-## Dataframe esperado
+## Expected DataFrame
 
 ```text
-Fecha         Equity   Bonds   Cash
+Date          Equity   Bonds   Cash
 2024-12-31    0.40     0.50    0.10
 ```
 
 ---
 
-## Ejemplo básico
+## Basic Example
 
 ```python
 g = hp.GraphMtplt(df)
@@ -28,7 +28,7 @@ g.show()
 
 ---
 
-## Seleccionar una fecha
+## Select a Date
 
 ```python
 g.graph_pie(
@@ -39,7 +39,7 @@ g.graph_pie(
 
 ---
 
-## Donut chart
+## Donut Chart
 
 ```python
 g.graph_pie(
@@ -51,7 +51,7 @@ g.graph_pie(
 
 ---
 
-## Ordenar valores
+## Sort Values
 
 ```python
 g.graph_pie(
@@ -62,7 +62,7 @@ g.graph_pie(
 
 ---
 
-## Mostrar porcentajes
+## Show Percentages
 
 ```python
 g.graph_pie(
@@ -73,7 +73,7 @@ g.graph_pie(
 
 ---
 
-## Leyenda
+## Legend
 
 ```python
 g.graph_pie(
@@ -88,11 +88,11 @@ g.graph_pie(
 
 ---
 
-## Casos de uso típicos
+## Typical Use Cases
 
 - Asset allocation.
-- Distribución sectorial.
-- Distribución geográfica.
-- Distribución por emisor.
-- Distribución por rating.
-- Exposición por moneda.
+- Sector distribution.
+- Geographic distribution.
+- Issuer distribution.
+- Rating distribution.
+- Currency exposure.

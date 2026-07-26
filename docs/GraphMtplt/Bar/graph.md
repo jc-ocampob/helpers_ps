@@ -1,24 +1,24 @@
 # graph_bar
 
-`graph_bar` genera gráficos de barras simples, agrupadas o stacked.
+`graph_bar` generates simple, grouped, or stacked bar charts.
 
-Soporta:
+It supports:
 
-- barras simples;
-- barras agrupadas;
-- barras stacked;
-- series temporales;
-- datos categóricos;
-- etiquetas de valor;
-- tags internos;
-- totales de stacks.
+- simple bars;
+- grouped bars;
+- stacked bars;
+- time series;
+- categorical data;
+- value labels;
+- internal tags;
+- stack totals.
 
 ---
 
-## Dataframe esperado
+## Expected DataFrame
 
 ```text
-Fecha         Equity   Bonds   Cash
+Date          Equity   Bonds   Cash
 2024-01-31    0.40     0.50    0.10
 2024-02-29    0.42     0.48    0.10
 2024-03-31    0.45     0.45    0.10
@@ -26,13 +26,13 @@ Fecha         Equity   Bonds   Cash
 
 ---
 
-## Barra simple
+## Simple Bar
 
 ```python
 g = Graph_mtplt(df)
 
 g.graph_bar(
-    tickers=["RETORNO"],
+    tickers=["RETURN"],
     bar_mode="time"
 )
 
@@ -41,7 +41,7 @@ g.show()
 
 ---
 
-## Barras agrupadas
+## Grouped Bars
 
 ```python
 g.graph_bar(
@@ -63,7 +63,7 @@ g.graph_bar(
 
 ---
 
-## Barras stacked
+## Stacked Bars
 
 ```python
 g.graph_bar(
@@ -73,9 +73,9 @@ g.graph_bar(
         "Cash"
     ],
     labels=[
-        "Renta Variable",
-        "Renta Fija",
-        "Caja"
+        "Equity",
+        "Fixed Income",
+        "Cash"
     ],
     stacked=True,
     bar_mode="last",
@@ -87,7 +87,7 @@ g.graph_bar(
 
 ---
 
-## Modos disponibles
+## Available Modes
 
 ### Auto
 
@@ -95,7 +95,7 @@ g.graph_bar(
 bar_mode="auto"
 ```
 
-El modo se define automáticamente.
+The mode is defined automatically.
 
 ### Time
 
@@ -103,7 +103,7 @@ El modo se define automáticamente.
 bar_mode="time"
 ```
 
-El índice se interpreta como eje temporal.
+The index is interpreted as a time axis.
 
 ### Last
 
@@ -111,27 +111,27 @@ El índice se interpreta como eje temporal.
 bar_mode="last"
 ```
 
-El índice se interpreta como categorías.
+The index is interpreted as categories.
 
 ---
 
-## Etiquetas de valor
+## Value Labels
 
-Usar:
+Use:
 
 ```python
 show="value_label"
 ```
 
-Ejemplo:
+Example:
 
 ```python
 g.graph_bar(
-    tickers=["RETORNO"],
+    tickers=["RETURN"],
     bar_mode="time",
     bar_labels={
         "label_1": {
-            "ticker": "RETORNO",
+            "ticker": "RETURN",
             "x_values": "last",
             "show": "value_label",
             "template": "{y_value:.1%}",
@@ -151,26 +151,27 @@ g.graph_bar(
 
 ---
 
-## Tag central
+## Center Tag
 
-Usar:
+Use:
 
 ```python
 show="bar_tag"
 ```
 
-Ejemplo:
+Example:
 
 ```python
 g.graph_bar(
-    tickers=["Peso"],
+    tickers=["Weight"],
     bar_mode="last",
     bar_labels={
         "tag_1": {
-            "ticker": "Peso",
+            "ticker": "Weight",
             "x_values": "last",
             "show": "bar_tag",
-            "template": "{label}\n{y_value:.1%}",
+            "template": "{label}
+{y_value:.1%}",
             "tag": {
                 "fontsize": 7,
                 "font_color": "white",
@@ -187,15 +188,15 @@ g.graph_bar(
 
 ---
 
-## Total de stack
+## Stack Total
 
-Usar:
+Use:
 
 ```python
 show="stack_total"
 ```
 
-Ejemplo:
+Example:
 
 ```python
 g.graph_bar(
@@ -231,11 +232,11 @@ g.graph_bar(
 
 ---
 
-## Casos de uso típicos
+## Typical Use Cases
 
 - Asset allocation.
-- Contribución a retorno.
-- Distribución por sector.
-- Distribución por país.
-- Resultados mensuales.
-- Atribución por clase de activo.
+- Return contribution.
+- Sector distribution.
+- Country distribution.
+- Monthly results.
+- Attribution by asset class.

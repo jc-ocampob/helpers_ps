@@ -1,13 +1,13 @@
 # graph_box_whiskers
 
-`graph_box_whiskers` genera gráficos Box & Whiskers para visualizar distribuciones históricas por serie.
+`graph_box_whiskers` generates Box & Whiskers charts to visualize historical distributions by series.
 
 ---
 
-## Dataframe esperado
+## Expected DataFrame
 
 ```text
-Fecha         SPX_PE   NDX_PE   EUROSTOXX_PE
+Date          SPX_PE   NDX_PE   EUROSTOXX_PE
 2024-01-31    18.2     24.1     13.5
 2024-02-29    18.7     25.0     13.8
 2024-03-31    19.1     25.4     14.0
@@ -15,7 +15,7 @@ Fecha         SPX_PE   NDX_PE   EUROSTOXX_PE
 
 ---
 
-## Ejemplo básico
+## Basic Example
 
 ```python
 g = hp.GraphMtplt(df)
@@ -29,7 +29,7 @@ g.show()
 
 ---
 
-## Mostrar media
+## Show Mean
 
 ```python
 g.graph_box_whiskers(
@@ -43,7 +43,7 @@ g.graph_box_whiskers(
 
 ---
 
-## Etiquetar máximos
+## Label Maximum Values
 
 ```python
 g.graph_box_whiskers(
@@ -57,7 +57,7 @@ g.graph_box_whiskers(
 
 ---
 
-## Etiquetar mínimos
+## Label Minimum Values
 
 ```python
 g.graph_box_whiskers(
@@ -71,7 +71,7 @@ g.graph_box_whiskers(
 
 ---
 
-## Etiquetar media
+## Label Mean
 
 ```python
 g.graph_box_whiskers(
@@ -85,13 +85,13 @@ g.graph_box_whiskers(
 
 ---
 
-## Mostrar último valor
+## Show Last Value
 
 ```python
 g.graph_box_whiskers(
     tickers="all",
     tag_dot={
-        "ultimo": {
+        "last": {
             "ticker": "SPX_PE",
             "x_values": "last",
             "show": "dot_tag",
@@ -115,11 +115,11 @@ g.graph_box_whiskers(
 
 ---
 
-## Casos de uso típicos
+## Typical Use Cases
 
-- P/E históricos.
-- EV/EBITDA históricos.
-- Yields históricos.
-- Spreads históricos.
-- Márgenes históricos.
-- Comparación relativa de valuaciones.
+- Historical P/E ratios.
+- Historical EV/EBITDA ratios.
+- Historical yields.
+- Historical spreads.
+- Historical margins.
+- Relative valuation comparison.
