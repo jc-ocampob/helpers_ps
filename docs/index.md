@@ -48,7 +48,7 @@ hp.BBGHelper
 ```
 
 ---
-## Next Steps
+## Next Step
 
 The next step is to view the [Instalation](install_guide.md)
 

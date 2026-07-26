@@ -2,15 +2,6 @@
 
 `GraphMtplt.graph_line()` generates line charts for time series or any indexed dataframe.
 
-::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_line
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
-
-
 ---
 
 ## Expected DataFrame
@@ -165,18 +156,6 @@ g.graph_line(
 
 ---
 
-## Add Recession Periods
-
-After creating the chart:
-
-```python
-g.add_recesiones(
-    country="United States"
-)
-```
-
----
-
 ## Typical Use Cases
 
 - Equity indices.
@@ -185,3 +164,15 @@ g.add_recesiones(
 - Rates and yields.
 - Macroeconomic indicators.
 - Cumulative portfolio performance.
+
+
+----------
+## API
+
+::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_line
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true

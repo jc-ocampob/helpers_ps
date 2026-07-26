@@ -1,6 +1,6 @@
 # Tag Handling
 
-Tag handling within `graph_line` relies on the helper functions `etiqueta_valor` and `punto_valor`; therefore, it inherits the available configuration options from those functions.
+Tag handling within `graph_line` relies on the helper functions `tag` and `dot`; therefore, it inherits the available configuration options from those functions.
 
 ## How `tag_dot` Works in `graph_line`
 
@@ -34,7 +34,7 @@ tag_dot = {
 
         # Control dictionary for the subgroup points,
         # inheriting all functionality from
-        # .punto_valor()
+        # self.dot()
         "dot": {
             "color": "green",
             "size": 22,
@@ -42,7 +42,7 @@ tag_dot = {
 
         # Control dictionary for the subgroup tags,
         # inheriting all functionality from
-        # .etiqueta_valor()
+        # self.tag()
         "tag": {
             "bg_color": "none",
             "font_color": "red"

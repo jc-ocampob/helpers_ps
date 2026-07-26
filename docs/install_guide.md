@@ -3,7 +3,7 @@
 ## Downloading the package
 
 ```bash
-install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.1"
+pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.9"
 ```
 
 ---
@@ -14,7 +14,7 @@ import helpers_ps as hp
 ```
 
 ---
-## Next Steps
+## Next Step
 
 The next step is to view the `GraphMtplt` class. [GraphMtplt](GraphMtplt/getting_started.md)
 

@@ -668,6 +668,7 @@ class Graph_base(Graph_meta_data):
         self,
         figsize: tuple[float, float] = (6.00, 4.80),
         color: str = "#D5D5D5",
+        researchtype: bool = True,
         lw: float = 0.8,
         nrows: int = 1,
         ncols: int = 1,
@@ -692,6 +693,8 @@ class Graph_base(Graph_meta_data):
             Figure size in inches.
         color : str, default "#D5D5D5"
             Color of the decorative horizontal divider lines.
+        researchtype : bool default True
+            Adds decorative figure dividers.
         lw : float, default 0.8
             Line width of the decorative figure dividers.
         nrows : int, default 1
@@ -806,21 +809,22 @@ class Graph_base(Graph_meta_data):
         # -------------------------------------------------
         # 5. Líneas decorativas de figura
         # -------------------------------------------------
-        self._fig.add_artist(
-            Line2D(
-                [0.01, 0.98], [0.95, 0.95],
-                transform=self._fig.transFigure,
-                color=color, lw=lw
+        if researchtype:
+            self._fig.add_artist(
+                Line2D(
+                    [0.01, 0.98], [0.95, 0.95],
+                    transform=self._fig.transFigure,
+                    color=color, lw=lw
+                )
             )
-        )
 
-        self._fig.add_artist(
-            Line2D(
-                [0.01, 0.98], [0.12, 0.12],
-                transform=self._fig.transFigure,
-                color=color, lw=lw
+            self._fig.add_artist(
+                Line2D(
+                    [0.01, 0.98], [0.12, 0.12],
+                    transform=self._fig.transFigure,
+                    color=color, lw=lw
+                )
             )
-        )
 
         # -------------------------------------------------
         # 6. Ajustes globales
