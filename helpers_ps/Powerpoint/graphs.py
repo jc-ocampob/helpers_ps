@@ -1,951 +1,1219 @@
-from .references import LEGEND_POSITION, LABEL_POSITION, AXIS_POSITION
+"""
+PowerPoint chart classes.
+
+This module provides reusable dataclass-based wrappers around python-pptx chart
+objects. The classes are designed to standardize chart creation across reports
+and presentations while keeping formatting parameters easy to customize.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from .utils import hex_to_rgb
-from helpers_ps.GlobVars.var_globs import PALETA_COLORES
-from itertools import accumulate
-from pptx import Presentation
-from pptx.chart.data import  CategoryChartData, BubbleChartData
+
+from pptx.chart.data import BubbleChartData, CategoryChartData
+from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.text import MSO_AUTO_SIZE
 from pptx.util import Cm, Pt
-from pptx.dml.color import RGBColor
+
+from helpers_ps.GlobVars.var_globs import PALETA_COLORES
+
+from .base import BasePowerPointChart
+from .references import LABEL_POSITION
+from .utils import (
+    calculate_axis_bounds,
+    flatten_nested_values,
+    hex_to_rgb,
+    validate_option,
+)
+
+
+BAR_CHART_TYPES = {
+    "COLUMN_CLUSTERED": XL_CHART_TYPE.COLUMN_CLUSTERED,
+    "COLUMN_STACKED": XL_CHART_TYPE.COLUMN_STACKED,
+    "COLUMN_STACKED_100": XL_CHART_TYPE.COLUMN_STACKED_100,
+    "BAR_CLUSTERED": XL_CHART_TYPE.BAR_CLUSTERED,
+    "BAR_STACKED": XL_CHART_TYPE.BAR_STACKED,
+    "BAR_STACKED_100": XL_CHART_TYPE.BAR_STACKED_100,
+}
+
+
+WATERFALL_SERIES_ORDER = [
+    "BasePositive",
+    "BaseNegative",
+    "IncreasePositive",
+    "IncreaseNegative",
+    "DecreasePositive",
+    "DecreaseNegative",
+    "TotalPositive",
+    "TotalNegative",
+    "LabelCarrier",
+]
+
 
 @dataclass
-class LineChart():
+class LineChart(BasePowerPointChart):
     """
-    Clase para graficos de lineas en pptx
+    Create a line chart in a PowerPoint slide.
 
-    Paramentros
-    -----------
-    presentation: Presentation = None
-        Presentación de PowerPoint donde se insertará el gráfico.
-    slide: int = 0
-        Índice de la diapositiva donde se insertará el gráfico.
-    series_names: list[str] = [None]
-        Lista de nombres de las series a graficar.
-    x: list[list] = [None]
-        Lista de listas con los valores del eje x para cada serie.
-    y: list[list] = [None]
-        Lista de listas con los valores del eje y para cada serie.
-    colors: list[str] = PALETA_COLORES_CREDICORP
-        Lista de colores en formato hexadecimal para cada serie.
-    position_x: int = 5
-        Posición horizontal del gráfico en centímetros.
-    position_y: int = 5
-        Posición vertical del gráfico en centímetros.
-    width: int = 10
-        Ancho del gráfico en centímetros.
-    height: int = 10
-        Alto del gráfico en centímetros.
-    title_show: bool = True
-        Indica si se muestra el título del gráfico.
-    title: str = ""
-        Texto del título del gráfico.
-    title_font: str = "Inter"
-        Fuente del título del gráfico.
-    title_font_size: int = 6
-        Tamaño de la fuente del título del gráfico.
-    x_axis_titulo_mostrar: bool = True
-        Indica si se muestra el título del eje x.
-    x_axis_titulo: str = ""
-        Texto del título del eje x.
-    x_axis_titulo_fuente: str = "Inter" 
-        Fuente del título del eje x.
-    x_axis_titulo_tamano: int = 6
-        Tamaño de la fuente del título del eje x.
-    x_axis_formato: str = "0.00"
-        Formato de los valores del eje x.
-    y_axis_titulo_mostrar: bool = True
-        Indica si se muestra el título del eje y.
-    y_axis_titulo: str = ""
-        Texto del título del eje y.
-    y_axis_titulo_fuente: str = "Inter"
-        Fuente del título del eje y.
-    y_axis_titulo_tamano: int = 6
-        Tamaño de la fuente del título del eje y.
-    y_axis_lineas: bool = False
-        Indica si se muestran las líneas de la cuadrícula del eje y.
-    y_axis_formato: str = "0.00"
-        Formato de los valores del eje y.
-    legend_show: bool = False
-        Indica si se muestra la leyenda del gráfico.
-    legend_font_size: int = 5
-        Tamaño de la fuente de la leyenda del gráfico.
-    legend_position: str = "bottom"
-        Posición de la leyenda del gráfico (bottom, top, right, left).
+    This class supports multiple line series. Since python-pptx line charts are
+    category charts, all series must share the same x-axis categories.
 
-    Funciones
-    ---------
-    chart_line(self) -> None:
-        Función para graficar un gráfico de líneas en una presentación de PowerPoint utilizando los parámetros definidos en la clase.
+    Parameters
+    ----------
+    series_names : list[str]
+        Names of the chart series.
+    x_values : list[list]
+        Category labels for each series. All series must share the same
+        categories.
+    y_values : list[list[float]]
+        Numeric values for each series.
+    colors : list[str]
+        Hexadecimal colors applied to each line series.
+
+    Methods
+    -------
+    chart()
+        Insert the line chart into the selected PowerPoint slide.
+
+    Returns
+    -------
+    pptx.chart.chart.Chart
+        The created chart object when calling chart().
     """
 
-    presentation: Presentation = None
-    slide: int = 0
-
     series_names: list[str] = field(default_factory=list)
-    x: list[list] = field(default_factory=list)
-    y: list[list] = field(default_factory=list)
+    x_values: list[list] = field(default_factory=list)
+    y_values: list[list[float]] = field(default_factory=list)
     colors: list[str] = field(default_factory=lambda: PALETA_COLORES)
 
-    position_x: int = 5
-    position_y: int = 5
+    x_axis_title_show: bool = False
+    x_axis_title: str = ""
+    x_axis_font_size: float = 6
+    x_axis_number_format: str = "0.00"
 
-    width: int = 10
-    height: int = 10
+    y_axis_title_show: bool = False
+    y_axis_title: str = ""
+    y_axis_font_size: float = 6
+    y_axis_gridlines_show: bool = False
+    y_axis_number_format: str = "0.00"
+    y_axis_minimum_adjustment: float = 5.0
+    y_axis_maximum_adjustment: float = 5.0
 
-    title_show: bool = False
-    title: str = ""
-    title_font: str = "Inter"
-    title_font_size: int = 6
-
-    x_axis_titulo_mostrar: bool = False
-    x_axis_titulo: str = ""
-    x_axis_titulo_tamano: int = 6
-    x_axis_formato: str = "0.00"
-
-    y_axis_titulo_mostrar: bool = False
-    y_axis_titulo: str = ""
-    y_axis_titulo_tamano: int = 6
-    y_axis_lineas: bool = False
-    y_axis_formato: str = "0.00"
-    y_factor_ajuste_min: int  = 5.0
-    y_factor_ajuste_max: int  = 5.0
-
-    legend_show: bool = False
-    legend_font_size: int = 5
-    legend_position: str = "bottom"
-
-    # post init para validar alguna opción
-    def __post_init__(self):
-        if self.legend_position not in LEGEND_POSITION.keys():
-            raise TypeError(f"Posición del grafico no es correcta las opciones son {LEGEND_POSITION.keys()}")
-
-    def chart(self) -> None:
+    def validate_inputs(self) -> None:
         """
-        Función para poder graficar un gráfico de líneas en una presentación de PowerPoint utilizando los paramentros de creación definidos en la clase
+        Validate line chart input data.
+
+        Raises
+        ------
+        ValueError
+            If the presentation is missing, series are empty, lengths are
+            inconsistent or x-axis categories differ across series.
         """
+        self.validate_base_inputs()
 
-        # Chart data type
-        chart_data = CategoryChartData()
+        if not self.series_names:
+            raise ValueError("series_names cannot be empty.")
 
-        # save min and max value for y_axis adjustment
-        _min_value = []
-        _max_value = []
+        if not self.x_values:
+            raise ValueError("x_values cannot be empty.")
 
-        # For loop to add data to chart
-        for serie in range(len(self.series_names)):
-            chart_data.categories = self.x[serie]
-            chart_data.add_series(self.series_names[serie], self.y[serie])
-            _min_value.append(min(self.y[serie]))
-            _max_value.append(max(self.y[serie]))
-        
-        # Definition of y_axis high and low
-        _min_value = min(_min_value)
-        _max_value = max(_max_value)
+        if not self.y_values:
+            raise ValueError("y_values cannot be empty.")
 
-        if _min_value < 0:
-            _min_value = _min_value * (1 + self.y_factor_ajuste_min/100)
-        elif _min_value > 0:
-            _min_value = _min_value * (1 - self.y_factor_ajuste_min/100)
-        else:
-            _min_value = 0
-            
-        if _max_value < 0:
-            _max_value = _max_value * (1 - self.y_factor_ajuste_max/100)
-        elif _max_value > 0:
-            _max_value = _max_value * (1 + self.y_factor_ajuste_max/100)
-        else:
-            _max_value = 0
+        if not (
+            len(self.series_names)
+            == len(self.x_values)
+            == len(self.y_values)
+        ):
+            raise ValueError(
+                "series_names, x_values and y_values must have the same "
+                "number of series."
+            )
 
-        # Slide where the chart will be put
-        slide = self.presentation.slides[self.slide]
-        # Create Chort on the presentation
-        x = Cm(self.position_x)
-        y = Cm(self.position_y)
-        w = Cm(self.width)
-        h = Cm(self.height)
-        chart = slide.shapes.add_chart(XL_CHART_TYPE.LINE, x, y, w, h, chart_data).chart
+        reference_categories = self.x_values[0]
 
-        # Title
-        chart.has_title = self.title_show
-        if self.title_show:
-            chart.chart_title.text_frame.text = self.title
-            chart.chart_title.text_frame.paragraphs[0].font.name = self.title_font
-            chart.chart_title.text_frame.paragraphs[0].font.size = Pt(self.title_font_size)
-        
-        # Y-axis
-        chart.value_axis.has_title = self.y_axis_titulo_mostrar
-        if self.y_axis_titulo_mostrar:
-            chart.value_axis.axis_title.text_frame.text = self.y_axis_titulo
-            chart.value_axis.axis_title.text_frame.paragraphs[0].font.name = self.title_font
-            chart.value_axis.axis_title.text_frame.paragraphs[0].font.size = Pt(self.y_axis_titulo_tamano)
-            
-        chart.value_axis.tick_labels.font.size = Pt(self.y_axis_titulo_tamano)
-        chart.value_axis.tick_labels.font.name = self.title_font
-        chart.value_axis.minimum_scale = _min_value
-        chart.value_axis.has_major_gridlines = self.y_axis_lineas
-        chart.value_axis.tick_labels.number_format = self.y_axis_formato
-
-        # X Axis
-        chart.category_axis.has_title = self.x_axis_titulo_mostrar
-        if self.x_axis_titulo_mostrar:
-            chart.category_axis.axis_title.text_frame.text = self.x_axis_titulo
-            chart.category_axis.axis_title.text_frame.paragraphs[0].font.size = Pt(self.x_axis_titulo_tamano)
-            chart.category_axis.axis_title.text_frame.paragraphs[0].font.name = self.title_font
-        chart.category_axis.tick_labels.font.size = Pt(self.x_axis_titulo_tamano)
-        chart.category_axis.tick_labels.font.name = self.title_font
-        chart.category_axis.tick_labels.number_format = self.x_axis_formato
-        
-        # Legend
-        chart.has_legend = self.legend_show
-        if self.legend_show:
-            chart.legend.position = LEGEND_POSITION[self.legend_position]
-            chart.legend.font.size = Pt(self.legend_font_size)
-            chart.legend.font.name = self.title_font
-
-        # Series colors
-        _col_c = 0
-        for serie in chart.series:
-            _s = serie.format.line.color.rgb = hex_to_rgb(self.colors[_col_c])
-            _col_c += 1
-        
-        return 0
-
-# Clase para generar grafico pie en una ppt
-@dataclass
-class PieChart():
-    presentation: Presentation = None
-    slide: int = 0
-
-    series_name: str = ""
-    x: list[str] = field(default_factory=list)
-    y: list[int] = field(default_factory=list)
-
-    colors: list[str] = field(default_factory=lambda: PALETA_COLORES)
-
-    position_x: int = 5
-    position_y: int = 5
-
-    width: int = 10
-    height: int = 10
-
-    title_show: bool = True 
-    title: str =  ""
-    title_font: str =  "Inter"
-    title_font_size: int = 6
-
-    # Legend information
-    legend_show: bool = False
-    legend_font_size: int = 5
-    legend_position: str = "bottom"
-
-    # Data labels
-    data_labels_show: bool = False
-    data_labels_position: str = "center"
-    data_labels_format: str = "0.0"
-    data_labels_font_size: int = 5
-
-    # post init para validar alguna opción
-    def __post_init__(self) -> None:
-        if self.legend_position not in LABEL_POSITION.keys():
-            raise TypeError(f"Posición del grafico no es correcta las opciones son {LABEL_POSITION.keys()}")
-        return None
-
-    def chart(self):
-        # Chart data type
-        chart_data = CategoryChartData()
-        
-        chart_data.categories = self.x
-        chart_data.add_series(self.series_name, self.y)
-
-        # Slide where the chart will be put
-        slide = self.presentation.slides[self.slide]
-
-        # Create Chort on the presentation
-        x = Cm(self.position_x)
-        y = Cm(self.position_y)
-        w = Cm(self.width)
-        h = Cm(self.height)
-
-        chart = slide.shapes.add_chart(XL_CHART_TYPE.PIE, x, y, w, h, chart_data).chart
-
-        # Title
-        chart.has_title = self.title_show
-        if self.title_show:
-            chart.chart_title.text_frame.text = self.title
-            chart.chart_title.text_frame.paragraphs[0].font.name = self.title_font
-            chart.chart_title.text_frame.paragraphs[0].font.size = Pt(self.title_font_size)
-
-        # Legend
-        chart.has_legend = self.legend_show
-        if self.legend_show:
-            chart.legend.font.size = Pt(self.legend_font_size)
-            chart.legend.position = LEGEND_POSITION[self.legend_position]
-        
-        # Add data labels
-        for plot in chart.plots:
-            plot.has_data_labels = self.data_labels_show
-            if self.data_labels_show:
-                plot.data_labels.show_category_name = False
-                plot.data_labels.show_value = True
-                plot.data_labels.number_format = self.data_labels_format
-                plot.data_labels.font.name = self.title_font
-                plot.data_labels.font.size = Pt(self.data_labels_font_size)
-                plot.data_labels.position = LABEL_POSITION[self.data_labels_position]
-
-        return None
-
-# Clase para generar grafico de barras
-@dataclass
-class BarChart():
-    presentation: Presentation = None
-    slide: int = 0
-
-    series_names: list[str] = None
-    x: list[str] = None
-    y: list[int] = None
-
-    colors: list[str] = None
-
-    position_x: int = 5
-    position_y: int = 5
-
-    width: int = 10
-    height: int = 10
-
-    title_show: bool = True 
-    title: str =  ""
-    title_font: str =  "Inter"
-    title_font_size: int = 6
-
-    # Legend information
-    legend_show: bool = False
-    legend_font_size: int = 5
-    legend_position: str = "bottom"
-
-    # Data labels
-    data_labels_show: bool = False
-    data_labels_position: str = "center"
-    data_labels_format: str = "0.0"
-    data_labels_font_size: int = 5
-
-    x_axis_titulo_mostrar: bool = False
-    x_axis_titulo: str = ""
-    x_axis_titulo_tamano: int = 6
-    x_axis_formato: str = "0.00"
-    x_axis_position: str = "center"
-
-    y_axis_titulo_mostrar: bool = False
-    y_axis_titulo: str = ""
-    y_axis_titulo_tamano: int = 6
-    y_axis_lineas: bool = False
-    y_axis_formato: str = "0.00"
-    y_axis_position: str = "center"
-    y_factor_ajuste_min: int  = 10.0
-    y_factor_ajuste_max: int  = 10.0
-
-    def chart(self, chart_type: str = "COLUMN_CLUSTERED") -> None:
-        # Chart data type
-        chart_data = CategoryChartData()
-
-        # save min and max value for y_axis adjustment
-        _min_value = []
-        _max_value = []
-        
-        # For loop to add data to chart
-        for serie in range(len(self.series_names)):
-            chart_data.categories = self.x[serie]
-            chart_data.add_series(self.series_names[serie], self.y[serie])
-            _min_value.append(min(self.y[serie]))
-            _max_value.append(max(self.y[serie]))
-        
-        # Definition of y_axis high and low
-        _min_value = min(_min_value)
-        _max_value = max(_max_value)
-
-        if _min_value < 0:
-            _min_value = _min_value * (1 + self.y_factor_ajuste_min/100)
-        elif _min_value > 0:
-            _min_value = _min_value * (1 - self.y_factor_ajuste_min/100)
-        else:
-            _min_value = 0
-            
-        if _max_value < 0:
-            _max_value = _max_value * (1 - self.y_factor_ajuste_max/100)
-        elif _max_value > 0:
-            _max_value = _max_value * (1 + self.y_factor_ajuste_max/100)
-        else:
-            _max_value = 0
-
-        # Slide where the chart will be put
-        slide = self.presentation.slides[self.slide]
-
-        # Create Chort on the presentation
-        x = Cm(self.position_x)
-        y = Cm(self.position_y)
-        w = Cm(self.width)
-        h = Cm(self.height)
-
-        chart_types = {
-            "COLUMN_CLUSTERED": XL_CHART_TYPE.COLUMN_CLUSTERED,
-            "COLUMN_STACKED": XL_CHART_TYPE.COLUMN_STACKED,
-            "COLUMN_STACKED_100": XL_CHART_TYPE.COLUMN_STACKED_100,
-            "BAR_CLUSTERED": XL_CHART_TYPE.BAR_CLUSTERED,
-            "BAR_STACKED": XL_CHART_TYPE.BAR_STACKED,
-            "BAR_STACKED_100": XL_CHART_TYPE.BAR_STACKED_100,
-        }
-
-        if chart_type not in chart_types.keys():
-            raise TypeError(f"Tipo de grafico no existe las opciones son {chart_types.keys()}")
-
-        chart = slide.shapes.add_chart(chart_types[chart_type], x, y, w, h, chart_data).chart
-
-        # suponiendo que ya tienes: chart = shape.chart
-        for s in chart.series:
-            # desactiva "Invertir si es negativo"
-            s.invert_if_negative = False
-
-        # Title
-        chart.has_title = self.title_show
-        if self.title_show:
-            chart.chart_title.text_frame.text = self.title
-            chart.chart_title.text_frame.paragraphs[0].font.name = self.title_font
-            chart.chart_title.text_frame.paragraphs[0].font.size = Pt(self.title_font_size)
-
-        # Legend
-        chart.has_legend = self.legend_show
-        if self.legend_show:
-            chart.legend.include_in_layout = self.legend_show
-            chart.legend.font.size = Pt(self.legend_font_size)
-            chart.legend.position = LEGEND_POSITION[self.legend_position]
-        
-        # Add data labels
-        for plot in chart.plots:
-            plot.has_data_labels = self.data_labels_show
-            if self.data_labels_show:
-                plot.data_labels.show_category_name = False
-                plot.data_labels.show_value = True
-                plot.data_labels.number_format = self.data_labels_format
-                plot.data_labels.font.name = self.title_font
-                plot.data_labels.font.size = Pt(self.data_labels_font_size)
-                plot.data_labels.position = LABEL_POSITION[self.data_labels_position]
-        
-        # Y-axis
-        chart.value_axis.has_title = self.y_axis_titulo_mostrar
-        chart.value_axis.tick_label_position = AXIS_POSITION[self.y_axis_position]
-        if self.y_axis_titulo_mostrar:
-            chart.value_axis.axis_title.text_frame.text = self.y_axis_titulo
-            chart.value_axis.axis_title.text_frame.paragraphs[0].font.name = self.title_font
-            chart.value_axis.axis_title.text_frame.paragraphs[0].font.size = Pt(self.y_axis_titulo_tamano)
-            
-        chart.value_axis.tick_labels.font.size = Pt(self.y_axis_titulo_tamano)
-        chart.value_axis.tick_labels.font.name = self.title_font
-        chart.value_axis.minimum_scale = _min_value
-        chart.value_axis.maximum_scale = _max_value
-        chart.value_axis.has_major_gridlines = self.y_axis_lineas
-        chart.value_axis.tick_labels.number_format = self.y_axis_formato
-
-        # X Axis
-        chart.category_axis.has_title = self.x_axis_titulo_mostrar
-        chart.category_axis.tick_label_position = AXIS_POSITION[self.x_axis_position]
-        if self.x_axis_titulo_mostrar:
-            chart.category_axis.axis_title.text_frame.text = self.x_axis_titulo
-            chart.category_axis.axis_title.text_frame.paragraphs[0].font.size = Pt(self.x_axis_titulo_tamano)
-            chart.category_axis.axis_title.text_frame.paragraphs[0].font.name = self.title_font
-        chart.category_axis.tick_labels.font.size = Pt(self.x_axis_titulo_tamano)
-        chart.category_axis.tick_labels.font.name = self.title_font
-        chart.category_axis.tick_labels.number_format = self.x_axis_formato
-
-        return None
-
-# Bubble chart 
-@dataclass
-class BubbleChart():
-
-    presentation: Presentation = None
-    slide: int = 0
-
-    series_names: list[str] = field(default_factory=list)
-    x: list[list] = field(default_factory=list)
-    y: list[list] = field(default_factory=list)
-    z: list[list] = field(default_factory=list)
-    colors: list[str] = field(default_factory=lambda: PALETA_COLORES)
-
-    position_x: int = 5
-    position_y: int = 5
-
-    width: int = 10
-    height: int = 10
-
-    title_show: bool = False
-    title: str = ""
-    title_font: str = "Inter"
-    title_font_size: int = 6
-
-    x_axis_titulo_mostrar: bool = False
-    x_axis_titulo: str = ""
-    x_axis_titulo_tamano: int = 6
-    x_axis_formato: str = "0.00"
-    x_factor_ajuste_min: int = 5.0
-    x_factor_ajuste_max: int = 5.0
-
-    y_axis_titulo_mostrar: bool = False
-    y_axis_titulo: str = ""
-    y_axis_titulo_tamano: int = 6
-    y_axis_lineas: bool = False
-    y_axis_formato: str = "0.00"
-    y_factor_ajuste_min: int  = 5.0
-    y_factor_ajuste_max: int  = 5.0
-
-    legend_show: bool = False
-    legend_font_size: int = 5
-    legend_position: str = "bottom"
-
-    # post init para validar alguna opción
-    def __post_init__(self):
-        if self.legend_position not in LEGEND_POSITION.keys():
-            raise TypeError(f"Posición del grafico no es correcta las opciones son {LEGEND_POSITION.keys()}")
-
-    def chart(self) -> None:
-        """
-        Función para poder graficar un gráfico de burbujas en una presentación de PowerPoint
-        utilizando los parámetros de creación definidos en la clase.
-        """
-
-        # Chart data type
-        chart_data = BubbleChartData()
-
-        # save min and max value for axis adjustment
-        _min_value_y = []
-        _max_value_y = []
-        _min_value_x = []
-        _max_value_x = []
-
-        # For loop to add data to chart
-        for serie in range(len(self.series_names)):
-
-            x_vals = self.x[serie]
-            y_vals = self.y[serie]  # viene como 5 para 5%
-            z_vals = self.z[serie]  # tamaño burbuja (ya viene en escala correcta)
-
-            # Validación básica de longitudes
-            if not (len(x_vals) == len(y_vals) == len(z_vals)):
+        for index, series_name in enumerate(self.series_names):
+            if len(self.x_values[index]) != len(self.y_values[index]):
                 raise ValueError(
-                    f"Longitudes no coinciden en serie '{self.series_names[serie]}': "
-                    f"len(x)={len(x_vals)}, len(y)={len(y_vals)}, len(z)={len(z_vals)}"
+                    f"Series '{series_name}' has inconsistent lengths: "
+                    f"len(x_values)={len(self.x_values[index])}, "
+                    f"len(y_values)={len(self.y_values[index])}."
                 )
 
-            # Track min/max for axis scaling
-            _min_value_x.append(min(x_vals))
-            _max_value_x.append(max(x_vals))
-            _min_value_y.append(min(y_vals))
-            _max_value_y.append(max(y_vals))
+            if self.x_values[index] != reference_categories:
+                raise ValueError(
+                    "All line chart series must share the same x-axis "
+                    "categories."
+                )
 
-            # BubbleChartData: add_series SOLO recibe el nombre
-            s = chart_data.add_series(self.series_names[serie])
+    def build_chart_data(self) -> CategoryChartData:
+        """
+        Build the chart data object used by python-pptx.
 
-            # Para bubble chart, agregas puntos (x, y, size) uno por uno
-            for x, y, z in zip(x_vals, y_vals, z_vals):
-                s.add_data_point(x, y, z)
+        Returns
+        -------
+        CategoryChartData
+            Chart data object ready to be inserted into PowerPoint.
+        """
+        chart_data = CategoryChartData()
+        chart_data.categories = self.x_values[0]
 
-        # Definition of y_axis high and low
-        _min_value_y = min(_min_value_y)
-        _max_value_y = max(_max_value_y)
+        for series_name, values in zip(self.series_names, self.y_values):
+            chart_data.add_series(series_name, values)
 
-        if _min_value_y < 0:
-            _min_value_y = _min_value_y * (1 + self.y_factor_ajuste_min/100)
-        elif _min_value_y > 0:
-            _min_value_y = _min_value_y * (1 - self.y_factor_ajuste_min/100)
-        else:
-            _min_value_y = 0
+        return chart_data
 
-        if _max_value_y < 0:
-            _max_value_y = _max_value_y * (1 - self.y_factor_ajuste_max/100)
-        elif _max_value_y > 0:
-            _max_value_y = _max_value_y * (1 + self.y_factor_ajuste_max/100)
-        else:
-            _max_value_y = 0
+    def apply_series_format(self, chart) -> None:
+        """
+        Apply line color formatting to each chart series.
 
-        # Definition of x_axis high and low
-        _min_value_x = min(_min_value_x)
-        _max_value_x = max(_max_value_x)
+        Parameters
+        ----------
+        chart : pptx.chart.chart.Chart
+            Chart object to format.
+        """
+        for index, series in enumerate(chart.series):
+            color = self.colors[index % len(self.colors)]
+            series.format.line.color.rgb = hex_to_rgb(color)
 
-        if _min_value_x < 0:
-            _min_value_x = _min_value_x * (1 + self.x_factor_ajuste_min/100)
-        elif _min_value_x > 0:
-            _min_value_x = _min_value_x * (1 - self.x_factor_ajuste_min/100)
-        else:
-            _min_value_x = 0
+    def chart(self):
+        """
+        Insert the line chart into the selected PowerPoint slide.
 
-        if _max_value_x < 0:
-            _max_value_x = _max_value_x * (1 - self.x_factor_ajuste_max/100)
-        elif _max_value_x > 0:
-            _max_value_x = _max_value_x * (1 + self.x_factor_ajuste_max/100)
-        else:
-            _max_value_x = 0
+        Returns
+        -------
+        pptx.chart.chart.Chart
+            Created PowerPoint chart object.
+        """
+        self.validate_inputs()
 
-        # Slide where the chart will be put
-        slide = self.presentation.slides[self.slide]
-
-        # Create Chart on the presentation
-        x = Cm(self.position_x)
-        y = Cm(self.position_y)
-        w = Cm(self.width)
-        h = Cm(self.height)
+        chart_data = self.build_chart_data()
+        slide = self.get_slide()
+        x, y, width, height = self.get_chart_position()
 
         chart = slide.shapes.add_chart(
-            XL_CHART_TYPE.BUBBLE, x, y, w, h, chart_data
+            XL_CHART_TYPE.LINE,
+            x,
+            y,
+            width,
+            height,
+            chart_data,
         ).chart
 
-        # Title
-        chart.has_title = self.title_show
-        if self.title_show:
-            chart.chart_title.text_frame.text = self.title
-            chart.chart_title.text_frame.paragraphs[0].font.name = self.title_font
-            chart.chart_title.text_frame.paragraphs[0].font.size = Pt(self.title_font_size)
+        y_minimum, y_maximum = calculate_axis_bounds(
+            values=flatten_nested_values(self.y_values),
+            minimum_adjustment_factor=self.y_axis_minimum_adjustment,
+            maximum_adjustment_factor=self.y_axis_maximum_adjustment,
+        )
 
-        # Y-axis
-        chart.value_axis.has_title = self.y_axis_titulo_mostrar
-        if self.y_axis_titulo_mostrar:
-            chart.value_axis.axis_title.text_frame.text = self.y_axis_titulo
-            chart.value_axis.axis_title.text_frame.paragraphs[0].font.name = self.title_font
-            chart.value_axis.axis_title.text_frame.paragraphs[0].font.size = Pt(self.y_axis_titulo_tamano)
+        self.apply_title(chart)
+        self.apply_value_axis(
+            chart=chart,
+            title_show=self.y_axis_title_show,
+            title=self.y_axis_title,
+            font_size=self.y_axis_font_size,
+            number_format=self.y_axis_number_format,
+            show_gridlines=self.y_axis_gridlines_show,
+            minimum_scale=y_minimum,
+            maximum_scale=y_maximum,
+        )
+        self.apply_category_axis(
+            chart=chart,
+            title_show=self.x_axis_title_show,
+            title=self.x_axis_title,
+            font_size=self.x_axis_font_size,
+            number_format=self.x_axis_number_format,
+        )
+        self.apply_legend(chart)
+        self.apply_series_format(chart)
 
-        chart.value_axis.tick_labels.font.size = Pt(self.y_axis_titulo_tamano)
-        chart.value_axis.tick_labels.font.name = self.title_font
-        chart.value_axis.minimum_scale = float(_min_value_y)
-        chart.value_axis.maximum_scale = float(_max_value_y)
-        chart.value_axis.has_major_gridlines = self.y_axis_lineas
-        chart.value_axis.tick_labels.number_format = self.y_axis_formato
+        return chart
 
-        # X Axis (en bubble chart python-pptx lo expone como category_axis)
-        chart.category_axis.has_title = self.x_axis_titulo_mostrar
-        if self.x_axis_titulo_mostrar:
-            chart.category_axis.axis_title.text_frame.text = self.x_axis_titulo
-            chart.category_axis.axis_title.text_frame.paragraphs[0].font.size = Pt(self.x_axis_titulo_tamano)
-            chart.category_axis.axis_title.text_frame.paragraphs[0].font.name = self.title_font
 
-        chart.category_axis.tick_labels.font.size = Pt(self.x_axis_titulo_tamano)
-        chart.category_axis.tick_labels.font.name = self.title_font
-        chart.category_axis.tick_labels.number_format = self.x_axis_formato
-        chart.category_axis.minimum_scale = float(_min_value_x)
-        chart.category_axis.maximum_scale = float(_max_value_x)
-
-        # Legend
-        chart.has_legend = self.legend_show
-        if self.legend_show:
-            chart.legend.position = LEGEND_POSITION[self.legend_position]
-            chart.legend.font.size = Pt(self.legend_font_size)
-            chart.legend.font.name = self.title_font
-
-        # Series colors (relleno sólido para burbujas)
-        _col_c = 0
-        for serie in chart.series:
-            serie.format.fill.solid()
-            serie.format.fill.fore_color.rgb = hex_to_rgb(self.colors[_col_c])
-            serie.format.line.fill.background()  # sin borde (opcional)
-            _col_c += 1
-
-        return 0
-
-# Waterfall chart
 @dataclass
-class WaterfallChart():
-    presentation: Presentation = None
-    slide: int = 0
+class PieChart(BasePowerPointChart):
+    """
+    Create a pie chart in a PowerPoint slide.
 
-    # --------------------------------------------------
-    # DATA (entrada en decimal: 0.012 = 1.2%)
-    # --------------------------------------------------
-    x: list[str] = None
-    y: list[float] = None
-    l: list[str] = None   # "total" o ""
+    Parameters
+    ----------
+    series_name : str
+        Name of the data series.
+    categories : list[str]
+        Category labels for each slice.
+    values : list[float]
+        Numeric values for each slice.
+    colors : list[str]
+        Hexadecimal colors applied to each slice.
 
-    # --------------------------------------------------
-    # COLORS
-    # --------------------------------------------------
-    color_aumento: RGBColor = RGBColor(192, 51, 36)
-    color_disminucion: RGBColor = RGBColor(18, 43, 95)
-    color_total: RGBColor = RGBColor(61, 120, 216)
+    Methods
+    -------
+    chart()
+        Insert the pie chart into the selected PowerPoint slide.
 
-    # --------------------------------------------------
-    # LAYOUT
-    # --------------------------------------------------
-    position_x: float = 5
-    position_y: float = 5
-    width: float = 10
-    height: float = 10
+    Returns
+    -------
+    pptx.chart.chart.Chart
+        The created chart object when calling chart().
+    """
 
-    # --------------------------------------------------
-    # TITLE
-    # --------------------------------------------------
+    series_name: str = ""
+    categories: list[str] = field(default_factory=list)
+    values: list[float] = field(default_factory=list)
+    colors: list[str] = field(default_factory=lambda: PALETA_COLORES)
+
     title_show: bool = True
-    title: str = ""
-    title_font: str = "Inter"
+
+    data_labels_show: bool = False
+    data_labels_position: str = "center"
+    data_labels_number_format: str = "0.0"
+    data_labels_font_size: float = 5
+
+    def validate_inputs(self) -> None:
+        """
+        Validate pie chart input data.
+
+        Raises
+        ------
+        ValueError
+            If categories or values are empty, or category/value lengths are
+            inconsistent.
+        """
+        self.validate_base_inputs()
+
+        if not self.categories:
+            raise ValueError("categories cannot be empty.")
+
+        if not self.values:
+            raise ValueError("values cannot be empty.")
+
+        if len(self.categories) != len(self.values):
+            raise ValueError(
+                f"categories and values must have the same length. "
+                f"Got len(categories)={len(self.categories)} and "
+                f"len(values)={len(self.values)}."
+            )
+
+    def build_chart_data(self) -> CategoryChartData:
+        """
+        Build the chart data object used by python-pptx.
+
+        Returns
+        -------
+        CategoryChartData
+            Chart data object ready to be inserted into PowerPoint.
+        """
+        chart_data = CategoryChartData()
+        chart_data.categories = self.categories
+        chart_data.add_series(self.series_name, self.values)
+
+        return chart_data
+
+    def apply_slice_colors(self, chart) -> None:
+        """
+        Apply fill colors to each pie slice.
+
+        Parameters
+        ----------
+        chart : pptx.chart.chart.Chart
+            Chart object to format.
+        """
+        series = chart.series[0]
+
+        for index, point in enumerate(series.points):
+            point.format.fill.solid()
+            point.format.fill.fore_color.rgb = hex_to_rgb(
+                self.colors[index % len(self.colors)]
+            )
+
+    def chart(self):
+        """
+        Insert the pie chart into the selected PowerPoint slide.
+
+        Returns
+        -------
+        pptx.chart.chart.Chart
+            Created PowerPoint chart object.
+        """
+        self.validate_inputs()
+
+        chart_data = self.build_chart_data()
+        slide = self.get_slide()
+        x, y, width, height = self.get_chart_position()
+
+        chart = slide.shapes.add_chart(
+            XL_CHART_TYPE.PIE,
+            x,
+            y,
+            width,
+            height,
+            chart_data,
+        ).chart
+
+        self.apply_title(chart)
+        self.apply_legend(chart)
+        self.apply_plot_data_labels(
+            chart=chart,
+            show_labels=self.data_labels_show,
+            label_position=self.data_labels_position,
+            number_format=self.data_labels_number_format,
+            font_size=self.data_labels_font_size,
+        )
+        self.apply_slice_colors(chart)
+
+        return chart
+
+
+@dataclass
+class BarChart(BasePowerPointChart):
+    """
+    Create a bar or column chart in a PowerPoint slide.
+
+    This class supports clustered, stacked and 100% stacked bar or column
+    charts.
+
+    Parameters
+    ----------
+    series_names : list[str]
+        Names of the chart series.
+    x_values : list[list]
+        Category labels for each series. All series must share the same
+        categories.
+    y_values : list[list[float]]
+        Numeric values for each series.
+    colors : list[str]
+        Hexadecimal colors applied to each bar or column series.
+
+    Methods
+    -------
+    chart(chart_type="COLUMN_CLUSTERED")
+        Insert the bar or column chart into the selected PowerPoint slide.
+
+    Returns
+    -------
+    pptx.chart.chart.Chart
+        The created chart object when calling chart().
+    """
+
+    series_names: list[str] = field(default_factory=list)
+    x_values: list[list] = field(default_factory=list)
+    y_values: list[list[float]] = field(default_factory=list)
+    colors: list[str] = field(default_factory=lambda: PALETA_COLORES)
+
+    title_show: bool = True
+
+    data_labels_show: bool = False
+    data_labels_position: str = "center"
+    data_labels_number_format: str = "0.0"
+    data_labels_font_size: float = 5
+
+    x_axis_title_show: bool = False
+    x_axis_title: str = ""
+    x_axis_font_size: float = 6
+    x_axis_number_format: str = "0.00"
+    x_axis_position: str = "center"
+
+    y_axis_title_show: bool = False
+    y_axis_title: str = ""
+    y_axis_font_size: float = 6
+    y_axis_gridlines_show: bool = False
+    y_axis_number_format: str = "0.00"
+    y_axis_position: str = "center"
+    y_axis_minimum_adjustment: float = 10.0
+    y_axis_maximum_adjustment: float = 10.0
+
+    def validate_inputs(self, chart_type: str) -> None:
+        """
+        Validate bar chart input data.
+
+        Parameters
+        ----------
+        chart_type : str
+            Chart type key to validate.
+
+        Raises
+        ------
+        ValueError
+            If data is missing, chart type is invalid or series lengths are
+            inconsistent.
+        """
+        self.validate_base_inputs()
+
+        validate_option(
+            value=chart_type,
+            options=BAR_CHART_TYPES,
+            parameter_name="chart_type",
+        )
+
+        if not self.series_names:
+            raise ValueError("series_names cannot be empty.")
+
+        if not self.x_values:
+            raise ValueError("x_values cannot be empty.")
+
+        if not self.y_values:
+            raise ValueError("y_values cannot be empty.")
+
+        if not (
+            len(self.series_names)
+            == len(self.x_values)
+            == len(self.y_values)
+        ):
+            raise ValueError(
+                "series_names, x_values and y_values must have the same "
+                "number of series."
+            )
+
+        reference_categories = self.x_values[0]
+
+        for index, series_name in enumerate(self.series_names):
+            if len(self.x_values[index]) != len(self.y_values[index]):
+                raise ValueError(
+                    f"Series '{series_name}' has inconsistent lengths: "
+                    f"len(x_values)={len(self.x_values[index])}, "
+                    f"len(y_values)={len(self.y_values[index])}."
+                )
+
+            if self.x_values[index] != reference_categories:
+                raise ValueError(
+                    "All bar chart series must share the same x-axis categories."
+                )
+
+    def build_chart_data(self) -> CategoryChartData:
+        """
+        Build the chart data object used by python-pptx.
+
+        Returns
+        -------
+        CategoryChartData
+            Chart data object ready to be inserted into PowerPoint.
+        """
+        chart_data = CategoryChartData()
+        chart_data.categories = self.x_values[0]
+
+        for series_name, values in zip(self.series_names, self.y_values):
+            chart_data.add_series(series_name, values)
+
+        return chart_data
+
+    def apply_series_format(self, chart) -> None:
+        """
+        Apply fill colors to each bar or column series.
+
+        Parameters
+        ----------
+        chart : pptx.chart.chart.Chart
+            Chart object to format.
+        """
+        for index, series in enumerate(chart.series):
+            series.invert_if_negative = False
+            series.format.fill.solid()
+            series.format.fill.fore_color.rgb = hex_to_rgb(
+                self.colors[index % len(self.colors)]
+            )
+
+    def chart(self, chart_type: str = "COLUMN_CLUSTERED"):
+        """
+        Insert the bar or column chart into the selected PowerPoint slide.
+
+        Parameters
+        ----------
+        chart_type : str, default "COLUMN_CLUSTERED"
+            Chart type key. Available options are defined in BAR_CHART_TYPES.
+
+        Returns
+        -------
+        pptx.chart.chart.Chart
+            Created PowerPoint chart object.
+        """
+        self.validate_inputs(chart_type=chart_type)
+
+        chart_data = self.build_chart_data()
+        slide = self.get_slide()
+        x, y, width, height = self.get_chart_position()
+
+        chart = slide.shapes.add_chart(
+            BAR_CHART_TYPES[chart_type],
+            x,
+            y,
+            width,
+            height,
+            chart_data,
+        ).chart
+
+        y_minimum, y_maximum = calculate_axis_bounds(
+            values=flatten_nested_values(self.y_values),
+            minimum_adjustment_factor=self.y_axis_minimum_adjustment,
+            maximum_adjustment_factor=self.y_axis_maximum_adjustment,
+        )
+
+        self.apply_title(chart)
+        self.apply_legend(chart)
+        self.apply_plot_data_labels(
+            chart=chart,
+            show_labels=self.data_labels_show,
+            label_position=self.data_labels_position,
+            number_format=self.data_labels_number_format,
+            font_size=self.data_labels_font_size,
+        )
+        self.apply_value_axis(
+            chart=chart,
+            title_show=self.y_axis_title_show,
+            title=self.y_axis_title,
+            font_size=self.y_axis_font_size,
+            number_format=self.y_axis_number_format,
+            show_gridlines=self.y_axis_gridlines_show,
+            tick_label_position=self.y_axis_position,
+            minimum_scale=y_minimum,
+            maximum_scale=y_maximum,
+        )
+        self.apply_category_axis(
+            chart=chart,
+            title_show=self.x_axis_title_show,
+            title=self.x_axis_title,
+            font_size=self.x_axis_font_size,
+            number_format=self.x_axis_number_format,
+            tick_label_position=self.x_axis_position,
+        )
+        self.apply_series_format(chart)
+
+        return chart
+
+
+@dataclass
+class BubbleChart(BasePowerPointChart):
+    """
+    Create a bubble chart in a PowerPoint slide.
+
+    Each series requires x-values, y-values and bubble sizes.
+
+    Parameters
+    ----------
+    series_names : list[str]
+        Names of the chart series.
+    x_values : list[list[float]]
+        X-axis values for each series.
+    y_values : list[list[float]]
+        Y-axis values for each series.
+    bubble_sizes : list[list[float]]
+        Bubble size values for each series.
+    colors : list[str]
+        Hexadecimal colors applied to each bubble series.
+
+    Methods
+    -------
+    chart()
+        Insert the bubble chart into the selected PowerPoint slide.
+
+    Returns
+    -------
+    pptx.chart.chart.Chart
+        The created chart object when calling chart().
+    """
+
+    series_names: list[str] = field(default_factory=list)
+    x_values: list[list[float]] = field(default_factory=list)
+    y_values: list[list[float]] = field(default_factory=list)
+    bubble_sizes: list[list[float]] = field(default_factory=list)
+    colors: list[str] = field(default_factory=lambda: PALETA_COLORES)
+
+    x_axis_title_show: bool = False
+    x_axis_title: str = ""
+    x_axis_font_size: float = 6
+    x_axis_number_format: str = "0.00"
+    x_axis_minimum_adjustment: float = 5.0
+    x_axis_maximum_adjustment: float = 5.0
+
+    y_axis_title_show: bool = False
+    y_axis_title: str = ""
+    y_axis_font_size: float = 6
+    y_axis_gridlines_show: bool = False
+    y_axis_number_format: str = "0.00"
+    y_axis_minimum_adjustment: float = 5.0
+    y_axis_maximum_adjustment: float = 5.0
+
+    def validate_inputs(self) -> None:
+        """
+        Validate bubble chart input data.
+
+        Raises
+        ------
+        ValueError
+            If required series data is missing or lengths are inconsistent.
+        """
+        self.validate_base_inputs()
+
+        if not self.series_names:
+            raise ValueError("series_names cannot be empty.")
+
+        if not self.x_values:
+            raise ValueError("x_values cannot be empty.")
+
+        if not self.y_values:
+            raise ValueError("y_values cannot be empty.")
+
+        if not self.bubble_sizes:
+            raise ValueError("bubble_sizes cannot be empty.")
+
+        if not (
+            len(self.series_names)
+            == len(self.x_values)
+            == len(self.y_values)
+            == len(self.bubble_sizes)
+        ):
+            raise ValueError(
+                "series_names, x_values, y_values and bubble_sizes must have "
+                "the same number of series."
+            )
+
+        for index, series_name in enumerate(self.series_names):
+            if not (
+                len(self.x_values[index])
+                == len(self.y_values[index])
+                == len(self.bubble_sizes[index])
+            ):
+                raise ValueError(
+                    f"Series '{series_name}' has inconsistent lengths: "
+                    f"len(x_values)={len(self.x_values[index])}, "
+                    f"len(y_values)={len(self.y_values[index])}, "
+                    f"len(bubble_sizes)={len(self.bubble_sizes[index])}."
+                )
+
+    def build_chart_data(self) -> BubbleChartData:
+        """
+        Build the bubble chart data object used by python-pptx.
+
+        Returns
+        -------
+        BubbleChartData
+            Chart data object ready to be inserted into PowerPoint.
+        """
+        chart_data = BubbleChartData()
+
+        for series_name, x_series, y_series, size_series in zip(
+            self.series_names,
+            self.x_values,
+            self.y_values,
+            self.bubble_sizes,
+        ):
+            series = chart_data.add_series(series_name)
+
+            for x_value, y_value, bubble_size in zip(
+                x_series,
+                y_series,
+                size_series,
+            ):
+                series.add_data_point(x_value, y_value, bubble_size)
+
+        return chart_data
+
+    def apply_series_format(self, chart) -> None:
+        """
+        Apply bubble fill colors and remove bubble borders.
+
+        Parameters
+        ----------
+        chart : pptx.chart.chart.Chart
+            Chart object to format.
+        """
+        for index, series in enumerate(chart.series):
+            series.format.fill.solid()
+            series.format.fill.fore_color.rgb = hex_to_rgb(
+                self.colors[index % len(self.colors)]
+            )
+            series.format.line.fill.background()
+
+    def chart(self):
+        """
+        Insert the bubble chart into the selected PowerPoint slide.
+
+        Returns
+        -------
+        pptx.chart.chart.Chart
+            Created PowerPoint chart object.
+        """
+        self.validate_inputs()
+
+        chart_data = self.build_chart_data()
+        slide = self.get_slide()
+        x, y, width, height = self.get_chart_position()
+
+        chart = slide.shapes.add_chart(
+            XL_CHART_TYPE.BUBBLE,
+            x,
+            y,
+            width,
+            height,
+            chart_data,
+        ).chart
+
+        x_minimum, x_maximum = calculate_axis_bounds(
+            values=flatten_nested_values(self.x_values),
+            minimum_adjustment_factor=self.x_axis_minimum_adjustment,
+            maximum_adjustment_factor=self.x_axis_maximum_adjustment,
+        )
+        y_minimum, y_maximum = calculate_axis_bounds(
+            values=flatten_nested_values(self.y_values),
+            minimum_adjustment_factor=self.y_axis_minimum_adjustment,
+            maximum_adjustment_factor=self.y_axis_maximum_adjustment,
+        )
+
+        self.apply_title(chart)
+        self.apply_value_axis(
+            chart=chart,
+            title_show=self.y_axis_title_show,
+            title=self.y_axis_title,
+            font_size=self.y_axis_font_size,
+            number_format=self.y_axis_number_format,
+            show_gridlines=self.y_axis_gridlines_show,
+            minimum_scale=y_minimum,
+            maximum_scale=y_maximum,
+        )
+        self.apply_category_axis(
+            chart=chart,
+            title_show=self.x_axis_title_show,
+            title=self.x_axis_title,
+            font_size=self.x_axis_font_size,
+            number_format=self.x_axis_number_format,
+            minimum_scale=x_minimum,
+            maximum_scale=x_maximum,
+        )
+        self.apply_legend(chart)
+        self.apply_series_format(chart)
+
+        return chart
+
+
+@dataclass
+class WaterfallChart(BasePowerPointChart):
+    """
+    Create a waterfall chart in PowerPoint using a stacked column chart.
+
+    Since python-pptx does not expose a native waterfall chart type, this class
+    builds a waterfall visualization using hidden base series and visible
+    increase, decrease and total series.
+
+    Parameters
+    ----------
+    categories : list[str]
+        Category labels shown on the x-axis.
+    values : list[float]
+        Numeric values for each waterfall step. Values are expected in decimal
+        format when using percentage labels, for example 0.012 means 1.2%.
+    bar_types : list[str]
+        Bar type for each category. Use "total" to mark total bars and an empty
+        string or any other value for regular contribution bars.
+
+    Methods
+    -------
+    chart()
+        Insert the waterfall chart into the selected PowerPoint slide.
+
+    Returns
+    -------
+    pptx.chart.chart.Chart
+        The created chart object when calling chart().
+    """
+
+    categories: list[str] = field(default_factory=list)
+    values: list[float] = field(default_factory=list)
+    bar_types: list[str] = field(default_factory=list)
+
+    increase_color: RGBColor = RGBColor(192, 51, 36)
+    decrease_color: RGBColor = RGBColor(18, 43, 95)
+    total_color: RGBColor = RGBColor(61, 120, 216)
+
+    title_show: bool = True
     title_font_size: float = 9
 
-    # --------------------------------------------------
-    # DATA LABELS
-    # --------------------------------------------------
     data_labels_show: bool = False
     data_labels_position: str = "inside_base"
-    data_labels_format: str = "0.00%"
-    data_labels_font_size: int = 8
+    data_labels_number_format: str = "0.00%"
+    data_labels_font_size: float = 8
 
-    # --------------------------------------------------
-    # AXES
-    # --------------------------------------------------
-    x_axis_titulo_mostrar: bool = False
-    x_axis_titulo: str = ""
+    x_axis_title_show: bool = False
+    x_axis_title: str = ""
     x_axis_position: str = "low"
-    x_axis_titulo_tamano: int = 8
-    x_axis_formato: str = "0.0"
+    x_axis_font_size: float = 8
+    x_axis_number_format: str = "0.0"
 
-    y_axis_titulo_mostrar: bool = False
-    y_axis_titulo_tamano: int = 8
-    y_axis_titulo: str = ""
-    y_axis_formato: str = "0.00%"
+    y_axis_title_show: bool = False
+    y_axis_title: str = ""
+    y_axis_font_size: float = 8
+    y_axis_number_format: str = "0.00%"
     y_axis_position: str = "low"
-    y_axis_lineas: bool = False
-    y_factor_ajuste_min: float = 20
-    y_factor_ajuste_max: float = 20
+    y_axis_gridlines_show: bool = False
+    y_axis_minimum_adjustment: float = 20
+    y_axis_maximum_adjustment: float = 20
 
-    # --------------------------------------------------
-    # LOGIC
-    # --------------------------------------------------
-    total_resets_running_except_last: bool = True
+    reset_running_total_except_last: bool = True
 
-    # ==================================================
-    # VALIDATION
-    # ==================================================
-    def _validate_inputs(self):
-        if self.presentation is None:
-            raise ValueError("presentation no puede ser None")
-        if self.x is None or self.y is None or self.l is None:
-            raise ValueError("Debes definir x, y y l")
-        if not (len(self.x) == len(self.y) == len(self.l)):
-            raise ValueError("x, y y l deben tener la misma longitud")
+    def validate_inputs(self) -> None:
+        """
+        Validate waterfall chart input data.
 
-    # ==================================================
-    # WATERFALL ENGINE
-    # ==================================================
-    def _build_waterfall_series(self):
-        # Escalar a porcentaje real
-        y_vals = [v for v in self.y]
+        Raises
+        ------
+        ValueError
+            If required data is empty, lengths are inconsistent or data label
+            position is invalid.
+        """
+        self.validate_base_inputs()
 
-        base_pos, base_neg = [], []
-        aum_pos, aum_neg = [], []
-        dis_pos, dis_neg = [], []
-        tot_pos, tot_neg = [], []
-        label_carrier = []
+        if not self.categories:
+            raise ValueError("categories cannot be empty.")
 
-        label_targets = [None] * len(y_vals)
-        running = 0.0
+        if not self.values:
+            raise ValueError("values cannot be empty.")
 
-        total_idx = [i for i, t in enumerate(self.l) if (t or "").lower() == "total"]
-        last_total = total_idx[-1] if total_idx else None
+        if not self.bar_types:
+            raise ValueError("bar_types cannot be empty.")
 
-        for i, (v, lab) in enumerate(zip(y_vals, self.l)):
-            lab = (lab or "").lower()
-            bp = bn = ap = an = dp = dn = tp = tn = 0.0
+        if not (
+            len(self.categories)
+            == len(self.values)
+            == len(self.bar_types)
+        ):
+            raise ValueError(
+                "categories, values and bar_types must have the same length."
+            )
 
-            if lab == "total":
-                if v >= 0:
-                    tp = v
-                    label_targets[i] = ("TotPos", v)
-                else:
-                    tn = v
-                    label_targets[i] = ("TotNeg", v)
+        validate_option(
+            value=self.data_labels_position,
+            options=LABEL_POSITION,
+            parameter_name="data_labels_position",
+        )
 
-                if self.total_resets_running_except_last and i != last_total:
-                    running = v
-            else:
-                start, end = running, running + v
-                low, high = min(start, end), max(start, end)
-                inc = end >= start
+    def build_waterfall_series(
+        self,
+    ) -> tuple[dict[str, list[float]], list[tuple[str, float] | None]]:
+        """
+        Build stacked-column series needed to emulate a waterfall chart.
 
-                if low >= 0:
-                    bp = low
-                    seg = high - low
-                    if inc:
-                        ap = seg
-                        label_targets[i] = ("AumPos", v)
-                    else:
-                        dp = seg
-                        label_targets[i] = ("DisPos", v)
-                elif high <= 0:
-                    bn = high
-                    seg = low - high
-                    if inc:
-                        an = seg
-                        label_targets[i] = ("AumNeg", v)
-                    else:
-                        dn = seg
-                        label_targets[i] = ("DisNeg", v)
-                else:
-                    if inc:
-                        ap, an = high, low
-                        label_targets[i] = ("AumPos" if end >= 0 else "AumNeg", v)
-                    else:
-                        dp, dn = high, low
-                        label_targets[i] = ("DisPos" if end >= 0 else "DisNeg", v)
+        Returns
+        -------
+        tuple[dict[str, list[float]], list[tuple[str, float] | None]]
+            Internal series dictionary and label target metadata.
+        """
+        series = {
+            "BasePositive": [],
+            "BaseNegative": [],
+            "IncreasePositive": [],
+            "IncreaseNegative": [],
+            "DecreasePositive": [],
+            "DecreaseNegative": [],
+            "TotalPositive": [],
+            "TotalNegative": [],
+            "LabelCarrier": [],
+        }
 
-                running = end
-                
-            label_carrier.append(ap + an + dp + dn + tp + tn)
-            base_pos.append(bp)
-            base_neg.append(bn)
-            aum_pos.append(ap)
-            aum_neg.append(an)
-            dis_pos.append(dp)
-            dis_neg.append(dn)
-            tot_pos.append(tp)
-            tot_neg.append(tn)
+        label_targets: list[tuple[str, float] | None] = [None] * len(self.values)
 
-        return {
-            "BasePos": base_pos, "BaseNeg": base_neg,
-            "AumPos": aum_pos, "AumNeg": aum_neg,
-            "DisPos": dis_pos, "DisNeg": dis_neg,
-            "TotPos": tot_pos, "TotNeg": tot_neg,
-            "LabelCarrier": label_carrier
-        }, label_targets
-
-    # ==================================================
-    # PUBLIC
-    # ==================================================
-    def chart(self):
-        self._validate_inputs()
-
-        series, labels = self._build_waterfall_series()
-
-        data = CategoryChartData()
-        data.categories = self.x
-
-        order = [
-            "BasePos","BaseNeg",
-            "AumPos","AumNeg",
-            "DisPos","DisNeg",
-            "TotPos","TotNeg", "LabelCarrier"
+        total_indexes = [
+            index
+            for index, bar_type in enumerate(self.bar_types)
+            if (bar_type or "").lower() == "total"
         ]
+        last_total_index = total_indexes[-1] if total_indexes else None
 
-        for k in order:
-            data.add_series(k, series[k])
-        
-        slide = self.presentation.slides[self.slide]
+        running_value = 0.0
+
+        for index, value in enumerate(self.values):
+            bar_type = (self.bar_types[index] or "").lower()
+
+            base_positive = 0.0
+            base_negative = 0.0
+            increase_positive = 0.0
+            increase_negative = 0.0
+            decrease_positive = 0.0
+            decrease_negative = 0.0
+            total_positive = 0.0
+            total_negative = 0.0
+
+            if bar_type == "total":
+                if value >= 0:
+                    total_positive = value
+                    label_targets[index] = ("TotalPositive", value)
+                else:
+                    total_negative = value
+                    label_targets[index] = ("TotalNegative", value)
+
+                if (
+                    self.reset_running_total_except_last
+                    and index != last_total_index
+                ):
+                    running_value = value
+
+            else:
+                start_value = running_value
+                end_value = running_value + value
+                low_value = min(start_value, end_value)
+                high_value = max(start_value, end_value)
+                is_increase = end_value >= start_value
+
+                if low_value >= 0:
+                    base_positive = low_value
+                    segment = high_value - low_value
+
+                    if is_increase:
+                        increase_positive = segment
+                        label_targets[index] = ("IncreasePositive", value)
+                    else:
+                        decrease_positive = segment
+                        label_targets[index] = ("DecreasePositive", value)
+
+                elif high_value <= 0:
+                    base_negative = high_value
+                    segment = low_value - high_value
+
+                    if is_increase:
+                        increase_negative = segment
+                        label_targets[index] = ("IncreaseNegative", value)
+                    else:
+                        decrease_negative = segment
+                        label_targets[index] = ("DecreaseNegative", value)
+
+                else:
+                    if is_increase:
+                        increase_positive = high_value
+                        increase_negative = low_value
+                        label_targets[index] = (
+                            "IncreasePositive"
+                            if end_value >= 0
+                            else "IncreaseNegative",
+                            value,
+                        )
+                    else:
+                        decrease_positive = high_value
+                        decrease_negative = low_value
+                        label_targets[index] = (
+                            "DecreasePositive"
+                            if end_value >= 0
+                            else "DecreaseNegative",
+                            value,
+                        )
+
+                running_value = end_value
+
+            label_carrier = (
+                increase_positive
+                + increase_negative
+                + decrease_positive
+                + decrease_negative
+                + total_positive
+                + total_negative
+            )
+
+            series["BasePositive"].append(base_positive)
+            series["BaseNegative"].append(base_negative)
+            series["IncreasePositive"].append(increase_positive)
+            series["IncreaseNegative"].append(increase_negative)
+            series["DecreasePositive"].append(decrease_positive)
+            series["DecreaseNegative"].append(decrease_negative)
+            series["TotalPositive"].append(total_positive)
+            series["TotalNegative"].append(total_negative)
+            series["LabelCarrier"].append(label_carrier)
+
+        return series, label_targets
+
+    def build_chart_data(self, series: dict[str, list[float]]) -> CategoryChartData:
+        """
+        Build the waterfall chart data object.
+
+        Parameters
+        ----------
+        series : dict[str, list[float]]
+            Internal waterfall series dictionary.
+
+        Returns
+        -------
+        CategoryChartData
+            Chart data object ready to be inserted into PowerPoint.
+        """
+        chart_data = CategoryChartData()
+        chart_data.categories = self.categories
+
+        for series_name in WATERFALL_SERIES_ORDER:
+            chart_data.add_series(series_name, series[series_name])
+
+        return chart_data
+
+    def calculate_waterfall_axis_bounds(self) -> tuple[float, float]:
+        """
+        Calculate adjusted y-axis bounds for the waterfall chart.
+
+        Returns
+        -------
+        tuple[float, float]
+            Adjusted minimum and maximum y-axis values.
+        """
+        running_values = [0.0]
+        running_value = 0.0
+
+        total_indexes = [
+            index
+            for index, bar_type in enumerate(self.bar_types)
+            if (bar_type or "").lower() == "total"
+        ]
+        last_total_index = total_indexes[-1] if total_indexes else None
+
+        for index, value in enumerate(self.values):
+            bar_type = (self.bar_types[index] or "").lower()
+
+            if bar_type == "total":
+                running_values.append(value)
+
+                if (
+                    self.reset_running_total_except_last
+                    and index != last_total_index
+                ):
+                    running_value = value
+            else:
+                running_value += value
+                running_values.append(running_value)
+
+        return calculate_axis_bounds(
+            values=running_values,
+            minimum_adjustment_factor=self.y_axis_minimum_adjustment,
+            maximum_adjustment_factor=self.y_axis_maximum_adjustment,
+        )
+
+    def apply_waterfall_series_format(self, chart) -> None:
+        """
+        Apply colors and hidden-series formatting to the waterfall chart.
+
+        Parameters
+        ----------
+        chart : pptx.chart.chart.Chart
+            Chart object to format.
+        """
+        chart.series[0].format.fill.background()
+        chart.series[1].format.fill.background()
+
+        label_carrier = chart.series[8]
+        label_carrier.format.fill.background()
+        label_carrier.format.line.fill.background()
+
+        for series in chart.series:
+            series.invert_if_negative = False
+
+        for index in (2, 3):
+            chart.series[index].format.fill.solid()
+            chart.series[index].format.fill.fore_color.rgb = self.increase_color
+
+        for index in (4, 5):
+            chart.series[index].format.fill.solid()
+            chart.series[index].format.fill.fore_color.rgb = self.decrease_color
+
+        for index in (6, 7):
+            chart.series[index].format.fill.solid()
+            chart.series[index].format.fill.fore_color.rgb = self.total_color
+
+    def apply_custom_data_labels(
+        self,
+        chart,
+        label_targets: list[tuple[str, float] | None],
+    ) -> None:
+        """
+        Apply custom value labels to the invisible label carrier series.
+
+        Parameters
+        ----------
+        chart : pptx.chart.chart.Chart
+            Chart object to format.
+        label_targets : list[tuple[str, float] | None]
+            Metadata returned by build_waterfall_series.
+        """
+        if not self.data_labels_show:
+            return
+
+        label_series = chart.series[8]
+        label_series.has_data_labels = True
+
+        for index, point in enumerate(label_series.points):
+            target = label_targets[index]
+
+            if target is None:
+                continue
+
+            _, value = target
+
+            label = point.data_label
+            label.show_value = False
+            label.position = LABEL_POSITION[self.data_labels_position]
+
+            text_frame = label.text_frame
+            text_frame.clear()
+            text_frame.auto_size = MSO_AUTO_SIZE.NONE
+            text_frame.word_wrap = False
+
+            paragraph = text_frame.paragraphs[0]
+            run = paragraph.add_run()
+
+            if self.data_labels_number_format == "0.00%":
+                run.text = f"{value * 100:.2f}%"
+            elif self.data_labels_number_format == "0.0%":
+                run.text = f"{value * 100:.1f}%"
+            elif self.data_labels_number_format == "0%":
+                run.text = f"{value * 100:.0f}%"
+            else:
+                run.text = str(value)
+
+            run.font.size = Pt(self.data_labels_font_size)
+            run.font.name = self.font_name
+
+    def chart(self):
+        """
+        Insert the waterfall chart into the selected PowerPoint slide.
+
+        Returns
+        -------
+        pptx.chart.chart.Chart
+            Created PowerPoint chart object.
+        """
+        self.validate_inputs()
+
+        series, label_targets = self.build_waterfall_series()
+        chart_data = self.build_chart_data(series)
+
+        slide = self.get_slide()
+
         chart = slide.shapes.add_chart(
             XL_CHART_TYPE.COLUMN_STACKED,
             Cm(self.position_x),
             Cm(self.position_y),
             Cm(self.width),
             Cm(self.height),
-            data
+            chart_data,
         ).chart
 
-        # Invisibles (bases)
-        chart.series[0].format.fill.background()
-        chart.series[1].format.fill.background()
+        y_minimum, y_maximum = self.calculate_waterfall_axis_bounds()
 
-        carrier_idx = 8
-        carrier = chart.series[carrier_idx]
-        carrier.format.fill.background()
-        carrier.format.line.fill.background()
+        self.apply_waterfall_series_format(chart)
+        self.apply_title(chart)
+        self.apply_value_axis(
+            chart=chart,
+            title_show=self.y_axis_title_show,
+            title=self.y_axis_title,
+            font_size=self.y_axis_font_size,
+            number_format=self.y_axis_number_format,
+            show_gridlines=self.y_axis_gridlines_show,
+            tick_label_position=self.y_axis_position,
+            minimum_scale=y_minimum,
+            maximum_scale=y_maximum,
+        )
+        self.apply_category_axis(
+            chart=chart,
+            title_show=self.x_axis_title_show,
+            title=self.x_axis_title,
+            font_size=self.x_axis_font_size,
+            number_format=self.x_axis_number_format,
+            tick_label_position=self.x_axis_position,
+        )
+        self.apply_custom_data_labels(
+            chart=chart,
+            label_targets=label_targets,
+        )
 
-        for s in chart.series:
-            # desactiva "Invertir si es negativo"
-            s.invert_if_negative = False
-
-        # Colores
-        for i in (2, 3):
-            chart.series[i].format.fill.solid()
-            chart.series[i].format.fill.fore_color.rgb = self.color_aumento
-        for i in (4, 5):
-            chart.series[i].format.fill.solid()
-            chart.series[i].format.fill.fore_color.rgb = self.color_disminucion
-        for i in (6, 7):
-            chart.series[i].format.fill.solid()
-            chart.series[i].format.fill.fore_color.rgb = self.color_total
-
-        if self.title_show:
-            p = chart.chart_title.text_frame.paragraphs[0]
-            p.text = self.title
-            p.font.name = self.title_font
-            p.font.size = Pt(self.title_font_size)
-        
-        # manejo de min y max
-        lls = series["LabelCarrier"]
-        lls.pop(-1)  # last
-        lls.pop(-2) 
-        accum = list(accumulate(lls))
-        if all(x >0 for x in accum):
-            _minval = 0
-            aj = 20 if abs(max(accum)) <= 0.001 else 0
-            _maxval = max(accum) * (1 + (self.y_factor_ajuste_max + aj)/100)
-        elif all(x < 0 for x in accum):
-            aj = 20 if abs(min(accum)) <= 0.001 else 0
-            _minval = min(accum) * (1 + (self.y_factor_ajuste_min + aj)/100)
-            _maxval = 0
-        else:
-            ajmin = 20 if abs(min(accum)) <= 0.001 else 0
-            ajmax = 20 if abs(max(accum)) <= 0.001 else 0
-            _minval = min(accum) * (1 + (self.y_factor_ajuste_min + ajmin)/100)
-            _maxval = max(accum) * (1 + (self.y_factor_ajuste_max + ajmax)/100)
-
-        # Y-axis
-        chart.value_axis.has_title = self.y_axis_titulo_mostrar
-        chart.value_axis.tick_label_position = AXIS_POSITION[self.y_axis_position]
-        if self.y_axis_titulo_mostrar:
-            chart.value_axis.axis_title.text_frame.text = self.y_axis_titulo
-            p = chart.value_axis.axis_title.text_frame.paragraphs[0]
-            p.font.name = self.title_font
-            p.font.size = Pt(self.y_axis_titulo_tamano)
-        
-        chart.value_axis.tick_labels.auto_scale = False
-        chart.value_axis.tick_labels.font.size = Pt(self.y_axis_titulo_tamano)
-        chart.value_axis.tick_labels.font.name = self.title_font
-        chart.value_axis.minimum_scale = _minval 
-        chart.value_axis.maximum_scale = _maxval
-        chart.value_axis.has_major_gridlines = self.y_axis_lineas
-        chart.value_axis.tick_labels.number_format = self.y_axis_formato
-
-        # X-axis
-        chart.category_axis.has_title = self.x_axis_titulo_mostrar
-        chart.category_axis.tick_label_position = AXIS_POSITION[self.x_axis_position]
-        if self.x_axis_titulo_mostrar:
-            chart.category_axis.axis_title.text_frame.text = self.x_axis_titulo
-            p = chart.category_axis.axis_title.text_frame.paragraphs[0]
-            p.font.size = Pt(self.x_axis_titulo_tamano)
-            p.font.name = self.title_font
-
-        chart.category_axis.tick_labels.font.size = Pt(self.x_axis_titulo_tamano)
-        chart.category_axis.tick_labels.font.name = self.title_font
-        chart.category_axis.tick_labels.number_format = self.x_axis_formato
-
-        if self.data_labels_show:
-            for i, point in enumerate(chart.series[8].points):
-
-                target = labels[i]
-                if target is None:
-                    continue
-
-                _, value = target
-
-                lbl = point.data_label
-                lbl.show_value = False
-                lbl.position = LABEL_POSITION["inside_base"]
-
-                tf = lbl.text_frame
-                tf.clear()
-                tf.auto_size = MSO_AUTO_SIZE.NONE
-                tf.word_wrap = False
-
-                p = tf.paragraphs[0]
-
-                # ✅ MUST use a run for font to stick
-                run = p.add_run()
-                run.text = f"{value * 100:.2f}%"
-
-                run.font.size = Pt(self.data_labels_font_size)
-                run.font.name = self.title_font
-
-      
+        return chart

@@ -1,131 +1,591 @@
-from pptx.dml.color import RGBColor
+"""
+Utility functions for PowerPoint automation.
+
+This module includes general helpers for color conversion, option validation,
+axis scaling, nested list handling and safe text replacement while preserving
+PowerPoint formatting where possible.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
 from copy import deepcopy
+from typing import Any
+
+from pptx.dml.color import RGBColor
 from pptx.shapes.group import GroupShape
 
-# ------------------------------------
-# Section 1: funciones
-# ------------------------------------
-# HEX to RGB formato
+
 def hex_to_rgb(hex_color: str) -> RGBColor:
-    hex_color = hex_color.lstrip("#")
-    return RGBColor(int(hex_color[0:2], 16),
-                    int(hex_color[2:4], 16),
-                    int(hex_color[4:6], 16))
-
-# ------------------------------------
-# Section 3: Tablas PPTX
-# ------------------------------------
-def set_cell_text_preserve_format(cell, new_text):
     """
-    Reemplaza el texto visible de una celda intentando preservar el formato existente:
-    - Reutiliza el primer run del primer párrafo (mantiene font, size, bold, color, etc.)
-    - Elimina texto de runs/párrafos adicionales para no mezclar contenido viejo.
+    Convert a hexadecimal color string into a python-pptx RGBColor object.
+
+    Parameters
+    ----------
+    hex_color : str
+        Hexadecimal color string. It can be passed with or without '#'.
+        Example: '#122B5F' or '122B5F'.
+
+    Returns
+    -------
+    RGBColor
+        RGBColor object compatible with python-pptx.
+
+    Raises
+    ------
+    ValueError
+        If hex_color is not a valid hexadecimal color.
     """
-    tf = cell.text_frame
+    if not isinstance(hex_color, str):
+        raise ValueError("hex_color must be a string.")
 
-    # Si no hay párrafos (raro), crea uno
-    if len(tf.paragraphs) == 0:
-        p = tf.add_paragraph()
-    else:
-        p = tf.paragraphs[0]
+    clean_color = hex_color.strip().lstrip("#")
 
-    # Si no hay runs, crea uno
-    if len(p.runs) == 0:
-        run = p.add_run()
-        run.text = new_text
-    else:
-        # 1) Setear el texto en el primer run (conserva formato)
-        p.runs[0].text = new_text
+    if len(clean_color) != 6:
+        raise ValueError(
+            f"Invalid hex color '{hex_color}'. Expected format is '#RRGGBB'."
+        )
 
-        # 2) Vaciar texto de runs adicionales del primer párrafo
-        for r in p.runs[1:]:
-            r.text = ""
+    try:
+        red = int(clean_color[0:2], 16)
+        green = int(clean_color[2:4], 16)
+        blue = int(clean_color[4:6], 16)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid hex color '{hex_color}'. Expected format is '#RRGGBB'."
+        ) from exc
 
-    # 3) Vaciar párrafos adicionales (si existieran) para evitar texto residual
-    for extra_p in tf.paragraphs[1:]:
-        for r in extra_p.runs:
-            r.text = ""
+    return RGBColor(red, green, blue)
 
-# ------------------------------------
-# Section 3: Cajas de texto PPTX
-# ------------------------------------
-def set_text_keep_format(shape, new_text: str, keep_linebreaks: bool = True):
+
+def validate_option(value: str, options: dict, parameter_name: str) -> None:
     """
-    Reemplaza el texto manteniendo el formato original del shape.
-    - NO usa text_frame.text (porque resetea estilos con frecuencia).
-    - Reutiliza el primer run existente (que ya tiene el estilo correcto).
-    - Si new_text tiene saltos de línea y keep_linebreaks=True,
-      crea párrafos adicionales copiando el formato del primer párrafo/run.
+    Validate that a value exists in a dictionary of valid options.
+
+    Parameters
+    ----------
+    value : str
+        Value to validate.
+    options : dict
+        Dictionary where valid values are represented by keys.
+    parameter_name : str
+        Name of the parameter being validated.
+
+    Raises
+    ------
+    ValueError
+        If value is not a valid key in options.
     """
-    if not shape.has_text_frame:
-        raise ValueError(f"El shape '{shape.name}' no tiene text_frame.")
+    if value not in options:
+        raise ValueError(
+            f"Invalid {parameter_name} '{value}'. "
+            f"Available options are: {list(options.keys())}."
+        )
 
-    tf = shape.text_frame
-    if len(tf.paragraphs) == 0:
-        p0 = tf.paragraphs[0]
-    else:
-        p0 = tf.paragraphs[0]
 
-    # Asegurar que exista al menos un run
-    if len(p0.runs) == 0:
-        r0 = p0.add_run()
-    else:
-        r0 = p0.runs[0]
+def apply_axis_adjustment(
+    value: float,
+    adjustment_factor: float,
+    is_minimum: bool,
+) -> float:
+    """
+    Apply a percentage adjustment to an axis boundary.
 
-    # Guardar "plantilla" de formato del párrafo y run (XML)
-    p0_xml = deepcopy(p0._p)       # formato del párrafo
-    r0_xml = deepcopy(r0._r)       # formato del run
+    Parameters
+    ----------
+    value : float
+        Axis boundary value.
+    adjustment_factor : float
+        Percentage adjustment to apply.
+    is_minimum : bool
+        Whether the value corresponds to the minimum axis boundary.
 
-    # Limpieza controlada: vaciar texto de todos los runs existentes (pero no borrar runs)
-    for r in p0.runs:
-        r.text = ""
+    Returns
+    -------
+    float
+        Adjusted axis boundary.
+    """
+    if value == 0:
+        return 0.0
 
-    # Si no quieres respetar saltos, simple:
-    if not keep_linebreaks or ("\n" not in new_text):
-        r0.text = new_text
+    factor = adjustment_factor / 100
+
+    if is_minimum:
+        if value < 0:
+            return value * (1 + factor)
+        return value * (1 - factor)
+
+    if value < 0:
+        return value * (1 - factor)
+
+    return value * (1 + factor)
+
+
+def calculate_axis_bounds(
+    values: Sequence[float],
+    minimum_adjustment_factor: float = 5.0,
+    maximum_adjustment_factor: float = 5.0,
+) -> tuple[float, float]:
+    """
+    Calculate adjusted minimum and maximum axis bounds.
+
+    Parameters
+    ----------
+    values : Sequence[float]
+        Numeric values used to calculate the axis range.
+    minimum_adjustment_factor : float, default 5.0
+        Percentage adjustment applied to the minimum value.
+    maximum_adjustment_factor : float, default 5.0
+        Percentage adjustment applied to the maximum value.
+
+    Returns
+    -------
+    tuple[float, float]
+        Adjusted minimum and maximum axis values.
+
+    Raises
+    ------
+    ValueError
+        If values is empty.
+    """
+    clean_values = [float(value) for value in values if value is not None]
+
+    if not clean_values:
+        raise ValueError("values cannot be empty.")
+
+    minimum_value = min(clean_values)
+    maximum_value = max(clean_values)
+
+    adjusted_minimum = apply_axis_adjustment(
+        value=minimum_value,
+        adjustment_factor=minimum_adjustment_factor,
+        is_minimum=True,
+    )
+    adjusted_maximum = apply_axis_adjustment(
+        value=maximum_value,
+        adjustment_factor=maximum_adjustment_factor,
+        is_minimum=False,
+    )
+
+    if adjusted_minimum == adjusted_maximum:
+        if adjusted_minimum == 0:
+            return -1.0, 1.0
+
+        padding = abs(adjusted_minimum) * 0.1
+        return adjusted_minimum - padding, adjusted_maximum + padding
+
+    return adjusted_minimum, adjusted_maximum
+
+
+def flatten_nested_values(values: Sequence[Sequence[float]]) -> list:
+    """
+    Flatten a nested sequence of numeric values into a single list.
+
+    Parameters
+    ----------
+    values : Sequence[Sequence[float]]
+        Nested numeric sequence.
+
+    Returns
+    -------
+    list[float]
+        Flattened list of values.
+    """
+    return [item for sublist in values for item in sublist]
+
+
+def validate_equal_length(
+    values: Sequence,
+    expected_length: int,
+    parameter_name: str,
+) -> None:
+    """
+    Validate that a sequence has an expected length.
+
+    Parameters
+    ----------
+    values : Sequence
+        Sequence to validate.
+    expected_length : int
+        Expected number of elements.
+    parameter_name : str
+        Name of the parameter being validated.
+
+    Raises
+    ------
+    ValueError
+        If the sequence length differs from expected_length.
+    """
+    if len(values) != expected_length:
+        raise ValueError(
+            f"{parameter_name} must have length {expected_length}. "
+            f"Got {len(values)}."
+        )
+
+
+def replace_text_preserve_style(
+    target: Any,
+    new_text: Any,
+    *,
+    preserve_linebreaks: bool = True,
+    linebreak_replacement: str = " ",
+    clear_extra_runs: bool = True,
+    clear_extra_paragraphs: bool = True,
+    none_as_empty: bool = True,
+) -> None:
+    """
+    Replace text in a PowerPoint shape or table cell while preserving the
+    formatting of the first paragraph and first run.
+
+    The function works with any python-pptx object that exposes a ``text_frame``
+    attribute, including shapes and table cells.
+
+    Parameters
+    ----------
+    target : Any
+        PowerPoint shape or table cell containing a text frame.
+    new_text : Any
+        New text to assign. Non-string values are converted to string.
+    preserve_linebreaks : bool, default True
+        If True, line breaks are preserved by creating one paragraph per line.
+        If False, line breaks are replaced by ``linebreak_replacement``.
+    linebreak_replacement : str, default " "
+        Text used to replace line breaks when ``preserve_linebreaks`` is False.
+    clear_extra_runs : bool, default True
+        Whether to remove extra runs from the first paragraph.
+    clear_extra_paragraphs : bool, default True
+        Whether to remove all paragraphs after the first one before adding
+        new multiline content.
+    none_as_empty : bool, default True
+        If True, None is converted to an empty string. If False, None is
+        converted to the string ``"None"``.
+
+    Raises
+    ------
+    ValueError
+        If the target does not contain a text frame.
+    """
+    text_frame = _get_text_frame(target)
+    text = _normalize_text(
+        new_text,
+        preserve_linebreaks=preserve_linebreaks,
+        linebreak_replacement=linebreak_replacement,
+        none_as_empty=none_as_empty,
+    )
+
+    lines = text.split("\n") if preserve_linebreaks else [text]
+
+    if not text_frame.paragraphs:
+        text_frame.text = text
         return
 
-    # Si hay saltos de línea, creamos varios párrafos con mismo estilo
-    lines = new_text.split("\n")
+    first_paragraph = text_frame.paragraphs[0]
+    first_run = _get_or_add_first_run(first_paragraph)
 
-    # 1ra línea en el run original
-    r0.text = lines[0]
+    template_paragraph = first_paragraph
+    template_run = first_run
 
-    # Eliminar párrafos extra existentes (si tu placeholder tenía varios)
-    # (python-pptx no tiene remove directo; estrategia: setear texto vacío en esos párrafos)
-    for p in tf.paragraphs[1:]:
-        # vaciamos el texto sin tocar el resto del shape
-        for r in p.runs:
-            r.text = ""
+    first_run.text = lines[0] if lines else ""
 
-    # Crear párrafos adicionales copiando el estilo base
+    if clear_extra_runs:
+        _remove_extra_runs(first_paragraph)
+
+    if clear_extra_paragraphs:
+        _remove_extra_paragraphs(text_frame)
+
     for line in lines[1:]:
-        p = tf.add_paragraph()
-        # Copiar formato del párrafo base
-        p._p[:] = deepcopy(p0_xml[:])
-        # Crear run y copiar formato run base
-        rr = p.add_run()
-        rr._r[:] = deepcopy(r0_xml[:])
-        rr.text = line
+        paragraph = text_frame.add_paragraph()
+        _copy_paragraph_format(template_paragraph, paragraph)
 
-def find_shape_by_name(slide, target_name: str):
-    def _walk(shapes):
-        for s in shapes:
-            if s.name == target_name:
-                return s
-            if isinstance(s, GroupShape):
-                found = _walk(s.shapes)
-                if found is not None:
-                    return found
+        run = paragraph.add_run()
+        _copy_run_format(template_run, run)
+        run.text = line
+
+
+def replace_shape_text_preserve_style(
+    shape: Any,
+    new_text: Any,
+    *,
+    preserve_linebreaks: bool = True,
+    linebreak_replacement: str = " ",
+    none_as_empty: bool = True,
+) -> None:
+    """
+    Replace text in a PowerPoint shape while preserving existing style.
+
+    Parameters
+    ----------
+    shape : Any
+        PowerPoint shape containing a text frame.
+    new_text : Any
+        New text to assign.
+    preserve_linebreaks : bool, default True
+        If True, line breaks are preserved as separate paragraphs.
+    linebreak_replacement : str, default " "
+        Replacement used when line breaks are not preserved.
+    none_as_empty : bool, default True
+        If True, None is converted to an empty string.
+    """
+    replace_text_preserve_style(
+        shape,
+        new_text,
+        preserve_linebreaks=preserve_linebreaks,
+        linebreak_replacement=linebreak_replacement,
+        none_as_empty=none_as_empty,
+    )
+
+
+def replace_cell_text_preserve_style(
+    cell: Any,
+    new_text: Any,
+    *,
+    preserve_linebreaks: bool = True,
+    linebreak_replacement: str = " ",
+    none_as_empty: bool = True,
+) -> None:
+    """
+    Replace text in a PowerPoint table cell while preserving existing style.
+
+    Parameters
+    ----------
+    cell : Any
+        PowerPoint table cell object.
+    new_text : Any
+        New text to assign.
+    preserve_linebreaks : bool, default True
+        If True, line breaks are preserved as separate paragraphs.
+    linebreak_replacement : str, default " "
+        Replacement used when line breaks are not preserved.
+    none_as_empty : bool, default True
+        If True, None is converted to an empty string.
+    """
+    replace_text_preserve_style(
+        cell,
+        new_text,
+        preserve_linebreaks=preserve_linebreaks,
+        linebreak_replacement=linebreak_replacement,
+        none_as_empty=none_as_empty,
+    )
+
+
+def _get_text_frame(target: Any):
+    """
+    Return the text frame from a PowerPoint shape or table cell.
+
+    Parameters
+    ----------
+    target : Any
+        Object expected to expose a ``text_frame`` attribute.
+
+    Returns
+    -------
+    TextFrame
+        The PowerPoint text frame.
+
+    Raises
+    ------
+    ValueError
+        If the target does not contain a text frame.
+    """
+    if hasattr(target, "has_text_frame") and not target.has_text_frame:
+        name = getattr(target, "name", "<unnamed>")
+        raise ValueError(f"The shape '{name}' does not have a text frame.")
+
+    if not hasattr(target, "text_frame"):
+        raise ValueError("The target object does not have a text frame.")
+
+    return target.text_frame
+
+
+def _normalize_text(
+    value: Any,
+    *,
+    preserve_linebreaks: bool,
+    linebreak_replacement: str,
+    none_as_empty: bool,
+) -> str:
+    """
+    Normalize input text before assigning it to a PowerPoint text frame.
+
+    Parameters
+    ----------
+    value : Any
+        Raw value to normalize.
+    preserve_linebreaks : bool
+        Whether line breaks should be preserved.
+    linebreak_replacement : str
+        Replacement used when line breaks are not preserved.
+    none_as_empty : bool
+        Whether None should be converted to an empty string.
+
+    Returns
+    -------
+    str
+        Normalized text.
+    """
+    if value is None and none_as_empty:
+        text = ""
+    else:
+        text = str(value)
+
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    if not preserve_linebreaks:
+        text = text.replace("\n", linebreak_replacement)
+
+    return text
+
+
+def _get_or_add_first_run(paragraph: Any):
+    """
+    Return the first run of a paragraph, creating one if necessary.
+
+    Parameters
+    ----------
+    paragraph : Any
+        PowerPoint paragraph object.
+
+    Returns
+    -------
+    Run
+        First run in the paragraph.
+    """
+    if paragraph.runs:
+        return paragraph.runs[0]
+
+    return paragraph.add_run()
+
+
+def _remove_extra_runs(paragraph: Any) -> None:
+    """
+    Remove all runs after the first run from a PowerPoint paragraph.
+
+    Parameters
+    ----------
+    paragraph : Any
+        PowerPoint paragraph object.
+    """
+    for run in list(paragraph.runs[1:]):
+        run._r.getparent().remove(run._r)
+
+
+def _remove_extra_paragraphs(text_frame: Any) -> None:
+    """
+    Remove all paragraphs after the first paragraph from a text frame.
+
+    Parameters
+    ----------
+    text_frame : Any
+        PowerPoint text frame object.
+    """
+    while len(text_frame.paragraphs) > 1:
+        paragraph = text_frame.paragraphs[-1]
+        paragraph._element.getparent().remove(paragraph._element)
+
+
+def _copy_paragraph_format(source_paragraph: Any, target_paragraph: Any) -> None:
+    """
+    Copy paragraph-level XML formatting from one paragraph to another.
+
+    This preserves properties such as alignment, indentation, bullet settings,
+    paragraph level, spacing, and other paragraph-level styles where available.
+
+    Parameters
+    ----------
+    source_paragraph : Any
+        Paragraph to copy formatting from.
+    target_paragraph : Any
+        Paragraph to copy formatting to.
+    """
+    source_ppr = source_paragraph._p.pPr
+
+    if source_ppr is None:
+        return
+
+    target_ppr = target_paragraph._p.get_or_add_pPr()
+    target_paragraph._p.remove(target_ppr)
+    target_paragraph._p.insert(0, deepcopy(source_ppr))
+
+
+def _copy_run_format(source_run: Any, target_run: Any) -> None:
+    """
+    Copy run-level XML formatting from one run to another.
+
+    This preserves properties such as font family, size, color, bold, italic,
+    underline, and other run-level styles where available.
+
+    Parameters
+    ----------
+    source_run : Any
+        Run to copy formatting from.
+    target_run : Any
+        Run to copy formatting to.
+    """
+    source_rpr = source_run._r.rPr
+
+    if source_rpr is None:
+        return
+
+    target_rpr = target_run._r.get_or_add_rPr()
+    target_run._r.remove(target_rpr)
+    target_run._r.insert(0, deepcopy(source_rpr))
+
+
+def get_shape_by_name(slide, target_name: str):
+    """
+    Find a shape by name in a slide, including shapes inside grouped shapes.
+
+    Parameters
+    ----------
+    slide
+        PowerPoint slide object.
+    target_name : str
+        Shape name to search for.
+
+    Returns
+    -------
+    object | None
+        Matching shape if found; otherwise None.
+    """
+
+    def walk_shapes(shapes):
+        for shape in shapes:
+            if shape.name == target_name:
+                return shape
+
+            if isinstance(shape, GroupShape):
+                found_shape = walk_shapes(shape.shapes)
+                if found_shape is not None:
+                    return found_shape
+
         return None
 
-    shp = _walk(slide.shapes)
-    if shp is None:
-        raise KeyError(f"No se encontró el shape con nombre: {target_name}")
-    return shp
+    return walk_shapes(slide.shapes)
 
-def get_layout_by_name(prs, layout_name):
+
+def get_layout_by_name(prs, layout_name: str):
+    """
+    Get a PowerPoint slide layout by name.
+
+    Parameters
+    ----------
+    prs
+        PowerPoint Presentation object.
+    layout_name : str
+        Layout name to search for.
+
+    Returns
+    -------
+    pptx.slide.SlideLayout
+        Matching slide layout.
+
+    Raises
+    ------
+    ValueError
+        If the layout name is not found.
+    """
     for layout in prs.slide_layouts:
         if layout.name == layout_name:
             return layout
-    raise ValueError(f"Layout '{layout_name}' not found")
+
+    raise ValueError(f"Layout '{layout_name}' not found.")

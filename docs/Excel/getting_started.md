@@ -1,7 +1,8 @@
-# `Powerpoint`
+# `Excel`
 
-`Powerpoint` provides a range of classes and functions that simplify graphing and power point creation
------
+The `Excel` module provides a range functions that simplify dataframe on excels
+
+----------
 ## Functions
 
 ::: helpers_ps.Excel.utils.to_excel_open

@@ -1,6 +1,8 @@
 # `Powerpoint`
 
-`Powerpoint` provides a range of classes and functions that simplify graphing and power point creation
+
+The `Powerpoint` module provides a range of classes and functions that simplify graphing and power point creation
+
 -----
 ## Classes
 
@@ -47,3 +49,48 @@
 
 -----
 ## Functions
+
+::: helpers_ps.Powerpoint.utils.replace_text_preserve_style
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+
+
+-----
+## Layouts
+
+::: helpers_ps.Powerpoint.references.LAYOUT2_2
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+
+::: helpers_ps.Powerpoint.references.LAYOUT3_2
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+
+::: helpers_ps.Powerpoint.references.LAYOUT3_3
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+
+::: helpers_ps.Powerpoint.references.LAYOUT4_3
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+
