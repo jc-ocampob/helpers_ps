@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: helpers_ps
-Version: 0.2.9
+Version: 0.2.10
 Summary: Internal helper package
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
@@ -33,20 +33,58 @@ Requires-Dist: pywin32>=311; platform_system == "Windows"
 
 # Helpers PS
 
-Paquete privado de utilidades para análisis financiero, generación de gráficos institucionales y automatización de reportes.
+Internal library developed for financial analisis, institutional graph generation and report construction. For full documentation visit https://jc-ocampob.github.io/helpers_ps/
 
-## Clase principal de gráficos
+------
+## Install
 
-```python
-from helpers_ps.Grafico.graf import Graph_mtplt
+```bash
+pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.10"
 ```
 
-Funciones principales:
+------
+## Import
 
-- `graph_line()`
-- `graph_bar()`
-- `graph_pie()`
-- `graph_box_whiskers()`
-- `plot()`
-- `show()`
-- `save()`
+```python
+import helpers_ps as hp
+```
+
+------
+## Main Components
+
+### Matplotlib Standarized Graphs
+
+Framework based on `matplotlib` for generating institutional graphs.
+
+Main class:
+
+```python
+hp.GraphMtplt
+```
+
+### Finacial Metrics calculations
+
+Functions used for general financial metricas to be calculated over a dataframe wich include `ytd`, `mtd`, `beta`, etc.
+
+Main reference:
+```python
+hp.FinCalculations
+```
+
+### Power Point presentations
+
+Framework based on `python-pptx` for generating graphs in powerpoint.
+
+Main reference:
+```python
+hp.Powerpoint
+```
+
+### Bloomberg data
+
+Framework based on `xbbg` for pulling data from bloomberg.
+
+Main reference:
+```python
+hp.BBGHelper
+```
