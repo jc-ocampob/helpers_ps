@@ -22,8 +22,8 @@ except Exception:
 
 from helpers_ps import (
     FinCalculations,
-    #BBGHelper,
-    Powerpoint
+    Powerpoint,
+    Excel
 )
 
 # ============================================================
@@ -48,5 +48,6 @@ __all__ = [
     #Alternate packages
     "FinCalculations",
     "BBGHelper"
-    "Powerpoint"
+    "Powerpoint",
+    "Excel"
 ]

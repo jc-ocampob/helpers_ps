@@ -1,13 +1,15 @@
 from .references import LEGEND_POSITION, LABEL_POSITION, AXIS_POSITION
 from dataclasses import dataclass, field
-from pptx import Presentation
-from pptx.chart.data import CategoryChartData, BubbleChartData
-from pptx.util import Cm, Pt
-from pptx.enum.chart import XL_CHART_TYPE
 from .utils import hex_to_rgb
 from helpers_ps.GlobVars.var_globs import PALETA_COLORES
+from itertools import accumulate
+from pptx import Presentation
+from pptx.chart.data import  CategoryChartData, BubbleChartData
+from pptx.enum.chart import XL_CHART_TYPE
+from pptx.enum.text import MSO_AUTO_SIZE
+from pptx.util import Cm, Pt
+from pptx.dml.color import RGBColor
 
-# Clase para generar grafico de lineas en una ppt
 @dataclass
 class LineChart():
     """
@@ -101,7 +103,6 @@ class LineChart():
     x_axis_titulo: str = ""
     x_axis_titulo_tamano: int = 6
     x_axis_formato: str = "0.00"
-    x_axis_position: str = "center"
 
     y_axis_titulo_mostrar: bool = False
     y_axis_titulo: str = ""
@@ -188,7 +189,6 @@ class LineChart():
 
         # X Axis
         chart.category_axis.has_title = self.x_axis_titulo_mostrar
-        chart.category_axis.tick_label_position = AXIS_POSITION[self.x_axis_position]
         if self.x_axis_titulo_mostrar:
             chart.category_axis.axis_title.text_frame.text = self.x_axis_titulo
             chart.category_axis.axis_title.text_frame.paragraphs[0].font.size = Pt(self.x_axis_titulo_tamano)
@@ -648,3 +648,304 @@ class BubbleChart():
             _col_c += 1
 
         return 0
+
+# Waterfall chart
+@dataclass
+class WaterfallChart():
+    presentation: Presentation = None
+    slide: int = 0
+
+    # --------------------------------------------------
+    # DATA (entrada en decimal: 0.012 = 1.2%)
+    # --------------------------------------------------
+    x: list[str] = None
+    y: list[float] = None
+    l: list[str] = None   # "total" o ""
+
+    # --------------------------------------------------
+    # COLORS
+    # --------------------------------------------------
+    color_aumento: RGBColor = RGBColor(192, 51, 36)
+    color_disminucion: RGBColor = RGBColor(18, 43, 95)
+    color_total: RGBColor = RGBColor(61, 120, 216)
+
+    # --------------------------------------------------
+    # LAYOUT
+    # --------------------------------------------------
+    position_x: float = 5
+    position_y: float = 5
+    width: float = 10
+    height: float = 10
+
+    # --------------------------------------------------
+    # TITLE
+    # --------------------------------------------------
+    title_show: bool = True
+    title: str = ""
+    title_font: str = "Inter"
+    title_font_size: float = 9
+
+    # --------------------------------------------------
+    # DATA LABELS
+    # --------------------------------------------------
+    data_labels_show: bool = False
+    data_labels_position: str = "inside_base"
+    data_labels_format: str = "0.00%"
+    data_labels_font_size: int = 8
+
+    # --------------------------------------------------
+    # AXES
+    # --------------------------------------------------
+    x_axis_titulo_mostrar: bool = False
+    x_axis_titulo: str = ""
+    x_axis_position: str = "low"
+    x_axis_titulo_tamano: int = 8
+    x_axis_formato: str = "0.0"
+
+    y_axis_titulo_mostrar: bool = False
+    y_axis_titulo_tamano: int = 8
+    y_axis_titulo: str = ""
+    y_axis_formato: str = "0.00%"
+    y_axis_position: str = "low"
+    y_axis_lineas: bool = False
+    y_factor_ajuste_min: float = 20
+    y_factor_ajuste_max: float = 20
+
+    # --------------------------------------------------
+    # LOGIC
+    # --------------------------------------------------
+    total_resets_running_except_last: bool = True
+
+    # ==================================================
+    # VALIDATION
+    # ==================================================
+    def _validate_inputs(self):
+        if self.presentation is None:
+            raise ValueError("presentation no puede ser None")
+        if self.x is None or self.y is None or self.l is None:
+            raise ValueError("Debes definir x, y y l")
+        if not (len(self.x) == len(self.y) == len(self.l)):
+            raise ValueError("x, y y l deben tener la misma longitud")
+
+    # ==================================================
+    # WATERFALL ENGINE
+    # ==================================================
+    def _build_waterfall_series(self):
+        # Escalar a porcentaje real
+        y_vals = [v for v in self.y]
+
+        base_pos, base_neg = [], []
+        aum_pos, aum_neg = [], []
+        dis_pos, dis_neg = [], []
+        tot_pos, tot_neg = [], []
+        label_carrier = []
+
+        label_targets = [None] * len(y_vals)
+        running = 0.0
+
+        total_idx = [i for i, t in enumerate(self.l) if (t or "").lower() == "total"]
+        last_total = total_idx[-1] if total_idx else None
+
+        for i, (v, lab) in enumerate(zip(y_vals, self.l)):
+            lab = (lab or "").lower()
+            bp = bn = ap = an = dp = dn = tp = tn = 0.0
+
+            if lab == "total":
+                if v >= 0:
+                    tp = v
+                    label_targets[i] = ("TotPos", v)
+                else:
+                    tn = v
+                    label_targets[i] = ("TotNeg", v)
+
+                if self.total_resets_running_except_last and i != last_total:
+                    running = v
+            else:
+                start, end = running, running + v
+                low, high = min(start, end), max(start, end)
+                inc = end >= start
+
+                if low >= 0:
+                    bp = low
+                    seg = high - low
+                    if inc:
+                        ap = seg
+                        label_targets[i] = ("AumPos", v)
+                    else:
+                        dp = seg
+                        label_targets[i] = ("DisPos", v)
+                elif high <= 0:
+                    bn = high
+                    seg = low - high
+                    if inc:
+                        an = seg
+                        label_targets[i] = ("AumNeg", v)
+                    else:
+                        dn = seg
+                        label_targets[i] = ("DisNeg", v)
+                else:
+                    if inc:
+                        ap, an = high, low
+                        label_targets[i] = ("AumPos" if end >= 0 else "AumNeg", v)
+                    else:
+                        dp, dn = high, low
+                        label_targets[i] = ("DisPos" if end >= 0 else "DisNeg", v)
+
+                running = end
+                
+            label_carrier.append(ap + an + dp + dn + tp + tn)
+            base_pos.append(bp)
+            base_neg.append(bn)
+            aum_pos.append(ap)
+            aum_neg.append(an)
+            dis_pos.append(dp)
+            dis_neg.append(dn)
+            tot_pos.append(tp)
+            tot_neg.append(tn)
+
+        return {
+            "BasePos": base_pos, "BaseNeg": base_neg,
+            "AumPos": aum_pos, "AumNeg": aum_neg,
+            "DisPos": dis_pos, "DisNeg": dis_neg,
+            "TotPos": tot_pos, "TotNeg": tot_neg,
+            "LabelCarrier": label_carrier
+        }, label_targets
+
+    # ==================================================
+    # PUBLIC
+    # ==================================================
+    def chart(self):
+        self._validate_inputs()
+
+        series, labels = self._build_waterfall_series()
+
+        data = CategoryChartData()
+        data.categories = self.x
+
+        order = [
+            "BasePos","BaseNeg",
+            "AumPos","AumNeg",
+            "DisPos","DisNeg",
+            "TotPos","TotNeg", "LabelCarrier"
+        ]
+
+        for k in order:
+            data.add_series(k, series[k])
+        
+        slide = self.presentation.slides[self.slide]
+        chart = slide.shapes.add_chart(
+            XL_CHART_TYPE.COLUMN_STACKED,
+            Cm(self.position_x),
+            Cm(self.position_y),
+            Cm(self.width),
+            Cm(self.height),
+            data
+        ).chart
+
+        # Invisibles (bases)
+        chart.series[0].format.fill.background()
+        chart.series[1].format.fill.background()
+
+        carrier_idx = 8
+        carrier = chart.series[carrier_idx]
+        carrier.format.fill.background()
+        carrier.format.line.fill.background()
+
+        for s in chart.series:
+            # desactiva "Invertir si es negativo"
+            s.invert_if_negative = False
+
+        # Colores
+        for i in (2, 3):
+            chart.series[i].format.fill.solid()
+            chart.series[i].format.fill.fore_color.rgb = self.color_aumento
+        for i in (4, 5):
+            chart.series[i].format.fill.solid()
+            chart.series[i].format.fill.fore_color.rgb = self.color_disminucion
+        for i in (6, 7):
+            chart.series[i].format.fill.solid()
+            chart.series[i].format.fill.fore_color.rgb = self.color_total
+
+        if self.title_show:
+            p = chart.chart_title.text_frame.paragraphs[0]
+            p.text = self.title
+            p.font.name = self.title_font
+            p.font.size = Pt(self.title_font_size)
+        
+        # manejo de min y max
+        lls = series["LabelCarrier"]
+        lls.pop(-1)  # last
+        lls.pop(-2) 
+        accum = list(accumulate(lls))
+        if all(x >0 for x in accum):
+            _minval = 0
+            aj = 20 if abs(max(accum)) <= 0.001 else 0
+            _maxval = max(accum) * (1 + (self.y_factor_ajuste_max + aj)/100)
+        elif all(x < 0 for x in accum):
+            aj = 20 if abs(min(accum)) <= 0.001 else 0
+            _minval = min(accum) * (1 + (self.y_factor_ajuste_min + aj)/100)
+            _maxval = 0
+        else:
+            ajmin = 20 if abs(min(accum)) <= 0.001 else 0
+            ajmax = 20 if abs(max(accum)) <= 0.001 else 0
+            _minval = min(accum) * (1 + (self.y_factor_ajuste_min + ajmin)/100)
+            _maxval = max(accum) * (1 + (self.y_factor_ajuste_max + ajmax)/100)
+
+        # Y-axis
+        chart.value_axis.has_title = self.y_axis_titulo_mostrar
+        chart.value_axis.tick_label_position = AXIS_POSITION[self.y_axis_position]
+        if self.y_axis_titulo_mostrar:
+            chart.value_axis.axis_title.text_frame.text = self.y_axis_titulo
+            p = chart.value_axis.axis_title.text_frame.paragraphs[0]
+            p.font.name = self.title_font
+            p.font.size = Pt(self.y_axis_titulo_tamano)
+        
+        chart.value_axis.tick_labels.auto_scale = False
+        chart.value_axis.tick_labels.font.size = Pt(self.y_axis_titulo_tamano)
+        chart.value_axis.tick_labels.font.name = self.title_font
+        chart.value_axis.minimum_scale = _minval 
+        chart.value_axis.maximum_scale = _maxval
+        chart.value_axis.has_major_gridlines = self.y_axis_lineas
+        chart.value_axis.tick_labels.number_format = self.y_axis_formato
+
+        # X-axis
+        chart.category_axis.has_title = self.x_axis_titulo_mostrar
+        chart.category_axis.tick_label_position = AXIS_POSITION[self.x_axis_position]
+        if self.x_axis_titulo_mostrar:
+            chart.category_axis.axis_title.text_frame.text = self.x_axis_titulo
+            p = chart.category_axis.axis_title.text_frame.paragraphs[0]
+            p.font.size = Pt(self.x_axis_titulo_tamano)
+            p.font.name = self.title_font
+
+        chart.category_axis.tick_labels.font.size = Pt(self.x_axis_titulo_tamano)
+        chart.category_axis.tick_labels.font.name = self.title_font
+        chart.category_axis.tick_labels.number_format = self.x_axis_formato
+
+        if self.data_labels_show:
+            for i, point in enumerate(chart.series[8].points):
+
+                target = labels[i]
+                if target is None:
+                    continue
+
+                _, value = target
+
+                lbl = point.data_label
+                lbl.show_value = False
+                lbl.position = LABEL_POSITION["inside_base"]
+
+                tf = lbl.text_frame
+                tf.clear()
+                tf.auto_size = MSO_AUTO_SIZE.NONE
+                tf.word_wrap = False
+
+                p = tf.paragraphs[0]
+
+                # ✅ MUST use a run for font to stick
+                run = p.add_run()
+                run.text = f"{value * 100:.2f}%"
+
+                run.font.size = Pt(self.data_labels_font_size)
+                run.font.name = self.title_font
+
+      

@@ -87,3 +87,8 @@ nav:
   - FinCalculations:
     - Getting Started: FinCalculations/getting_started.md
   
+  - Powerpoint:
+    - Getting Started: Powerpoint/getting_started.md
+  
+  - Excel:
+    - Getting Started: Excel/getting_started.md
