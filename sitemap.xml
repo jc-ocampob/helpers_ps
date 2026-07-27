@@ -2,70 +2,74 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/install_guide/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/FinCalculations/getting_started/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/getting_started/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Bar/graph/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Box/graph/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Line/graph/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Line/tags/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
+    </url>
+    <url>
+         <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Line/examples/simple_line%20total/</loc>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Line/examples/simple_line/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Line/examples/tags/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Pie/graph/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/Utils/utils/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/api/graph_mtplt/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/api/helpers/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/examples/bar_stacked/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/examples/box_whiskers/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/examples/line_last_value/</loc>
-         <lastmod>2026-07-26</lastmod>
+         <lastmod>2026-07-27</lastmod>
     </url>
 </urlset>
