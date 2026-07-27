@@ -3,7 +3,18 @@
 Internal library developed for financial analisis, institutional graph generation and report construction. For full documentation visit https://jc-ocampob.github.io/helpers_ps/
 
 ------
+## Install
+
+```bash
+pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.10"
+```
+
+------
 ## Import
+
+```python
+import helpers_ps as hp
+```
 
 ------
 ## Main Components
