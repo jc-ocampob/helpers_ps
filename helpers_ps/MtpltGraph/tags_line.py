@@ -16,6 +16,8 @@ import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter, MultipleLocator
+from collections.abc import Mapping
+from typing import Any
 
 try:
     from helpers_ps.GlobVars.var_globs import PALETA_COLORES
@@ -37,7 +39,7 @@ class Line_tags():
     """
     def _line_label_generate(
         self,
-        control_dict: dict = None,
+        control_dict: Mapping[str, dict[str, Any]] | None = None,
     ) -> None:
         """
         Generate line chart labels and markers based on a control dictionary.
@@ -150,7 +152,6 @@ class Line_tags():
                         **dot
                     )
 
-        for ti in control_dict.keys():
-            _temp_controls = control_dict[ti]
-            _generate(**_temp_controls)
+        for control_name, controls in control_dict.items():
+            _generate(**controls)
 

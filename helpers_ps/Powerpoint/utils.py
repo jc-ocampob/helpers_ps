@@ -589,3 +589,7 @@ def get_layout_by_name(prs, layout_name: str):
             return layout
 
     raise ValueError(f"Layout '{layout_name}' not found.")
+
+def delete_slide(prs, slide_index):
+    slide_id_list = prs.slides._sldIdLst  # underlying XML
+    slide_id_list.remove(slide_id_list[slide_index])

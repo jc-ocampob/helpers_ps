@@ -574,10 +574,10 @@ class Metrics():
         px = self.data_frame.sort_index()
 
         if method == "simple":
-            rets = px.pct_change().dropna()
+            rets = px.pct_change()
 
         elif method == "log":
-            rets = np.log(px / px.shift(1)).dropna()
+            rets = np.log(px / px.shift(1))
 
         else:
             raise ValueError(
@@ -610,9 +610,9 @@ class Metrics():
         px = self.data_frame.sort_index()
 
         if method == "simple":
-            rets = px.pct_change().dropna()
+            rets = px.pct_change()
         elif method == "log":
-            rets = np.log(px / px.shift(1)).dropna()
+            rets = np.log(px / px.shift(1))
         else:
             raise ValueError(
                 "method must be 'simple' or 'log'"
@@ -1721,10 +1721,10 @@ def tracking_error(
         raise TypeError(f"{benchmark} is not a valid column")
 
     if method == "simple":
-        rets = px.pct_change().dropna()
+        rets = px.pct_change()
 
     elif method == "log":
-        rets = np.log(px / px.shift(1)).dropna()
+        rets = np.log(px / px.shift(1))
 
     else:
         raise ValueError("method must be 'simple' or 'log'")
@@ -1793,10 +1793,10 @@ def information_ratio(
         raise TypeError(f"{benchmark} is not a valid column")
 
     if method == "simple":
-        rets = px.pct_change().dropna()
+        rets = px.pct_change()
 
     elif method == "log":
-        rets = np.log(px / px.shift(1)).dropna()
+        rets = np.log(px / px.shift(1))
 
     else:
         raise ValueError("method must be 'simple' or 'log'")
