@@ -19,7 +19,7 @@ git tag v0.2.12
 git push origin v0.2.12
 
 
-# 7. Para instalaciones hacer lo siguiente reemplazando por la version v*
+# 7. Para instalaciones hacer lo siguiente reemplazando por la version v0.2.12
 pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.12"
 
 # Para instalaciones ignorando las dependencias del paquete
