@@ -20,7 +20,7 @@ git push origin v0.2.11
 
 
 # 7. Para instalaciones hacer lo siguiente reemplazando por la version v*
-pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.1"
+pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.11"
 
 # Para instalaciones ignorando las dependencias del paquete
 pip install --no-deps "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.1"

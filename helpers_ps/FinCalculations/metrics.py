@@ -1,9 +1,10 @@
+from __future__ import annotations
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
-from collections import Counter
 from functools import wraps
+from typing import Callable, Literal
 
 
 @dataclass
@@ -928,9 +929,23 @@ class Metrics():
         return percentile_last
 
 
-# Functions
+# =============================================================================
+# Type aliases
+# =============================================================================
 
-def _dfvalidate(func):
+ReturnMethod = Literal["simple", "log"]
+CompoundMethod = Literal["none", "cumulative", "rolling"]
+PeriodToDate = Literal["wtd", "mtd", "qtd", "ytd"]
+VaRMethod = Literal["historical", "gaussian", "cornish_fisher"]
+DrawdownMethod = Literal["simple", "log"]
+RelativeOperation = Literal["-", "/", "*", "+"]
+
+
+# =============================================================================
+# Validation helpers
+# =============================================================================
+
+def _dfvalidate(func: Callable) -> Callable:
     """
     Validate that the decorated function receives a valid pandas DataFrame.
 
@@ -938,7 +953,8 @@ def _dfvalidate(func):
     -----------
     This decorator searches for the first pandas DataFrame passed either as a
     positional argument or as a keyword argument. It validates that the DataFrame
-    is not empty and that its index is datetime-like before executing the
+    is not empty, that its index is datetime-like, that the index does not have
+    duplicated values, and that all columns are numeric before executing the
     decorated function.
 
     Parameters
@@ -954,273 +970,172 @@ def _dfvalidate(func):
     Raises
     ------
     TypeError
-        If no pandas DataFrame is found or if the DataFrame index is not datetime-like.
+        If no pandas DataFrame is found, if the DataFrame index is not
+        datetime-like, or if the DataFrame contains non-numeric columns.
 
     ValueError
-        If the DataFrame is empty.
+        If the DataFrame is empty or if the index contains duplicated values.
     """
 
     @wraps(func)
     def wrapper(*args, **kwargs):
         df = None
 
-        # Search DataFrame in positional arguments
         for arg in args:
             if isinstance(arg, pd.DataFrame):
                 df = arg
                 break
 
-        # If not found, search DataFrame in keyword arguments
         if df is None:
             for value in kwargs.values():
                 if isinstance(value, pd.DataFrame):
                     df = value
                     break
 
-        # Validate that a DataFrame was provided
         if df is None:
             raise TypeError(
-                f"No pandas DataFrame was found in function '{func.__name__}'"
+                f"No pandas DataFrame was found in function '{func.__name__}'."
             )
 
-        # Validate that DataFrame is not empty
         if df.empty:
             raise ValueError("The DataFrame cannot be empty.")
 
-        # Validate that index is datetime
-        if not pd.api.types.is_datetime64_any_dtype(df.index):
-            raise TypeError("The DataFrame index must be datetime-like.")
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise TypeError("The DataFrame index must be a pandas DatetimeIndex.")
+
+        if df.index.has_duplicates:
+            raise ValueError("The DataFrame index contains duplicated values.")
+
+        non_numeric_cols = df.select_dtypes(exclude="number").columns.tolist()
+        if non_numeric_cols:
+            raise TypeError(
+                f"The DataFrame contains non-numeric columns: {non_numeric_cols}."
+            )
 
         return func(*args, **kwargs)
 
     return wrapper
 
 
-@_dfvalidate
-def ytd(
+def _validate_benchmark(
     df: pd.DataFrame,
-    fallback: bool = True
-) -> pd.DataFrame:
+    benchmark: str,
+) -> None:
     """
-    Calculate Year-To-Date returns for price series.
-
-    Description
-    -----------
-    This function calculates the Year-To-Date performance for each column in a
-    price DataFrame. The base value is the last valid price from the previous
-    year. If no previous year-end value is available and fallback is enabled,
-    the first valid value of the current year is used as the base.
+    Validate that the benchmark column exists in the DataFrame.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+        Input DataFrame.
 
-    fallback : bool, default True
-        If True, uses the first valid price of the current year when the
-        previous year-end price is not available.
+    benchmark : str
+        Benchmark column name.
 
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with Year-To-Date returns for each price series.
+    Raises
+    ------
+    ValueError
+        If the benchmark column is not present in the DataFrame.
     """
-
-    df = df.sort_index()
-
-    year = df.index.to_period("Y")
-
-    year_end_prices = (
-        df.groupby(year)
-        .apply(lambda g: g.ffill().iloc[-1])
-    )
-
-    prev_period = (df.index - pd.offsets.YearEnd(1)).to_period("Y")
-
-    prev_year_bases = year_end_prices.reindex(prev_period)
-    prev_year_bases.index = df.index
-    prev_year_bases = prev_year_bases.reindex(columns=df.columns)
-
-    if fallback:
-        first_in_year = (
-            df.groupby(year)
-            .apply(lambda g: g.bfill().iloc[0])
-        )
-
-        first_in_year = first_in_year.reindex(year)
-        first_in_year.index = df.index
-        first_in_year = first_in_year.reindex(columns=df.columns)
-
-        prev_year_bases = prev_year_bases.combine_first(first_in_year)
-
-    if not prev_year_bases.index.equals(df.index):
-        raise RuntimeError("Index mismatch after alignment.")
-
-    if list(prev_year_bases.columns) != list(df.columns):
-        raise RuntimeError("Columns mismatch after alignment.")
-
-    assert df.shape == prev_year_bases.shape, (
-        f"Shape mismatch: df {df.shape} vs bases {prev_year_bases.shape}"
-    )
-
-    ytd = df.div(prev_year_bases) - 1
-
-    return ytd
+    if benchmark not in df.columns:
+        raise ValueError(f"Benchmark '{benchmark}' was not found in the DataFrame.")
 
 
-@_dfvalidate
-def mtd(
-    df: pd.DataFrame,
-    fallback: bool = True
-) -> pd.DataFrame:
+def _validate_window(
+    window: int,
+    name: str = "window",
+) -> None:
     """
-    Calculate Month-To-Date returns for price series.
-
-    Description
-    -----------
-    This function calculates the Month-To-Date performance for each column in a
-    price DataFrame. The base value is the last valid price from the previous
-    month. If no previous month-end value is available and fallback is enabled,
-    the first valid value of the current month is used as the base.
+    Validate that a rolling window is a positive integer.
 
     Parameters
     ----------
-    df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+    window : int
+        Rolling window value.
 
-    fallback : bool, default True
-        If True, uses the first valid price of the current month when the
-        previous month-end price is not available.
+    name : str, default "window"
+        Name used in the error message.
 
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with Month-To-Date returns for each price series.
+    Raises
+    ------
+    TypeError
+        If the window is not an integer.
+
+    ValueError
+        If the window is less than or equal to zero.
     """
+    if not isinstance(window, int):
+        raise TypeError(f"{name} must be an integer.")
 
-    df = df.sort_index()
-
-    mon = df.index.to_period("M")
-
-    month_end_prices = (
-        df.groupby(mon)
-        .apply(lambda g: g.ffill().iloc[-1])
-    )
-
-    prev_mon = (df.index - pd.offsets.MonthEnd(1)).to_period("M")
-    prev_month_bases = month_end_prices.reindex(prev_mon)
-
-    prev_month_bases.index = df.index
-    prev_month_bases = prev_month_bases.reindex(columns=df.columns)
-
-    if fallback:
-        first_in_month = (
-            df.groupby(mon)
-            .apply(lambda g: g.bfill().iloc[0])
-        )
-
-        first_in_month = first_in_month.reindex(mon)
-        first_in_month.index = df.index
-        first_in_month = first_in_month.reindex(columns=df.columns)
-
-        prev_month_bases = prev_month_bases.combine_first(first_in_month)
-
-    assert df.shape == prev_month_bases.shape, (
-        f"Shape mismatch: df {df.shape} vs bases {prev_month_bases.shape}"
-    )
-    assert df.index.equals(prev_month_bases.index), "Index mismatch after alignment."
-    assert list(df.columns) == list(prev_month_bases.columns), "Columns mismatch after alignment."
-
-    mtd = df.div(prev_month_bases) - 1
-
-    return mtd
+    if window <= 0:
+        raise ValueError(f"{name} must be greater than zero.")
 
 
-@_dfvalidate
-def qtd(
-    df: pd.DataFrame,
-    fallback: bool = True
-) -> pd.DataFrame:
+def _validate_confidence(
+    confidence: float,
+) -> None:
     """
-    Calculate Quarter-To-Date returns for price series.
-
-    Description
-    -----------
-    This function calculates the Quarter-To-Date performance for each column in a
-    price DataFrame. The base value is the last valid price from the previous
-    quarter. If no previous quarter-end value is available and fallback is
-    enabled, the first valid value of the current quarter is used as the base.
+    Validate that a confidence level is between zero and one.
 
     Parameters
     ----------
-    df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+    confidence : float
+        Confidence level.
 
-    fallback : bool, default True
-        If True, uses the first valid price of the current quarter when the
-        previous quarter-end price is not available.
+    Raises
+    ------
+    ValueError
+        If confidence is not between zero and one.
+    """
+    if not 0 < confidence < 1:
+        raise ValueError("confidence must be greater than 0 and less than 1.")
+
+
+# =============================================================================
+# Return helpers
+# =============================================================================
+
+def _compound_returns(
+    returns: pd.DataFrame | pd.Series,
+    method: ReturnMethod = "simple",
+) -> pd.Series | float:
+    """
+    Compound simple or log returns into a total return.
+
+    Parameters
+    ----------
+    returns : pd.DataFrame or pd.Series
+        Return data.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+        - "simple": compounds using product of one plus returns.
+        - "log": compounds using exponential of summed log returns.
 
     Returns
     -------
-    pd.DataFrame
-        DataFrame with Quarter-To-Date returns for each price series.
+    pd.Series or float
+        Compounded return.
     """
+    if method == "simple":
+        return (1.0 + returns).prod() - 1.0
 
-    df = df.sort_index()
+    if method == "log":
+        return np.exp(returns.sum()) - 1.0
 
-    qtr = df.index.to_period("Q")
-
-    quarter_end_prices = (
-        df.groupby(qtr)
-        .apply(lambda g: g.ffill().iloc[-1])
-    )
-
-    prev_qtr = (df.index - pd.offsets.QuarterEnd(1)).to_period("Q")
-    prev_quarter_bases = quarter_end_prices.reindex(prev_qtr)
-
-    prev_quarter_bases.index = df.index
-    prev_quarter_bases = prev_quarter_bases.reindex(columns=df.columns)
-
-    if fallback:
-        first_in_quarter = (
-            df.groupby(qtr)
-            .apply(lambda g: g.bfill().iloc[0])
-        )
-
-        first_in_quarter = first_in_quarter.reindex(qtr)
-        first_in_quarter.index = df.index
-        first_in_quarter = first_in_quarter.reindex(columns=df.columns)
-
-        prev_quarter_bases = prev_quarter_bases.combine_first(first_in_quarter)
-
-    assert df.shape == prev_quarter_bases.shape, (
-        f"Shape mismatch: df {df.shape} vs bases {prev_quarter_bases.shape}"
-    )
-    assert df.index.equals(prev_quarter_bases.index), "Index mismatch after alignment."
-    assert list(df.columns) == list(prev_quarter_bases.columns), "Columns mismatch after alignment."
-
-    qtd = df.div(prev_quarter_bases) - 1
-
-    return qtd
+    raise ValueError("method must be 'simple' or 'log'.")
 
 
-@_dfvalidate
-def drawdown(
+def _to_returns(
     df: pd.DataFrame,
-    method: str = "simple",
-    min_price: float = 1e-6
+    method: ReturnMethod = "simple",
+    dropna: bool = False,
+    compound: CompoundMethod = "none",
+    window: int | None = None,
+    min_periods: int | None = None,
 ) -> pd.DataFrame:
     """
-    Calculate drawdown for price series.
-
-    Description
-    -----------
-    This function calculates the drawdown of each price series relative to its
-    historical running maximum. It supports both simple price-based drawdown and
-    log-price-based drawdown.
+    Convert price data into returns.
 
     Parameters
     ----------
@@ -1229,45 +1144,438 @@ def drawdown(
         columns.
 
     method : {"simple", "log"}, default "simple"
-        Drawdown calculation method.
-        - "simple": calculates drawdown using prices and running maximum prices.
-        - "log": calculates drawdown using log-prices and running maximum log-prices.
+        Return calculation method.
+        - "simple": calculates percentage returns.
+        - "log": calculates logarithmic returns.
 
-    min_price : float, default 1e-6
-        Minimum valid price threshold. Prices less than or equal to this value
-        are treated as invalid to avoid division or logarithm issues.
+    dropna : bool, default False
+        Whether to drop rows where all values are missing.
+
+    compound : {"none", "cumulative", "rolling"}, default "none"
+        Compounding method.
+        - "none": returns one-period returns.
+        - "cumulative": returns compounded returns from the first valid
+          observation.
+        - "rolling": returns compounded returns over a rolling window.
+
+    window : int or None, default None
+        Rolling window used when compound is "rolling".
+
+    min_periods : int or None, default None
+        Minimum number of observations required for rolling compounded returns.
+        If None, the rolling window value is used.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with drawdown values for each price series.
-    """
+        Return DataFrame.
 
+    Raises
+    ------
+    ValueError
+        If method or compound is invalid, or if window is missing when
+        compound is "rolling".
+    """
     px = df.sort_index()
 
-    px = px.where(px > min_price)
-
     if method == "simple":
-        px_ff = px.ffill()
-        roll_max = px_ff.cummax()
-        dd = px.divide(roll_max) - 1.0
-
+        rets = px.pct_change()
     elif method == "log":
-        logp = np.log(px)
-        logp_ff = logp.ffill()
-        roll_max_log = logp_ff.cummax()
-        dd = np.exp(logp - roll_max_log) - 1.0
+        rets = np.log(px / px.shift(1))
+    else:
+        raise ValueError("method must be 'simple' or 'log'.")
+
+    if compound == "none":
+        output = rets
+
+    elif compound == "cumulative":
+        if method == "simple":
+            output = (1.0 + rets).cumprod() - 1.0
+        else:
+            output = np.exp(rets.cumsum()) - 1.0
+
+    elif compound == "rolling":
+        if window is None:
+            raise ValueError("window must be provided when compound='rolling'.")
+
+        _validate_window(window)
+
+        mp = window if min_periods is None else min_periods
+
+        if method == "simple":
+            output = (
+                (1.0 + rets)
+                .rolling(window=window, min_periods=mp)
+                .apply(np.prod, raw=True)
+                - 1.0
+            )
+        else:
+            output = (
+                np.exp(
+                    rets.rolling(window=window, min_periods=mp).sum()
+                )
+                - 1.0
+            )
 
     else:
-        raise ValueError("method must be 'simple' or 'log'")
+        raise ValueError("compound must be 'none', 'cumulative', or 'rolling'.")
 
-    return dd
+    if dropna:
+        output = output.dropna(how="all")
+
+    return output
+
+
+def _period_to_date(
+    df: pd.DataFrame,
+    period: PeriodToDate = "ytd",
+    fallback: bool = True,
+    week_freq: str = "W-FRI",
+) -> pd.DataFrame:
+    """
+    Calculate period-to-date returns for price series.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame with a datetime index and one or more asset price
+        columns.
+
+    period : {"wtd", "mtd", "qtd", "ytd"}, default "ytd"
+        Period-to-date frequency.
+        - "wtd": Week-to-date.
+        - "mtd": Month-to-date.
+        - "qtd": Quarter-to-date.
+        - "ytd": Year-to-date.
+
+    fallback : bool, default True
+        If True, uses the first valid price of the current period when the
+        previous period-end price is not available.
+
+    week_freq : str, default "W-FRI"
+        Weekly frequency used when period is "wtd". The default assumes a
+        market week ending on Friday.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with period-to-date returns for each price series.
+    
+    Notes
+    -----
+    The function assumes prices may be stored on a calendar-day basis
+    with non-trading days forward-filled (e.g. Bloomberg PX_LAST).
+    Period-to-date calculations are therefore performed on the calendar
+    index rather than a trading-day calendar.
+    
+    """
+    px = df.sort_index()
+
+    period_map = {
+        "wtd": week_freq,
+        "mtd": "M",
+        "qtd": "Q",
+        "ytd": "Y",
+    }
+
+    if period not in period_map:
+        raise ValueError("period must be 'wtd', 'mtd', 'qtd', or 'ytd'.")
+
+    freq = period_map[period]
+
+    current_period = px.index.to_period(freq)
+    previous_period = current_period - 1
+
+    period_end_prices = (
+        px.groupby(current_period)
+        .apply(lambda g: g.ffill().iloc[-1])
+    )
+
+    bases = period_end_prices.reindex(previous_period)
+    bases.index = px.index
+    bases = bases.reindex(columns=px.columns)
+
+    if fallback:
+        first_in_period = (
+            px.groupby(current_period)
+            .apply(lambda g: g.bfill().iloc[0])
+        )
+
+        first_in_period = first_in_period.reindex(current_period)
+        first_in_period.index = px.index
+        first_in_period = first_in_period.reindex(columns=px.columns)
+
+        bases = bases.combine_first(first_in_period)
+
+    if not bases.index.equals(px.index):
+        raise RuntimeError("Index mismatch after alignment.")
+
+    if list(bases.columns) != list(px.columns):
+        raise RuntimeError("Columns mismatch after alignment.")
+
+    if bases.shape != px.shape:
+        raise RuntimeError(
+            f"Shape mismatch: df {px.shape} vs bases {bases.shape}."
+        )
+
+    return px.div(bases) - 1.0
+
+
+# =============================================================================
+# Period-to-date returns
+# =============================================================================
+
+@_dfvalidate
+def wtd(
+    df: pd.DataFrame,
+    fallback: bool = True,
+    week_freq: str = "W-FRI",
+) -> pd.DataFrame:
+    """
+    Calculate Week-To-Date returns for price series.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame with a datetime index and one or more asset price
+        columns.
+
+    fallback : bool, default True
+        If True, uses the first valid price of the current week when the
+        previous week-end price is not available.
+
+    week_freq : str, default "W-FRI"
+        Weekly frequency used for week grouping.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with Week-To-Date returns for each price series.
+    """
+    return _period_to_date(
+        df=df,
+        period="wtd",
+        fallback=fallback,
+        week_freq=week_freq,
+    )
+
+
+@_dfvalidate
+def mtd(
+    df: pd.DataFrame,
+    fallback: bool = True,
+) -> pd.DataFrame:
+    """
+    Calculate Month-To-Date returns for price series.
+    """
+    return _period_to_date(
+        df=df,
+        period="mtd",
+        fallback=fallback,
+    )
+
+
+@_dfvalidate
+def qtd(
+    df: pd.DataFrame,
+    fallback: bool = True,
+) -> pd.DataFrame:
+    """
+    Calculate Quarter-To-Date returns for price series.
+    """
+    return _period_to_date(
+        df=df,
+        period="qtd",
+        fallback=fallback,
+    )
+
+
+@_dfvalidate
+def ytd(
+    df: pd.DataFrame,
+    fallback: bool = True,
+) -> pd.DataFrame:
+    """
+    Calculate Year-To-Date returns for price series.
+    """
+    return _period_to_date(
+        df=df,
+        period="ytd",
+        fallback=fallback,
+    )
+
+
+# =============================================================================
+# Performance metrics
+# =============================================================================
+
+@_dfvalidate
+def total_return(
+    df: pd.DataFrame,
+    method: ReturnMethod = "simple",
+) -> pd.Series:
+    """
+    Calculate total return for each price series.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    Returns
+    -------
+    pd.Series
+        Total return by asset.
+    """
+    rets = _to_returns(df, method=method, dropna=False)
+
+    output = _compound_returns(
+        returns=rets,
+        method=method,
+    )
+
+    return output.rename("Total Return")
+
+
+@_dfvalidate
+def annualized_return(
+    df: pd.DataFrame,
+    periods_per_year: int = 252,
+    method: ReturnMethod = "simple",
+) -> pd.Series:
+    """
+    Calculate annualized return for each price series.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    Returns
+    -------
+    pd.Series
+        Annualized return by asset.
+    """
+    rets = _to_returns(df, method=method, dropna=False)
+
+    n_periods = rets.notna().sum()
+
+    total = _compound_returns(
+        returns=rets,
+        method=method,
+    )
+
+    output = (1.0 + total) ** (periods_per_year / n_periods) - 1.0
+
+    return output.rename("Annualized Return")
+
+
+@_dfvalidate
+def volatility(
+    df: pd.DataFrame,
+    method: ReturnMethod = "simple",
+    annualize: bool = True,
+    periods_per_year: int = 252,
+    ddof: int = 1,
+) -> pd.Series:
+    """
+    Calculate return volatility for each asset.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    annualize : bool, default True
+        If True, annualizes volatility.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    ddof : int, default 1
+        Delta degrees of freedom.
+
+    Returns
+    -------
+    pd.Series
+        Volatility by asset.
+    """
+    rets = _to_returns(df, method=method)
+
+    output = rets.std(ddof=ddof)
+
+    if annualize:
+        output *= np.sqrt(periods_per_year)
+
+    return output.rename("Volatility")
+
+
+@_dfvalidate
+def sharpe_ratio(
+    df: pd.DataFrame,
+    risk_free_rate: float = 0.0,
+    method: ReturnMethod = "simple",
+    annualize: bool = True,
+    periods_per_year: int = 252,
+    ddof: int = 1,
+) -> pd.Series:
+    """
+    Calculate Sharpe ratio for each asset.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    risk_free_rate : float, default 0.0
+        Annualized risk-free rate.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    annualize : bool, default True
+        If True, annualizes the Sharpe ratio.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    ddof : int, default 1
+        Delta degrees of freedom.
+
+    Returns
+    -------
+    pd.Series
+        Sharpe ratio by asset.
+    """
+    rets = _to_returns(df, method=method)
+
+    period_rf = risk_free_rate / periods_per_year
+    excess = rets - period_rf
+
+    output = excess.mean() / excess.std(ddof=ddof)
+
+    if annualize:
+        output *= np.sqrt(periods_per_year)
+
+    return output.rename("Sharpe Ratio")
 
 
 @_dfvalidate
 def downside_std(
     df: pd.DataFrame,
-    method: str = "simple",
+    method: ReturnMethod = "simple",
     target_return: float = 0.0,
     annualize: bool = False,
     periods_per_year: int = 252,
@@ -1275,59 +1583,242 @@ def downside_std(
     """
     Calculate downside standard deviation for each asset.
 
-    Description
-    -----------
-    This function calculates downside deviation by considering only returns below
-    a target return. Returns above the target are set to zero before calculating
-    the downside standard deviation.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+        Price DataFrame.
 
     method : {"simple", "log"}, default "simple"
         Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
 
     target_return : float, default 0.0
-        Minimum acceptable return. Only returns below this threshold contribute
-        to downside deviation.
+        Minimum acceptable return per period.
 
     annualize : bool, default False
-        If True, annualizes the downside standard deviation.
+        If True, annualizes downside standard deviation.
 
     periods_per_year : int, default 252
-        Number of periods per year used for annualization.
+        Number of periods per year.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with one column named "std_downside" containing downside
-        standard deviation by asset.
+        DataFrame with one column named "std_downside".
     """
-
-    px = df.sort_index()
-
-    if method == "simple":
-        rets = px.pct_change()
-
-    elif method == "log":
-        rets = np.log(px / px.shift(1))
-
-    else:
-        raise ValueError("method must be 'simple' or 'log'")
+    rets = _to_returns(df, method=method)
 
     downside = (rets - target_return).where(rets < target_return, 0.0)
 
-    dsd = np.sqrt((downside**2).mean())
+    output = np.sqrt((downside ** 2).mean())
 
     if annualize:
-        dsd *= np.sqrt(periods_per_year)
+        output *= np.sqrt(periods_per_year)
 
-    return dsd.to_frame(name="std_downside")
+    return output.to_frame(name="std_downside")
+
+
+@_dfvalidate
+def sortino_ratio(
+    df: pd.DataFrame,
+    target_return: float = 0.0,
+    method: ReturnMethod = "simple",
+    annualize: bool = True,
+    periods_per_year: int = 252,
+) -> pd.Series:
+    """
+    Calculate Sortino ratio for each asset.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    target_return : float, default 0.0
+        Annualized minimum acceptable return.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    annualize : bool, default True
+        If True, annualizes the ratio.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    Returns
+    -------
+    pd.Series
+        Sortino ratio by asset.
+    """
+    rets = _to_returns(df, method=method)
+
+    period_target = target_return / periods_per_year
+
+    downside = (rets - period_target).where(rets < period_target, 0.0)
+    downside_dev = np.sqrt((downside ** 2).mean())
+
+    excess_return = rets.mean() - period_target
+
+    output = excess_return / downside_dev
+
+    if annualize:
+        output *= np.sqrt(periods_per_year)
+
+    return output.rename("Sortino Ratio")
+
+
+# =============================================================================
+# Drawdown metrics
+# =============================================================================
+
+@_dfvalidate
+def drawdown(
+    df: pd.DataFrame,
+    method: DrawdownMethod = "simple",
+    min_price: float = 1e-6,
+) -> pd.DataFrame:
+    """
+    Calculate drawdown for price series.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    method : {"simple", "log"}, default "simple"
+        Drawdown calculation method.
+
+    min_price : float, default 1e-6
+        Minimum valid price threshold.
+
+    Returns
+    -------
+    pd.DataFrame
+        Drawdown time series by asset.
+    """
+    px = df.sort_index()
+    px = px.where(px > min_price)
+
+    if method == "simple":
+        px_ff = px.ffill()
+        roll_max = px_ff.cummax()
+        output = px.divide(roll_max) - 1.0
+
+    elif method == "log":
+        logp = np.log(px)
+        logp_ff = logp.ffill()
+        roll_max_log = logp_ff.cummax()
+        output = np.exp(logp - roll_max_log) - 1.0
+
+    else:
+        raise ValueError("method must be 'simple' or 'log'.")
+
+    return output
+
+
+@_dfvalidate
+def max_drawdown(
+    df: pd.DataFrame,
+    method: DrawdownMethod = "simple",
+    min_price: float = 1e-6,
+) -> pd.Series:
+    """
+    Calculate maximum drawdown for each asset.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    method : {"simple", "log"}, default "simple"
+        Drawdown calculation method.
+
+    min_price : float, default 1e-6
+        Minimum valid price threshold.
+
+    Returns
+    -------
+    pd.Series
+        Maximum drawdown by asset.
+    """
+    output = drawdown(
+        df=df,
+        method=method,
+        min_price=min_price,
+    ).min()
+
+    return output.rename("Max Drawdown")
+
+
+@_dfvalidate
+def calmar_ratio(
+    df: pd.DataFrame,
+    periods_per_year: int = 252,
+) -> pd.Series:
+    """
+    Calculate Calmar ratio for each asset.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    Returns
+    -------
+    pd.Series
+        Calmar ratio by asset.
+    """
+    ann_ret = annualized_return(
+        df=df,
+        periods_per_year=periods_per_year,
+    )
+
+    mdd = max_drawdown(df=df).abs()
+
+    output = ann_ret / mdd
+
+    return output.rename("Calmar Ratio")
+
+
+# =============================================================================
+# Benchmark-relative metrics
+# =============================================================================
+
+@_dfvalidate
+def active_return(
+    df: pd.DataFrame,
+    benchmark: str,
+    method: ReturnMethod = "simple",
+) -> pd.DataFrame:
+    """
+    Calculate active returns relative to a benchmark.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame including the benchmark column.
+
+    benchmark : str
+        Benchmark column name.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    Returns
+    -------
+    pd.DataFrame
+        Active returns by asset.
+    """
+    _validate_benchmark(df, benchmark)
+
+    rets = _to_returns(df, method=method)
+
+    output = rets.sub(rets[benchmark], axis=0)
+
+    return output
 
 
 @_dfvalidate
@@ -1335,233 +1826,433 @@ def beta(
     df: pd.DataFrame,
     benchmark: str,
     window: int | None = None,
-    method: str = "simple",
+    method: ReturnMethod = "simple",
+    min_periods: int | None = None,
+    ddof: int = 1,
 ) -> pd.Series | pd.DataFrame:
     """
     Calculate beta relative to a benchmark.
 
-    Description
-    -----------
-    This function calculates either historical beta or rolling beta for each
-    asset relative to a benchmark column. Beta is calculated as covariance of
-    asset returns with benchmark returns divided by benchmark variance.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
+        Price DataFrame including the benchmark column.
 
     benchmark : str
-        Column name of the benchmark asset.
+        Benchmark column name.
 
     window : int or None, default None
-        Rolling window size.
-        - If None, historical beta is calculated using the full return history.
-        - If an integer is provided, rolling beta is calculated.
+        Rolling window size. If None, historical beta is calculated.
 
     method : {"simple", "log"}, default "simple"
         Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
+
+    min_periods : int or None, default None
+        Minimum observations required for rolling calculations.
+
+    ddof : int, default 1
+        Delta degrees of freedom.
 
     Returns
     -------
     pd.Series or pd.DataFrame
-        Series with historical beta by asset when window is None.
-        DataFrame with rolling beta values when window is provided.
+        Historical beta by asset or rolling beta time series.
     """
+    _validate_benchmark(df, benchmark)
 
-    px = df.sort_index()
-
-    if benchmark not in px.columns.tolist():
-        raise TypeError(f"{benchmark} is not a valid column")
-
-    if method == "simple":
-        rets = px.pct_change()
-
-    elif method == "log":
-        rets = np.log(px / px.shift(1))
-
-    else:
-        raise ValueError("method must be 'simple' or 'log'")
-
+    rets = _to_returns(df, method=method)
     benchmark_returns = rets[benchmark]
 
     if window is None:
-        bench_var = benchmark_returns.var()
+        bench_var = benchmark_returns.var(ddof=ddof)
 
-        beta = rets.apply(
+        output = rets.apply(
             lambda col: col.cov(benchmark_returns) / bench_var
         )
 
-        return beta
+        return output.rename("Beta")
 
-    bench_var = benchmark_returns.rolling(window).var()
+    _validate_window(window)
 
-    rolling_beta = (
-        rets.rolling(window)
+    mp = window if min_periods is None else min_periods
+
+    bench_var = benchmark_returns.rolling(
+        window=window,
+        min_periods=mp,
+    ).var(ddof=ddof)
+
+    output = (
+        rets.rolling(window=window, min_periods=mp)
         .cov(benchmark_returns)
         .divide(bench_var, axis=0)
     )
 
-    return rolling_beta
+    return output
+
+
+@_dfvalidate
+def tracking_error(
+    df: pd.DataFrame,
+    benchmark: str,
+    method: ReturnMethod = "simple",
+    annualize: bool = True,
+    periods_per_year: int = 252,
+    ddof: int = 1,
+) -> pd.Series:
+    """
+    Calculate tracking error relative to a benchmark.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame including the benchmark column.
+
+    benchmark : str
+        Benchmark column name.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    annualize : bool, default True
+        If True, annualizes tracking error.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    ddof : int, default 1
+        Delta degrees of freedom.
+
+    Returns
+    -------
+    pd.Series
+        Tracking error by asset.
+    """
+    active = active_return(
+        df=df,
+        benchmark=benchmark,
+        method=method,
+    )
+
+    output = active.std(ddof=ddof)
+
+    if annualize:
+        output *= np.sqrt(periods_per_year)
+
+    return output.rename("Tracking Error")
+
+
+@_dfvalidate
+def rolling_tracking_error(
+    df: pd.DataFrame,
+    benchmark: str,
+    window: int = 252,
+    method: ReturnMethod = "simple",
+    annualize: bool = True,
+    periods_per_year: int = 252,
+    min_periods: int | None = None,
+    ddof: int = 1,
+) -> pd.DataFrame:
+    """
+    Calculate rolling tracking error relative to a benchmark.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame including the benchmark column.
+
+    benchmark : str
+        Benchmark column name.
+
+    window : int, default 252
+        Rolling window size.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    annualize : bool, default True
+        If True, annualizes tracking error.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    min_periods : int or None, default None
+        Minimum observations required.
+
+    ddof : int, default 1
+        Delta degrees of freedom.
+
+    Returns
+    -------
+    pd.DataFrame
+        Rolling tracking error by asset.
+    """
+    _validate_window(window)
+
+    active = active_return(
+        df=df,
+        benchmark=benchmark,
+        method=method,
+    )
+
+    mp = window if min_periods is None else min_periods
+
+    output = active.rolling(
+        window=window,
+        min_periods=mp,
+    ).std(ddof=ddof)
+
+    if annualize:
+        output *= np.sqrt(periods_per_year)
+
+    return output
+
+
+@_dfvalidate
+def information_ratio(
+    df: pd.DataFrame,
+    benchmark: str,
+    method: ReturnMethod = "simple",
+    annualize: bool = True,
+    periods_per_year: int = 252,
+    ddof: int = 1,
+) -> pd.Series:
+    """
+    Calculate information ratio relative to a benchmark.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame including the benchmark column.
+
+    benchmark : str
+        Benchmark column name.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    annualize : bool, default True
+        If True, annualizes the information ratio.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    ddof : int, default 1
+        Delta degrees of freedom.
+
+    Returns
+    -------
+    pd.Series
+        Information ratio by asset.
+    """
+    active = active_return(
+        df=df,
+        benchmark=benchmark,
+        method=method,
+    )
+
+    mean_active = active.mean()
+    te = active.std(ddof=ddof)
+
+    output = mean_active / te
+
+    if annualize:
+        output *= np.sqrt(periods_per_year)
+
+    return output.rename("Information Ratio")
+
+
+@_dfvalidate
+def rolling_information_ratio(
+    df: pd.DataFrame,
+    benchmark: str,
+    window: int = 252,
+    method: ReturnMethod = "simple",
+    annualize: bool = True,
+    periods_per_year: int = 252,
+    min_periods: int | None = None,
+    ddof: int = 1,
+) -> pd.DataFrame:
+    """
+    Calculate rolling information ratio relative to a benchmark.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame including the benchmark column.
+
+    benchmark : str
+        Benchmark column name.
+
+    window : int, default 252
+        Rolling window size.
+
+    method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    annualize : bool, default True
+        If True, annualizes the information ratio.
+
+    periods_per_year : int, default 252
+        Number of periods per year.
+
+    min_periods : int or None, default None
+        Minimum observations required.
+
+    ddof : int, default 1
+        Delta degrees of freedom.
+
+    Returns
+    -------
+    pd.DataFrame
+        Rolling information ratio by asset.
+    """
+    _validate_window(window)
+
+    active = active_return(
+        df=df,
+        benchmark=benchmark,
+        method=method,
+    )
+
+    mp = window if min_periods is None else min_periods
+
+    mean_active = active.rolling(
+        window=window,
+        min_periods=mp,
+    ).mean()
+
+    te = active.rolling(
+        window=window,
+        min_periods=mp,
+    ).std(ddof=ddof)
+
+    output = mean_active / te
+
+    if annualize:
+        output *= np.sqrt(periods_per_year)
+
+    return output
 
 
 @_dfvalidate
 def upside_capture(
     df: pd.DataFrame,
     benchmark: str,
-    method: str = "simple",
+    method: ReturnMethod = "simple",
 ) -> pd.Series:
     """
     Calculate upside capture ratio relative to a benchmark.
 
-    Description
-    -----------
-    This function calculates the upside capture ratio for each asset by comparing
-    asset performance against benchmark performance during periods when the
-    benchmark return is positive.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
+        Price DataFrame including the benchmark column.
 
     benchmark : str
-        Column name of the benchmark asset.
+        Benchmark column name.
 
     method : {"simple", "log"}, default "simple"
         Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
 
     Returns
     -------
     pd.Series
         Upside capture ratio by asset.
     """
+    _validate_benchmark(df, benchmark)
 
-    px = df.sort_index()
-
-    if benchmark not in px.columns.tolist():
-        raise TypeError(f"{benchmark} is not a valid column")
-
-    if method == "simple":
-        rets = px.pct_change()
-
-    elif method == "log":
-        rets = np.log(px / px.shift(1))
-
-    else:
-        raise ValueError("method must be 'simple' or 'log'")
-
+    rets = _to_returns(df, method=method)
     bench = rets[benchmark]
 
     mask = bench > 0
 
-    asset_up = (1 + rets[mask]).prod() - 1
-    bench_up = (1 + bench[mask]).prod() - 1
+    asset_up = _compound_returns(
+        returns=rets.loc[mask],
+        method=method,
+    )
 
-    return asset_up / bench_up
+    bench_up = _compound_returns(
+        returns=bench.loc[mask],
+        method=method,
+    )
+
+    output = asset_up / bench_up
+
+    return output.rename("Upside Capture")
 
 
 @_dfvalidate
 def downside_capture(
     df: pd.DataFrame,
     benchmark: str,
-    method: str = "simple",
+    method: ReturnMethod = "simple",
 ) -> pd.Series:
     """
     Calculate downside capture ratio relative to a benchmark.
 
-    Description
-    -----------
-    This function calculates the downside capture ratio for each asset by
-    comparing asset performance against benchmark performance during periods
-    when the benchmark return is negative.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
+        Price DataFrame including the benchmark column.
 
     benchmark : str
-        Column name of the benchmark asset.
+        Benchmark column name.
 
     method : {"simple", "log"}, default "simple"
         Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
 
     Returns
     -------
     pd.Series
         Downside capture ratio by asset.
     """
+    _validate_benchmark(df, benchmark)
 
-    px = df.sort_index()
-
-    if benchmark not in px.columns.tolist():
-        raise TypeError(f"{benchmark} is not a valid column")
-
-    if method == "simple":
-        rets = px.pct_change()
-
-    elif method == "log":
-        rets = np.log(px / px.shift(1))
-
-    else:
-        raise ValueError("method must be 'simple' or 'log'")
-
+    rets = _to_returns(df, method=method)
     bench = rets[benchmark]
 
     mask = bench < 0
 
-    asset_down = (1 + rets[mask]).prod() - 1
-    bench_down = (1 + bench[mask]).prod() - 1
+    asset_down = _compound_returns(
+        returns=rets.loc[mask],
+        method=method,
+    )
 
-    return asset_down / bench_down
+    bench_down = _compound_returns(
+        returns=bench.loc[mask],
+        method=method,
+    )
+
+    output = asset_down / bench_down
+
+    return output.rename("Downside Capture")
 
 
 @_dfvalidate
 def capture_ratio(
     df: pd.DataFrame,
     benchmark: str,
-    method: str = "simple",
+    method: ReturnMethod = "simple",
 ) -> pd.Series:
     """
-    Calculate the upside-to-downside capture ratio.
-
-    Description
-    -----------
-    This function calculates the ratio between upside capture and downside
-    capture for each asset relative to a benchmark. A higher value indicates
-    stronger participation in positive benchmark periods relative to negative
-    benchmark periods.
+    Calculate upside-to-downside capture ratio.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
+        Price DataFrame including the benchmark column.
 
     benchmark : str
-        Column name of the benchmark asset.
+        Benchmark column name.
 
     method : {"simple", "log"}, default "simple"
         Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
 
     Returns
     -------
     pd.Series
-        Upside capture divided by downside capture for each asset.
+        Upside capture divided by downside capture.
     """
-
     uc = upside_capture(
         df=df,
         benchmark=benchmark,
@@ -1574,345 +2265,135 @@ def capture_ratio(
         method=method,
     )
 
-    return uc / dc
+    output = uc / dc
+
+    return output.rename("Capture Ratio")
 
 
 @_dfvalidate
-def var(
-    df: pd.DataFrame,
-    confidence: float = 0.95,
-    method: str = "historical",
-    returns_method: str = "simple",
-    horizon: int = 1,
-) -> pd.Series:
-    """
-    Calculate Value at Risk for each asset.
-
-    Description
-    -----------
-    This function calculates Value at Risk using historical simulation,
-    Gaussian parametric VaR, or Cornish-Fisher modified VaR. The result is
-    expressed as a positive loss.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
-
-    confidence : float, default 0.95
-        Confidence level used to calculate VaR.
-
-    method : {"historical", "gaussian", "cornish_fisher"}, default "historical"
-        VaR calculation methodology.
-        - "historical": historical simulation VaR.
-        - "gaussian": parametric normal VaR.
-        - "cornish_fisher": modified VaR adjusted for skewness and kurtosis.
-
-    returns_method : {"simple", "log"}, default "simple"
-        Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
-
-    horizon : int, default 1
-        Holding period expressed in return periods. If greater than 1, VaR is
-        scaled using the square-root-of-time rule.
-
-    Returns
-    -------
-    pd.Series
-        Value at Risk by asset, expressed as a positive loss.
-    """
-
-    px = df.sort_index()
-
-    if returns_method == "simple":
-        rets = px.pct_change().dropna()
-
-    elif returns_method == "log":
-        rets = np.log(px / px.shift(1)).dropna()
-
-    else:
-        raise ValueError("returns_method must be 'simple' or 'log'")
-
-    alpha = 1 - confidence
-
-    if method == "historical":
-        output = -rets.quantile(alpha)
-
-    elif method == "gaussian":
-        z = norm.ppf(alpha)
-        output = -(rets.mean() + z * rets.std())
-
-    elif method == "cornish_fisher":
-        z = norm.ppf(alpha)
-
-        s = rets.skew()
-        k = rets.kurtosis()
-
-        z_cf = (
-            z
-            + ((z**2 - 1) * s / 6)
-            + ((z**3 - 3 * z) * k / 24)
-            - ((2 * z**3 - 5 * z) * s**2 / 36)
-        )
-
-        output = -(rets.mean() + z_cf * rets.std())
-
-    else:
-        raise ValueError(
-            "method must be 'historical', 'gaussian', or 'cornish_fisher'"
-        )
-
-    if horizon > 1:
-        output *= np.sqrt(horizon)
-
-    return output.rename(
-        f"VaR_{method}_{int(confidence * 100)}"
-    )
-
-
-@_dfvalidate
-def tracking_error(
+def hit_ratio(
     df: pd.DataFrame,
     benchmark: str,
-    method: str = "simple",
-    annualize: bool = True,
-    periods_per_year: int = 252,
+    method: ReturnMethod = "simple",
 ) -> pd.Series:
     """
-    Calculate tracking error relative to a benchmark.
-
-    Description
-    -----------
-    This function calculates the standard deviation of active returns, where
-    active return is defined as asset return minus benchmark return. The result
-    can be annualized.
+    Calculate the percentage of periods with positive active return.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
+        Price DataFrame including the benchmark column.
 
     benchmark : str
-        Column name of the benchmark asset.
+        Benchmark column name.
 
     method : {"simple", "log"}, default "simple"
         Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
-
-    annualize : bool, default True
-        If True, annualizes tracking error.
-
-    periods_per_year : int, default 252
-        Number of periods per year used for annualization.
 
     Returns
     -------
     pd.Series
-        Tracking error by asset.
+        Hit ratio by asset.
     """
-
-    px = df.sort_index()
-
-    if benchmark not in px.columns.tolist():
-        raise TypeError(f"{benchmark} is not a valid column")
-
-    if method == "simple":
-        rets = px.pct_change()
-
-    elif method == "log":
-        rets = np.log(px / px.shift(1))
-
-    else:
-        raise ValueError("method must be 'simple' or 'log'")
-
-    benchmark_returns = rets[benchmark]
-
-    active_returns = rets.sub(
-        benchmark_returns,
-        axis=0
+    active = active_return(
+        df=df,
+        benchmark=benchmark,
+        method=method,
     )
 
-    te = active_returns.std()
+    output = active.gt(0).sum() / active.notna().sum()
 
-    if annualize:
-        te *= np.sqrt(periods_per_year)
-
-    return te.rename("Tracking Error")
-
-
-@_dfvalidate
-def information_ratio(
-    df: pd.DataFrame,
-    benchmark: str,
-    method: str = "simple",
-    annualize: bool = True,
-    periods_per_year: int = 252,
-) -> pd.Series:
-    """
-    Calculate information ratio relative to a benchmark.
-
-    Description
-    -----------
-    This function calculates the information ratio as average active return
-    divided by tracking error. Active return is defined as asset return minus
-    benchmark return. The ratio can be annualized.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
-
-    benchmark : str
-        Column name of the benchmark asset.
-
-    method : {"simple", "log"}, default "simple"
-        Return calculation method.
-        - "simple": uses percentage returns.
-        - "log": uses logarithmic returns.
-
-    annualize : bool, default True
-        If True, annualizes the information ratio.
-
-    periods_per_year : int, default 252
-        Number of periods per year used for annualization.
-
-    Returns
-    -------
-    pd.Series
-        Information ratio by asset.
-    """
-
-    px = df.sort_index()
-
-    if benchmark not in px.columns.tolist():
-        raise TypeError(f"{benchmark} is not a valid column")
-
-    if method == "simple":
-        rets = px.pct_change()
-
-    elif method == "log":
-        rets = np.log(px / px.shift(1))
-
-    else:
-        raise ValueError("method must be 'simple' or 'log'")
-
-    active_returns = rets.sub(
-        rets[benchmark],
-        axis=0
-    )
-
-    active_return = active_returns.mean()
-    tracking_error_value = active_returns.std()
-
-    ir = active_return / tracking_error_value
-
-    if annualize:
-        ir *= np.sqrt(periods_per_year)
-
-    return ir.rename("Information Ratio")
+    return output.rename("Hit Ratio")
 
 
 @_dfvalidate
 def excess_return(
     df: pd.DataFrame,
     benchmark: str,
-    period: str = "qtd"
+    period: PeriodToDate = "qtd",
+    fallback: bool = True,
+    week_freq: str = "W-FRI",
 ) -> pd.DataFrame:
     """
     Calculate excess return relative to a benchmark.
 
-    Description
-    -----------
-    This function calculates the return of each asset over a selected period and
-    subtracts the benchmark return for the same period. Supported periods are
-    Month-To-Date, Quarter-To-Date, and Year-To-Date.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
+        Price DataFrame including the benchmark column.
 
     benchmark : str
-        Column name of the benchmark asset.
+        Benchmark column name.
 
-    period : {"mtd", "qtd", "ytd"}, default "qtd"
+    period : {"wtd", "mtd", "qtd", "ytd"}, default "qtd"
         Period used to calculate returns before computing excess return.
+
+    fallback : bool, default True
+        If True, uses the first valid price of the current period when the
+        previous period-end price is not available.
+
+    week_freq : str, default "W-FRI"
+        Weekly frequency used when period is "wtd".
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with excess return by asset through time.
+        Excess return by asset through time.
     """
+    _validate_benchmark(df, benchmark)
 
-    px = df.sort_index()
+    data = _period_to_date(
+        df=df,
+        period=period,
+        fallback=fallback,
+        week_freq=week_freq,
+    )
 
-    if benchmark not in px.columns.tolist():
-        raise TypeError(f"{benchmark} is not a valid column")
+    output = data.sub(data[benchmark], axis=0)
 
-    if period == "ytd":
-        data = ytd(px)
-
-    elif period == "mtd":
-        data = mtd(px)
-
-    elif period == "qtd":
-        data = qtd(px)
-
-    else:
-        raise NotImplementedError(f"{period} is not implemented")
-
-    data = data.sub(data[benchmark], axis=0)
-
-    return data
+    return output
 
 
 @_dfvalidate
 def consistency(
     df: pd.DataFrame,
     benchmark: str,
-    period: str = "qtd"
+    period: PeriodToDate = "qtd",
+    fallback: bool = True,
+    week_freq: str = "W-FRI",
 ) -> pd.Series:
     """
     Calculate outperformance consistency relative to a benchmark.
 
-    Description
-    -----------
-    This function calculates the percentage of periods in which each asset
-    outperformed the benchmark based on excess returns.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index. It must include the benchmark
-        column and one or more asset columns.
+        Price DataFrame including the benchmark column.
 
     benchmark : str
-        Column name of the benchmark asset.
+        Benchmark column name.
 
-    period : {"mtd", "qtd", "ytd"}, default "qtd"
+    period : {"wtd", "mtd", "qtd", "ytd"}, default "qtd"
         Period used to calculate returns before computing excess return.
+
+    fallback : bool, default True
+        If True, uses the first valid price of the current period when the
+        previous period-end price is not available.
+
+    week_freq : str, default "W-FRI"
+        Weekly frequency used when period is "wtd".
 
     Returns
     -------
     pd.Series
         Percentage of observations where each asset had positive excess return.
     """
-
-    px = df.sort_index()
-
-    if benchmark not in px.columns.tolist():
-        raise TypeError(f"{benchmark} is not a valid column")
-
     exre = excess_return(
-        df=px,
+        df=df,
         benchmark=benchmark,
-        period=period
+        period=period,
+        fallback=fallback,
+        week_freq=week_freq,
     )
 
     output = exre.gt(0).sum() / exre.notna().sum()
@@ -1920,43 +2401,198 @@ def consistency(
     return output.rename("Consistency")
 
 
-@_dfvalidate
-def rsi(
-    df: pd.DataFrame,
-    window: int = 14,
-    prefix: str = "RSI{w}_"
-) -> pd.DataFrame:
-    """
-    Calculate Relative Strength Index for price series.
+# =============================================================================
+# Risk metrics
+# =============================================================================
 
-    Description
-    -----------
-    This function calculates the Relative Strength Index for each price series
-    using the specified rolling window. Output columns are renamed using the
-    selected prefix.
+@_dfvalidate
+def value_at_risk(
+    df: pd.DataFrame,
+    confidence: float = 0.95,
+    method: VaRMethod = "historical",
+    returns_method: ReturnMethod = "simple",
+    horizon: int = 1,
+) -> pd.Series:
+    """
+    Calculate Value at Risk for each asset.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+        Price DataFrame.
+
+    confidence : float, default 0.95
+        Confidence level used to calculate VaR.
+
+    method : {"historical", "gaussian", "cornish_fisher"}, default "historical"
+        VaR calculation methodology.
+
+    returns_method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    horizon : int, default 1
+        Holding period expressed in return periods.
+
+    Returns
+    -------
+    pd.Series
+        Value at Risk by asset, expressed as a positive loss.
+    """
+    _validate_confidence(confidence)
+    _validate_window(horizon, name="horizon")
+
+    alpha = 1.0 - confidence
+
+    rets = _to_returns(
+        df=df,
+        method=returns_method,
+        dropna=True,
+    )
+
+    if method == "historical":
+        if horizon == 1:
+            horizon_rets = rets
+        else:
+            horizon_rets = _to_returns(
+                df=df,
+                method=returns_method,
+                dropna=True,
+                compound="rolling",
+                window=horizon,
+                min_periods=horizon,
+            )
+
+        output = -horizon_rets.quantile(alpha)
+
+    elif method == "gaussian":
+        z = norm.ppf(alpha)
+
+        output = -(
+            rets.mean() * horizon
+            + z * rets.std() * np.sqrt(horizon)
+        )
+
+    elif method == "cornish_fisher":
+        z = norm.ppf(alpha)
+
+        skewness = rets.skew()
+        kurtosis = rets.kurtosis()
+
+        z_cf = (
+            z
+            + ((z ** 2 - 1.0) * skewness / 6.0)
+            + ((z ** 3 - 3.0 * z) * kurtosis / 24.0)
+            - ((2.0 * z ** 3 - 5.0 * z) * skewness ** 2 / 36.0)
+        )
+
+        output = -(
+            rets.mean() * horizon
+            + z_cf * rets.std() * np.sqrt(horizon)
+        )
+
+    else:
+        raise ValueError(
+            "method must be 'historical', 'gaussian', or 'cornish_fisher'."
+        )
+
+    return output.rename(f"VaR_{method}_{int(confidence * 100)}")
+
+
+@_dfvalidate
+def expected_shortfall(
+    df: pd.DataFrame,
+    confidence: float = 0.95,
+    returns_method: ReturnMethod = "simple",
+    horizon: int = 1,
+) -> pd.Series:
+    """
+    Calculate Expected Shortfall, also known as Conditional VaR.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
+
+    confidence : float, default 0.95
+        Confidence level.
+
+    returns_method : {"simple", "log"}, default "simple"
+        Return calculation method.
+
+    horizon : int, default 1
+        Holding period expressed in return periods.
+
+    Returns
+    -------
+    pd.Series
+        Expected Shortfall by asset, expressed as a positive loss.
+    """
+    _validate_confidence(confidence)
+    _validate_window(horizon, name="horizon")
+
+    alpha = 1.0 - confidence
+
+    if horizon == 1:
+        horizon_rets = _to_returns(
+            df=df,
+            method=returns_method,
+            dropna=True,
+        )
+    else:
+        horizon_rets = _to_returns(
+            df=df,
+            method=returns_method,
+            dropna=True,
+            compound="rolling",
+            window=horizon,
+            min_periods=horizon,
+        )
+
+    threshold = horizon_rets.quantile(alpha)
+
+    output = horizon_rets.where(
+        horizon_rets.le(threshold),
+    ).mean()
+
+    output = -output
+
+    return output.rename(f"Expected Shortfall_{int(confidence * 100)}")
+
+
+# =============================================================================
+# Technical indicators
+# =============================================================================
+
+@_dfvalidate
+def rsi(
+    df: pd.DataFrame,
+    window: int = 14,
+    prefix: str = "RSI{w}_",
+) -> pd.DataFrame:
+    """
+    Calculate Relative Strength Index for price series.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
 
     window : int, default 14
         Number of periods used to calculate average gains and losses.
 
     prefix : str, default "RSI{w}_"
-        Prefix used to rename output columns. The placeholder "{w}" is replaced
-        by the window value.
+        Prefix used to rename output columns.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with RSI values for each price series.
+        RSI values for each price series.
     """
+    _validate_window(window)
 
-    df = df.sort_index()
+    px = df.sort_index()
 
-    delta = df.diff()
+    delta = px.diff()
 
     gain = delta.where(delta > 0, 0.0)
     loss = -delta.where(delta < 0, 0.0)
@@ -1967,7 +2603,7 @@ def rsi(
     rs = avg_gain / avg_loss
     output = 100.0 - (100.0 / (1.0 + rs))
 
-    output.columns = [f"{prefix.format(w=window)}{c}" for c in df.columns]
+    output.columns = [f"{prefix.format(w=window)}{col}" for col in px.columns]
 
     return output
 
@@ -1977,51 +2613,47 @@ def sma(
     df: pd.DataFrame,
     windows: list[int] | None = None,
     min_periods: int | None = None,
-    prefix: str = "SMA{w}_"
+    prefix: str = "SMA{w}_",
 ) -> pd.DataFrame:
     """
     Calculate Simple Moving Averages for price series.
 
-    Description
-    -----------
-    This function calculates Simple Moving Averages for each price series across
-    one or more rolling windows. Results for all windows are concatenated into a
-    single DataFrame.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+        Price DataFrame.
 
     windows : list[int] or None, default None
-        List of rolling windows. If None, the default window is [50].
+        Rolling windows. If None, defaults to [50].
 
     min_periods : int or None, default None
-        Minimum number of observations required to compute the rolling mean. If
-        None, each window value is used as its own minimum period.
+        Minimum observations required.
 
     prefix : str, default "SMA{w}_"
-        Prefix used to rename output columns. The placeholder "{w}" is replaced
-        by each window value.
+        Prefix used to rename output columns.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with SMA values for each price series and window.
+        SMA values for each price series and window.
     """
-
     if windows is None:
         windows = [50]
 
-    df = df.sort_index()
-
+    px = df.sort_index()
     frames = []
 
-    for w in windows:
-        mp = w if min_periods is None else min_periods
-        output = df.rolling(window=w, min_periods=mp).mean()
-        output.columns = [f"{prefix.format(w=w)}{c}" for c in df.columns]
+    for window in windows:
+        _validate_window(window)
+
+        mp = window if min_periods is None else min_periods
+
+        output = px.rolling(
+            window=window,
+            min_periods=mp,
+        ).mean()
+
+        output.columns = [f"{prefix.format(w=window)}{col}" for col in px.columns]
         frames.append(output)
 
     return pd.concat(frames, axis=1)
@@ -2032,225 +2664,229 @@ def ema(
     df: pd.DataFrame,
     windows: list[int] | None = None,
     min_periods: int | None = None,
-    prefix: str = "EMA{w}_"
+    prefix: str = "EMA{w}_",
 ) -> pd.DataFrame:
     """
     Calculate Exponential Moving Averages for price series.
 
-    Description
-    -----------
-    This function calculates Exponential Moving Averages for each price series
-    across one or more exponential windows. Results for all windows are
-    concatenated into a single DataFrame.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+        Price DataFrame.
 
     windows : list[int] or None, default None
-        List of exponential moving average spans. If None, the default window
-        is [27].
+        EMA spans. If None, defaults to [27].
 
     min_periods : int or None, default None
-        Minimum number of observations required to compute the EMA. If None,
-        each window value is used as its own minimum period.
+        Minimum observations required.
 
     prefix : str, default "EMA{w}_"
-        Prefix used to rename output columns. The placeholder "{w}" is replaced
-        by each window value.
+        Prefix used to rename output columns.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with EMA values for each price series and window.
+        EMA values for each price series and window.
     """
-
     if windows is None:
         windows = [27]
 
-    df = df.sort_index()
-
+    px = df.sort_index()
     frames = []
 
-    for w in windows:
-        mp = w if min_periods is None else min_periods
-        output = df.ewm(span=w, min_periods=mp).mean()
-        output.columns = [f"{prefix.format(w=w)}{c}" for c in df.columns]
+    for window in windows:
+        _validate_window(window)
+
+        mp = window if min_periods is None else min_periods
+
+        output = px.ewm(
+            span=window,
+            min_periods=mp,
+        ).mean()
+
+        output.columns = [f"{prefix.format(w=window)}{col}" for col in px.columns]
         frames.append(output)
 
     return pd.concat(frames, axis=1)
 
 
 @_dfvalidate
-def ranges(
+def zscore(
     df: pd.DataFrame,
-    desviaciones: list[int] | None = None,
-    prefix: str = "Media({w}sigma)_"
+    window: int = 252,
+    min_periods: int | None = None,
+    prefix: str = "ZScore{w}_",
 ) -> pd.DataFrame:
     """
-    Calculate static mean-based ranges using standard deviation offsets.
-
-    Description
-    -----------
-    This function calculates horizontal reference levels for each column based on
-    the column mean plus a selected number of standard deviations. Each generated
-    column contains a constant value through the full index of the input
-    DataFrame.
+    Calculate rolling z-score for each price series.
 
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame with a datetime index and one or more numeric columns.
+        Price DataFrame.
 
-    desviaciones : list[int] or None, default None
-        List of standard deviation multipliers. If None, the default values are
-        [-1, 0, 1].
+    window : int, default 252
+        Rolling window size.
 
-    prefix : str, default "Media({w}sigma)_"
-        Prefix used to rename output columns. The placeholder "{w}" is replaced
-        by each standard deviation multiplier.
+    min_periods : int or None, default None
+        Minimum observations required.
+
+    prefix : str, default "ZScore{w}_"
+        Prefix used to rename output columns.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with generated mean plus/minus standard deviation reference
-        levels for each input column.
+        Rolling z-score values.
     """
+    _validate_window(window)
 
-    if desviaciones is None:
-        desviaciones = [-1, 0, 1]
+    px = df.sort_index()
 
-    mean = df.mean()
-    std = df.std()
+    mp = window if min_periods is None else min_periods
 
-    final = None
+    mean = px.rolling(
+        window=window,
+        min_periods=mp,
+    ).mean()
 
-    for col in df.columns:
-        for w in desviaciones:
-            col_name = prefix.format(w=w)
+    std = px.rolling(
+        window=window,
+        min_periods=mp,
+    ).std()
 
-            if final is None:
-                temp = df[[col]].copy()
-                temp[f"{col_name}{col}"] = mean[col] + w * std[col]
-                temp = temp.drop(columns=[col])
-                final = temp
+    output = (px - mean) / std
 
-            else:
-                final[f"{col_name}{col}"] = mean[col] + w * std[col]
+    output.columns = [f"{prefix.format(w=window)}{col}" for col in px.columns]
 
-    return final
+    return output
 
 
 @_dfvalidate
-def relative(
+def bollinger_bands(
     df: pd.DataFrame,
-    ticker_list: list[str] | None = None,
-    relative_list: list[str] | None = None,
-    operation_list: list[str] | None = None,
+    window: int = 20,
+    num_std: float = 2.0,
+    min_periods: int | None = None,
 ) -> pd.DataFrame:
     """
-    Calculate relative series between selected columns.
-
-    Description
-    -----------
-    This function creates derived time series by applying arithmetic operations
-    between pairs of columns. Supported operations are subtraction, division,
-    multiplication, and addition. A relative value equal to "1" means that the
-    original ticker series is returned without comparison.
+    Calculate Bollinger Bands for each price series.
 
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame with a datetime index and one or more numeric columns.
+        Price DataFrame.
 
-    ticker_list : list[str] or None, default None
-        List of main ticker columns to use in each calculation.
+    window : int, default 20
+        Rolling window size.
 
-    relative_list : list[str] or None, default None
-        List of relative ticker columns to compare against. Use "1" to return
-        the original ticker without applying an operation.
+    num_std : float, default 2.0
+        Number of standard deviations used for upper and lower bands.
 
-    operation_list : list[str] or None, default None
-        List of arithmetic operations. Supported values are:
-        - "-": subtraction
-        - "/": division
-        - "*": multiplication
-        - "+": addition
+    min_periods : int or None, default None
+        Minimum observations required.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with calculated relative series.
+        Bollinger Band columns for each asset.
     """
+    _validate_window(window)
 
-    if ticker_list is None or relative_list is None or operation_list is None:
-        raise ValueError("ticker_list, relative_list, and operation_list cannot be None.")
+    px = df.sort_index()
 
-    if not (len(ticker_list) == len(relative_list) == len(operation_list)):
-        raise ValueError(
-            "ticker_list, relative_list, and operation_list must have the same length."
+    mp = window if min_periods is None else min_periods
+
+    middle = px.rolling(
+        window=window,
+        min_periods=mp,
+    ).mean()
+
+    std = px.rolling(
+        window=window,
+        min_periods=mp,
+    ).std()
+
+    upper = middle + num_std * std
+    lower = middle - num_std * std
+
+    frames = []
+
+    for col in px.columns:
+        temp = pd.DataFrame(
+            {
+                f"BB_Middle{window}_{col}": middle[col],
+                f"BB_Upper{window}_{col}": upper[col],
+                f"BB_Lower{window}_{col}": lower[col],
+            },
+            index=px.index,
         )
 
-    for ticker in ticker_list:
-        if ticker not in df.columns:
-            raise ValueError(f"Ticker '{ticker}' was not found in the DataFrame.")
+        frames.append(temp)
 
-    for relative_ticker in relative_list:
-        if relative_ticker not in df.columns and relative_ticker != "1":
-            raise ValueError(
-                f"Relative ticker '{relative_ticker}' was not found in the DataFrame and is not '1'."
-            )
+    return pd.concat(frames, axis=1)
 
-    final = None
 
-    for i in range(len(ticker_list)):
-        ticker = ticker_list[i]
-        relative_ticker = relative_list[i]
-        operation = operation_list[i]
+@_dfvalidate
+def macd(
+    df: pd.DataFrame,
+    fast: int = 12,
+    slow: int = 26,
+    signal: int = 9,
+) -> pd.DataFrame:
+    """
+    Calculate MACD indicator for each price series.
 
-        temp_data = df[[ticker, relative_ticker] if relative_ticker != "1" else [ticker]].copy()
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Price DataFrame.
 
-        if relative_ticker == "1":
-            temp_data = temp_data.rename(columns={ticker: ticker_list[i]})
+    fast : int, default 12
+        Fast EMA span.
 
-            if i == 0:
-                final = temp_data
-            else:
-                final = final.join(temp_data)
+    slow : int, default 26
+        Slow EMA span.
 
-            continue
+    signal : int, default 9
+        Signal line EMA span.
 
-        if operation == "-":
-            temp_data["Output"] = temp_data[ticker] - temp_data[relative_ticker]
-            output_title = f"Spread {ticker_list[i]} vs {relative_list[i]}"
+    Returns
+    -------
+    pd.DataFrame
+        MACD, signal, and histogram columns.
+    """
+    _validate_window(fast, name="fast")
+    _validate_window(slow, name="slow")
+    _validate_window(signal, name="signal")
 
-        elif operation == "/":
-            temp_data["Output"] = temp_data[ticker] / temp_data[relative_ticker]
-            output_title = f"Relative {ticker_list[i]} vs {relative_list[i]}"
+    if fast >= slow:
+        raise ValueError("fast must be lower than slow.")
 
-        elif operation == "*":
-            temp_data["Output"] = temp_data[ticker] * temp_data[relative_ticker]
-            output_title = f"Multiplication {ticker_list[i]} vs {relative_list[i]}"
+    px = df.sort_index()
 
-        elif operation == "+":
-            temp_data["Output"] = temp_data[ticker] + temp_data[relative_ticker]
-            output_title = f"Sum {ticker_list[i]} vs {relative_list[i]}"
+    ema_fast = px.ewm(span=fast, min_periods=fast).mean()
+    ema_slow = px.ewm(span=slow, min_periods=slow).mean()
 
-        else:
-            raise ValueError(
-                f"Operation '{operation}' is not supported. Use '-', '/', '*', or '+'."
-            )
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, min_periods=signal).mean()
+    histogram = macd_line - signal_line
 
-        temp_data = temp_data[["Output"]].rename(columns={"Output": output_title})
+    frames = []
 
-        if i == 0:
-            final = temp_data
-        else:
-            final = final.join(temp_data)
+    for col in px.columns:
+        temp = pd.DataFrame(
+            {
+                f"MACD_{col}": macd_line[col],
+                f"MACDSignal_{col}": signal_line[col],
+                f"MACDHist_{col}": histogram[col],
+            },
+            index=px.index,
+        )
 
-    return final
+        frames.append(temp)
+
+    return pd.concat(frames, axis=1)
 
 
 @_dfvalidate
@@ -2262,73 +2898,69 @@ def momentum(
     """
     Calculate standardized momentum indicators.
 
-    Description
-    -----------
-    This function calculates simple momentum over one or more lookback windows.
-    Momentum is computed as the percentage change over each window and then
-    standardized using its rolling mean and rolling standard deviation.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+        Price DataFrame.
 
     windows : list[int] or None, default None
-        List of lookback windows. If None, the default values are [15, 30].
+        Lookback windows. If None, defaults to [15, 30].
 
     prefix : str, default "MomentumSimple{w}_"
-        Prefix used to rename output columns. The placeholder "{w}" is replaced
-        by each window value.
+        Prefix used to rename output columns.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with standardized momentum values for each asset and window.
+        Standardized momentum values.
     """
-
     if windows is None:
         windows = [15, 30]
 
-    data = df.sort_index()
-
+    px = df.sort_index()
     frames = []
 
-    for w in windows:
-        data_temp = data.pct_change(periods=w)
-        mean = data_temp.rolling(window=w).mean()
-        std = data_temp.rolling(window=w).std()
+    for window in windows:
+        _validate_window(window)
 
-        output = (data_temp - mean) / std.where(std != 0, 1)
-        output.columns = [f"{prefix.format(w=w)}{c}" for c in data_temp.columns]
+        data_temp = _to_returns(
+            df=px,
+            method="simple",
+            compound="rolling",
+            window=window,
+            min_periods=window,
+        )
+
+        mean = data_temp.rolling(
+            window=window,
+            min_periods=window,
+        ).mean()
+
+        std = data_temp.rolling(
+            window=window,
+            min_periods=window,
+        ).std()
+
+        output = (data_temp - mean) / std.replace(0.0, np.nan)
+        output.columns = [f"{prefix.format(w=window)}{col}" for col in px.columns]
 
         frames.append(output)
 
-    final = pd.concat(frames, axis=1)
-
-    return final
+    return pd.concat(frames, axis=1)
 
 
 @_dfvalidate
 def momentum_sma(
     df: pd.DataFrame,
-    prefix: str = "MomentumSMA_"
+    prefix: str = "MomentumSMA_",
 ) -> pd.DataFrame:
     """
     Calculate a moving-average-based momentum score.
 
-    Description
-    -----------
-    This function resamples prices to weekly frequency and calculates a momentum
-    score based on the relationship between price, a 5-week moving average, a
-    15-week moving average, the slope of the 15-week moving average, and the
-    spread between both moving averages.
-
     Parameters
     ----------
     df : pd.DataFrame
-        Price DataFrame with a datetime index and one or more asset price
-        columns.
+        Price DataFrame.
 
     prefix : str, default "MomentumSMA_"
         Prefix used to rename output columns.
@@ -2336,11 +2968,9 @@ def momentum_sma(
     Returns
     -------
     pd.DataFrame
-        DataFrame with momentum scores for each asset.
+        Momentum scores for each asset.
     """
-
-    data_price = df.sort_index()
-    data_price = data_price.resample("W").last()
+    data_price = df.sort_index().resample("W").last()
 
     scores = []
 
@@ -2357,39 +2987,248 @@ def momentum_sma(
             (temp[ticker] < temp["MA(15)"])
             & (temp["dMA(15)"] < 0)
             & (temp["spreadW"] < 0),
-            "Score"
+            "Score",
         ] = 1
 
         temp.loc[
             (temp[ticker] < temp["MA(15)"])
             & (temp["dMA(15)"] > 0)
             & (temp["spreadW"] < 0),
-            "Score"
+            "Score",
         ] = 2
 
         temp.loc[
             (temp[ticker] > temp["MA(15)"])
             & (temp["dMA(15)"] < 0)
             & (temp["spreadW"] > 0),
-            "Score"
+            "Score",
         ] = 4
 
         temp.loc[
             (temp[ticker] > temp["MA(15)"])
             & (temp["dMA(15)"] > 0.0001)
             & (temp["spreadW"] > 0.0001),
-            "Score"
+            "Score",
         ] = 5
 
         temp.loc[temp["Score"].isna(), "Score"] = 3
 
-        temp = temp[["Score"]].rename(columns={"Score": f"{prefix}{ticker}"})
+        temp = temp[["Score"]].rename(
+            columns={"Score": f"{prefix}{ticker}"}
+        )
 
         scores.append(temp)
 
-    final = pd.concat(scores, axis=1)
+    return pd.concat(scores, axis=1)
 
-    return final
+
+# =============================================================================
+# Range and transformation helpers
+# =============================================================================
+
+@_dfvalidate
+def mean_std_bands(
+    df: pd.DataFrame,
+    std_multipliers: list[int | float] | None = None,
+    prefix: str = "Mean({w}std)_",
+) -> pd.DataFrame:
+    """
+    Calculate static mean-based ranges using standard deviation offsets.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with numeric columns.
+
+    std_multipliers : list[int or float] or None, default None
+        Standard deviation multipliers. If None, defaults to [-1, 0, 1].
+
+    prefix : str, default "Mean({w}std)_"
+        Prefix used to rename output columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Mean plus or minus standard deviation reference levels.
+    """
+    if std_multipliers is None:
+        std_multipliers = [-1, 0, 1]
+
+    data = df.sort_index()
+
+    mean = data.mean()
+    std = data.std()
+
+    frames = []
+
+    for col in data.columns:
+        for multiplier in std_multipliers:
+            col_name = f"{prefix.format(w=multiplier)}{col}"
+
+            temp = pd.Series(
+                mean[col] + multiplier * std[col],
+                index=data.index,
+                name=col_name,
+            )
+
+            frames.append(temp)
+
+    return pd.concat(frames, axis=1)
+
+
+@_dfvalidate
+def relative(
+    df: pd.DataFrame,
+    calculations: list[dict[str, str]],
+) -> pd.DataFrame:
+    """
+    Calculate relative series between selected columns using a dictionary-based
+    configuration.
+
+    Description
+    -----------
+    This function creates derived time series by applying arithmetic operations
+    between pairs of columns. Each calculation is defined as a dictionary with
+    the following keys:
+
+    - "ticker": main column used as the left-hand side of the operation.
+    - "relative": comparison column used as the right-hand side of the operation.
+      Use "1" to return the original ticker without applying an operation.
+    - "operation": arithmetic operation to apply. Supported values are "-",
+      "/", "*", and "+".
+    - "name": optional custom output column name.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with a datetime index and one or more numeric columns.
+
+    calculations : list[dict[str, str]]
+        List of calculation dictionaries.
+
+        Required keys:
+        - "ticker"
+
+        Optional keys:
+        - "relative", default "1"
+        - "operation", default "/"
+        - "name", default generated automatically
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with calculated relative series.
+
+    Raises
+    ------
+    ValueError
+        If calculations is empty, if a required column is missing, or if an
+        unsupported operation is provided.
+
+    TypeError
+        If calculations is not a list of dictionaries.
+
+    Examples
+    --------
+    calculations = [
+        {
+            "ticker": "SPY",
+            "relative": "ACWI",
+            "operation": "/",
+            "name": "SPY vs ACWI",
+        },
+        {
+            "ticker": "EEM",
+            "relative": "ACWI",
+            "operation": "-",
+        },
+        {
+            "ticker": "GLD",
+            "relative": "1",
+        },
+    ]
+
+    output = relative(df, calculations=calculations)
+    """
+    if not isinstance(calculations, list):
+        raise TypeError("calculations must be a list of dictionaries.")
+
+    if len(calculations) == 0:
+        raise ValueError("calculations cannot be empty.")
+
+    data = df.sort_index()
+
+    operations = {
+        "-": lambda x, y: x - y,
+        "/": lambda x, y: x / y,
+        "*": lambda x, y: x * y,
+        "+": lambda x, y: x + y,
+    }
+
+    default_names = {
+        "-": "Spread",
+        "/": "Relative",
+        "*": "Multiplication",
+        "+": "Sum",
+    }
+
+    frames = []
+
+    for i, calc in enumerate(calculations):
+        if not isinstance(calc, dict):
+            raise TypeError(
+                f"Each item in calculations must be a dictionary. "
+                f"Invalid item at position {i}."
+            )
+
+        if "ticker" not in calc:
+            raise ValueError(
+                f"Missing required key 'ticker' in calculation at position {i}."
+            )
+
+        ticker = calc["ticker"]
+        relative_ticker = calc.get("relative", "1")
+        operation = calc.get("operation", "/")
+        custom_name = calc.get("name")
+
+        if ticker not in data.columns:
+            raise ValueError(
+                f"Ticker '{ticker}' was not found in the DataFrame."
+            )
+
+        if relative_ticker != "1" and relative_ticker not in data.columns:
+            raise ValueError(
+                f"Relative ticker '{relative_ticker}' was not found in the DataFrame."
+            )
+
+        if relative_ticker == "1":
+            output = data[ticker].copy()
+            output.name = custom_name if custom_name is not None else ticker
+            frames.append(output)
+            continue
+
+        if operation not in operations:
+            raise ValueError(
+                f"Operation '{operation}' is not supported. "
+                "Use '-', '/', '*', or '+'."
+            )
+
+        output = operations[operation](
+            data[ticker],
+            data[relative_ticker],
+        )
+
+        if custom_name is not None:
+            output_name = custom_name
+        else:
+            output_name = (
+                f"{default_names[operation]} {ticker} vs {relative_ticker}"
+            )
+
+        output = output.rename(output_name)
+        frames.append(output)
+
+    return pd.concat(frames, axis=1)
 
 
 @_dfvalidate
@@ -2400,39 +3239,30 @@ def rank_percentile(
     """
     Calculate percentile rank by column.
 
-    Description
-    -----------
-    This function calculates the percentile rank for each column in a DataFrame.
-    If no value is provided, it calculates the percentile rank of the last
-    observation in the DataFrame. If a value is provided, it calculates where
-    that value would rank within the historical distribution.
-
-    For multi-column DataFrames, value must be a one-row DataFrame with the same
-    columns as df. This avoids applying a single scalar value across metrics with
-    different scales.
-
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame with a datetime index and one or more numeric columns.
+        DataFrame with numeric columns.
 
     value : float, int, pd.DataFrame, or None, default None
         Value to rank against the historical distribution.
-        - If None, the last row of df is ranked.
-        - If float or int, df must have exactly one column.
-        - If pd.DataFrame, it must have exactly one row and the same columns as df.
+        - If None, ranks the last row of df.
+        - If scalar, df must have exactly one column.
+        - If DataFrame, it must have exactly one row and the same columns as df.
 
     Returns
     -------
     pd.Series
         Percentile rank by column.
     """
+    data = df.sort_index()
 
     if value is None:
-        return df.rank(pct=True).iloc[-1]
+        output = data.rank(pct=True).iloc[-1]
+        return output.rename("Percentile Rank")
 
     if isinstance(value, (int, float)):
-        if df.shape[1] > 1:
+        if data.shape[1] > 1:
             raise ValueError(
                 "When the DataFrame has more than one column, value must be "
                 "a one-row DataFrame with the same columns."
@@ -2440,51 +3270,37 @@ def rank_percentile(
 
         value_row = pd.DataFrame(
             [[value]],
-            columns=df.columns,
+            columns=data.columns,
         )
 
     elif isinstance(value, pd.DataFrame):
         if value.shape[0] != 1:
             raise ValueError("value must be a one-row DataFrame.")
 
-        missing_cols = [col for col in df.columns if col not in value.columns]
-        extra_cols = [col for col in value.columns if col not in df.columns]
+        missing_cols = [col for col in data.columns if col not in value.columns]
+        extra_cols = [col for col in value.columns if col not in data.columns]
 
         if missing_cols:
-            raise ValueError(
-                f"Missing columns in value: {missing_cols}"
-            )
+            raise ValueError(f"Missing columns in value: {missing_cols}")
 
         if extra_cols:
             raise ValueError(
                 f"value contains columns that are not present in df: {extra_cols}"
             )
 
-        value_row = value[df.columns].copy()
+        value_row = value[data.columns].copy()
 
     else:
         raise TypeError(
             "value must be None, int, float, or a one-row DataFrame."
         )
 
-    df_temp = pd.concat(
-        [df, value_row],
+    data_temp = pd.concat(
+        [data, value_row],
         axis=0,
     )
 
-    percentile_value = df_temp.rank(pct=True).iloc[-1]
+    output = data_temp.rank(pct=True).iloc[-1]
 
-    return percentile_value
-
-
-
-
-
-
-
-
-
-
-
-
+    return output.rename("Percentile Rank")
 
