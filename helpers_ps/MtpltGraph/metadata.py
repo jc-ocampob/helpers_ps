@@ -47,6 +47,11 @@ class Graph_meta_data():
     _df_idx = None                  # Numero de dataframe activo
     _ax = None                      # Eje activo en la clase
     _df = None                      # Dataframe activo de la clase
+    _right_ax = None
+    _axis_map = None
+    _right_axis_enabled = False
+    _right_axis_config = None
+    _y_axis_right = None
     
     # Meta data alamacenada
     _ticker_label_color: list[tuple[str, str, str]] = None
@@ -103,7 +108,7 @@ class Graph_meta_data():
         self._meta_data[current_idx] = {
             "dataframe": self._df_idx,
             "xmeta": {
-                "mode": self._x_axis_mode, 
+                "mode": self._x_axis_mode,
                 "fechas": self._x_axis_fechas,
                 "x_vals": self._x_vals
             },
@@ -114,7 +119,26 @@ class Graph_meta_data():
             "months": self._months,
             "years": self._years,
             "ticker_label_color": self._ticker_label_color,
-            "custom_legend_handles": list(self._custom_legend_handles) if self._custom_legend_handles is not None else []
+            "custom_legend_handles": (
+                list(self._custom_legend_handles)
+                if self._custom_legend_handles is not None
+                else []
+            ),
+
+            # Secondary y-axis metadata
+            "right_ax": self._right_ax,
+            "axis_map": dict(self._axis_map) if self._axis_map is not None else None,
+            "right_axis_enabled": self._right_axis_enabled,
+            "right_axis_config": (
+                dict(self._right_axis_config)
+                if self._right_axis_config is not None
+                else None
+            ),
+            "y_axis_right": (
+                dict(self._y_axis_right)
+                if self._y_axis_right is not None
+                else None
+            ),
         }
 
         # Guardar el axis actual dentro de la lista
@@ -149,6 +173,11 @@ class Graph_meta_data():
         self._custom_legend_handles = list(
             target_meta.get("custom_legend_handles", [])
         )
+        self._right_ax = target_meta.get("right_ax")
+        self._axis_map = target_meta.get("axis_map")
+        self._right_axis_enabled = target_meta.get("right_axis_enabled", False)
+        self._right_axis_config = target_meta.get("right_axis_config")
+        self._y_axis_right = target_meta.get("y_axis_right")
 
         # -------------------------------------------------
         # 3. Activar nuevo eje
@@ -222,11 +251,23 @@ class Graph_meta_data():
                 "months": None,
                 "years": None,
                 "ticker_label_color": None,
-                "custom_legend_handles": []
+                "custom_legend_handles": [],
+
+                # Secondary y-axis metadata
+                "right_ax": None,
+                "axis_map": None,
+                "right_axis_enabled": False,
+                "right_axis_config": None,
+                "y_axis_right": None,
             }
             for i, ax in enumerate(self._axes)
         }
 
         # Metadata activa del primer eje
         self._custom_legend_handles = []
+        self._right_ax = None
+        self._axis_map = None
+        self._right_axis_enabled = False
+        self._right_axis_config = None
+        self._y_axis_right = None
 

@@ -5,6 +5,7 @@ import locale
 import warnings
 from dataclasses import dataclass, field
 from importlib.resources import files
+from typing import Any, Callable, Self
 
 import matplotlib as mpl
 import matplotlib.dates as mdates
@@ -28,6 +29,7 @@ except Exception:
 from .metadata import Graph_meta_data
 from .config import buffers
 
+
 @dataclass
 class Graph_base(Graph_meta_data):
     """
@@ -47,6 +49,111 @@ class Graph_base(Graph_meta_data):
     This class assumes that figure and axis metadata are managed through
     `Graph_meta_data`, particularly via `_generate_metadata`.
     """
+    # =========================
+    # Chainable API helpers
+    # =========================
+    def pipe(
+        self: Self,
+        func: Callable[..., Self | None],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Self:
+        """
+        Apply a custom function to the graph object and keep the chain alive.
+
+        This method follows the same idea as pandas .pipe(), allowing reusable
+        graph transformations to be inserted into the chart-building workflow.
+
+        Parameters
+        ----------
+        func:
+            Function that receives the current graph object as its first argument.
+            The function can either return the graph object or return None.
+        *args:
+            Positional arguments passed to the function.
+        **kwargs:
+            Keyword arguments passed to the function.
+
+        Returns
+        -------
+        Graph_base
+            The current graph object, or the object returned by the function.
+        """
+        result = func(self, *args, **kwargs)
+        return self if result is None else result
+
+    def tap(
+        self: Self,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Self:
+        """
+        Execute a side-effect function and keep the chain alive.
+
+        This is useful for debugging, logging, previewing, or applying matplotlib
+        actions that do not need to return the graph object.
+
+        Parameters
+        ----------
+        func:
+            Function that receives the current graph object as its first argument.
+        *args:
+            Positional arguments passed to the function.
+        **kwargs:
+            Keyword arguments passed to the function.
+
+        Returns
+        -------
+        Graph_base
+            The current graph object.
+        """
+        func(self, *args, **kwargs)
+        return self
+
+    def axis(self: Self, ax_index: int = 0) -> Self:
+        """
+        Select the active subplot axis and keep the chain alive.
+
+        This is a public chainable wrapper around _set_axis().
+
+        Parameters
+        ----------
+        ax_index:
+            Zero-based index of the subplot axis to activate.
+
+        Returns
+        -------
+        Graph_base
+            The current graph object.
+        """
+        self._set_axis(ax_index=ax_index)
+        return self
+
+    def get_axis(self, side: str = "left"):
+        """
+        Return the active left or right Matplotlib axis.
+
+        Parameters
+        ----------
+        side:
+            Axis side to retrieve. Must be either "left" or "right".
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+            The requested Matplotlib axis.
+        """
+        if side not in {"left", "right"}:
+            raise ValueError("side must be 'left' or 'right'.")
+
+        if side == "left":
+            return self._ax
+
+        if self._right_ax is None:
+            raise RuntimeError("No right axis exists for the active chart.")
+
+        return self._right_ax
 
     # =========================
     # funciones de ayuda
@@ -300,53 +407,177 @@ class Graph_base(Graph_meta_data):
         lim: tuple[float, float] | None = None,
         fmt: str | None = None,
         fontsize: float = 7,
-        tick_step: int = None
-    ) -> None:
+        tick_step: int | None = None,
+        label: str | None = None,
+        label_fontsize: float | None = None,
+        label_color: str | None = None,
+        tick_color: str | None = None,
+        spine_color: str | None = None,
+        margins_x: float | None = 0.01,
+        side: str | None = None,
+        ax=None,
+    ):
         """
-        Prepare the y-axis limits, tick labels, formatting, and spacing.
+        Prepare and format a y-axis.
+
+        This method formats a target y-axis with limits, tick label formatting,
+        tick styling, axis label styling, spine color, and optional tick spacing.
+
+        It can be used for the active axis, the left axis, the right axis, or an
+        explicitly provided Matplotlib axis. Grid lines are intentionally handled
+        by horizontal_guides() to keep responsibilities separated.
 
         Parameters
         ----------
-        lim : tuple[float, float] or None, optional
-            Lower and upper y-axis limits. If None, Matplotlib determines the limits
-            automatically.
-        fmt : str or None, optional
-            Numeric format string used for y-axis labels. If None, `",.0f"` is used.
-        fontsize : float, default 7
+        lim:
+            Lower and upper y-axis limits.
+        fmt:
+            Numeric format string used for y-axis labels. If None, ',.0f' is used.
+        fontsize:
             Font size used for y-axis tick labels.
-        tick_step : int or None, optional
-            Fixed interval between y-axis ticks. If None, Matplotlib determines the
-            tick spacing automatically.
+        tick_step:
+            Fixed interval between y-axis ticks.
+        label:
+            Optional y-axis label.
+        label_fontsize:
+            Font size used for the y-axis label. If None, uses fontsize.
+        label_color:
+            Color used for the y-axis label.
+        tick_color:
+            Color used for y-axis tick labels and tick marks.
+        spine_color:
+            Color used for the y-axis spine.
+        margins_x:
+            X-axis margin passed to the target axis. If None, margins are not changed.
+        side:
+            Optional side reference. Use 'left' or 'right'. If None, the method
+            formats the active axis unless ax is provided.
+        ax:
+            Explicit Matplotlib axis to format. This takes priority over side.
 
         Returns
         -------
-        None
-            The y-axis configuration is applied directly to the active axis.
+        Graph_base
+            Current graph object.
         """
+        # -------------------------------------------------
+        # 1. Resolve target axis
+        # -------------------------------------------------
+        if ax is not None:
+            target_ax = ax
+
+        elif side == "right":
+            if getattr(self, "_right_ax", None) is None:
+                raise RuntimeError("No right axis exists for the active chart.")
+            target_ax = self._right_ax
+
+        elif side == "left":
+            target_ax = self._ax
+
+        else:
+            target_ax = self._ax
+
+        if target_ax is None:
+            raise RuntimeError(
+                "No axis available. Create a chart before formatting the y-axis."
+            )
+
+        # -------------------------------------------------
+        # 2. Resolve side
+        # -------------------------------------------------
+        if side is None:
+            if getattr(self, "_right_ax", None) is target_ax:
+                resolved_side = "right"
+            else:
+                resolved_side = "left"
+        else:
+            resolved_side = side
+
+        if resolved_side not in {"left", "right"}:
+            raise ValueError("side must be either 'left', 'right', or None.")
+
+        spine_name = "right" if resolved_side == "right" else "left"
+
+        # -------------------------------------------------
+        # 3. Limits and margins
+        # -------------------------------------------------
         if lim is not None:
-            self._ax.set_ylim(*lim)
-        self._ax.margins(x=0.01)
-                
-        # Agregar format al eje y
+            target_ax.set_ylim(*lim)
+
+        if margins_x is not None:
+            target_ax.margins(x=margins_x)
+
+        # -------------------------------------------------
+        # 4. Tick formatter
+        # -------------------------------------------------
         fmt = fmt if fmt is not None else ",.0f"
-        self._ax.yaxis.set_major_formatter(
+
+        target_ax.yaxis.set_major_formatter(
             FuncFormatter(lambda x, pos: f"{x:{fmt}}")
         )
-        self._ax.tick_params(axis='y', labelsize=fontsize)
 
+        # -------------------------------------------------
+        # 5. Tick params
+        # Important:
+        # Do not pass colors=None to Matplotlib.
+        # -------------------------------------------------
+        tick_params = {
+            "axis": "y",
+            "labelsize": fontsize,
+        }
+
+        final_tick_color = tick_color if tick_color is not None else label_color
+
+        if final_tick_color is not None:
+            tick_params["colors"] = final_tick_color
+
+        target_ax.tick_params(**tick_params)
+
+        # -------------------------------------------------
+        # 6. Tick locator
+        # -------------------------------------------------
         if tick_step is not None:
-            self._ax.yaxis.set_major_locator(MultipleLocator(tick_step))
+            target_ax.yaxis.set_major_locator(MultipleLocator(tick_step))
+
+        # -------------------------------------------------
+        # 7. Axis label
+        # Important:
+        # Do not force color=None.
+        # -------------------------------------------------
+        if label is not None:
+            label_kwargs = {
+                "fontsize": label_fontsize if label_fontsize is not None else fontsize,
+            }
+
+            final_label_color = label_color if label_color is not None else final_tick_color
+
+            if final_label_color is not None:
+                label_kwargs["color"] = final_label_color
+
+            target_ax.set_ylabel(label, **label_kwargs)
+
+        # -------------------------------------------------
+        # 8. Spine color
+        # Important:
+        # Do not force color=None.
+        # -------------------------------------------------
+        final_spine_color = spine_color if spine_color is not None else final_tick_color
+
+        if final_spine_color is not None:
+            target_ax.spines[spine_name].set_color(final_spine_color)
+
+        return self
 
     # =========================
     # Metodos de titulos subtitulos y fuente
     # =========================
-    def set_titles(
+    def add_titles(
         self,
         title: str | None = None,
         title_font_size: int = 12,
         subtitle: str | None = None,
         subtitle_font_size: int = 9
-    ) -> None:
+    ) -> Self:
         """
         Add a main title and subtitle to the active figure.
 
@@ -396,6 +627,8 @@ class Graph_base(Graph_meta_data):
                 color="#333333"
             )
 
+        return self
+
     def add_source(
         self,
         text: str | list | None = None,
@@ -404,7 +637,7 @@ class Graph_base(Graph_meta_data):
         fontsize: float = 6,
         color: str = "#606060",
         line_spacing: float = 0.022,
-    ):
+    ) -> Self:
         """
         Add a source note or footer text to the active figure.
 
@@ -438,7 +671,7 @@ class Graph_base(Graph_meta_data):
             If more than four source lines are provided.
         """
         if text is None:
-            return None
+            return self
         
         if isinstance(text, str):
             lines = [text]
@@ -461,6 +694,8 @@ class Graph_base(Graph_meta_data):
                 color=color
             )
 
+        return self
+
     def add_legend(
             self,
             show: bool = False,
@@ -472,7 +707,7 @@ class Graph_base(Graph_meta_data):
             edgecolor: str = "white",
             facecolor: str = "white",
             framealpha: float = 0.6
-    ) -> None:
+    ) -> Self:
         """
         Add and style a legend for the active axis.
 
@@ -508,7 +743,7 @@ class Graph_base(Graph_meta_data):
         """
 
         if not show:
-            return None
+            return self
 
         handles, labels = self._ax.get_legend_handles_labels()
 
@@ -537,7 +772,7 @@ class Graph_base(Graph_meta_data):
             seen.add(lab)
 
         if len(final_handles) == 0:
-            return None
+            return self
 
         self._ax.legend(
             final_handles,
@@ -552,13 +787,15 @@ class Graph_base(Graph_meta_data):
             framealpha=framealpha
         )
 
+        return self
+
     def add_legend_point(
         self,
         label: str,
         color: str,
         marker: str = "o",
         markersize: float = 6,
-    ):
+    ) -> Self:
         
         """
         Register a custom point-style legend item for the active axis.
@@ -577,7 +814,7 @@ class Graph_base(Graph_meta_data):
         }
 
         if label in existing_labels:
-            return None
+            return self
 
         self._custom_legend_handles.append(
             Line2D(
@@ -593,20 +830,24 @@ class Graph_base(Graph_meta_data):
             )
         )
 
+        return self
+
     # =========================
     # Metodos de la figura general
     # =========================
-    def show(self) -> None:
+    def show(self: Self) -> Self:
         """
-        Display the active Matplotlib figure.
+        Display the active Matplotlib figure and keep the chain alive.
 
         Returns
         -------
-        None
-            The active figure is displayed if it exists.
+        Graph_base
+            The current graph object.
         """
         if self._fig:
-            return self._fig.show()
+            self._fig.show()
+
+        return self
 
     def save(
         self,
@@ -614,7 +855,7 @@ class Graph_base(Graph_meta_data):
         name: str = "graph_1",
         dpi: int = 400,
         reset_buffers: bool = True
-    ):
+    ) -> Self:
         """
         Save the active figure into an in-memory PNG buffer.
 
@@ -653,16 +894,30 @@ class Graph_base(Graph_meta_data):
 
         if reset_buffers:
             self._fig = None
-            self._ax = None
+            self._meta_data = None
             self._axes = None
             self._axes_shape = None
-            self._axes_state = None
-            self._active_ax_idx = 0
-            self._xmeta = None
-            self._bar_meta = None
+
+            self._ax_idx = None
+            self._df_idx = None
+            self._ax = None
+            self._df = None
+
+            self._ticker_label_color = None
+            self._x_axis_fechas = None
+            self._x_axis_mode = None
+            self._x_vals = None
             self._months = None
             self._years = None
-            self._custom_legend_handles = None
+
+            self._bar_mode = None
+            self._bar_stacked = None
+            self._bar_grouped = None
+            self._bar_rects = None
+
+            self._custom_legend_handles = []
+
+        return self
 
     def plot(
         self,
@@ -679,7 +934,7 @@ class Graph_base(Graph_meta_data):
         width_ratios: list[float] | None = None,
         hspace: float | None = None,
         wspace: float | None = None
-    ) -> None:
+    ) -> Self:
         """
         Create the base Matplotlib figure and axes layout.
 
@@ -838,34 +1093,108 @@ class Graph_base(Graph_meta_data):
                 bottom=0.30
             )
 
+        return self
+
     # =========================
     # Metodos de as etiquetas, guias y sombras
     # =========================
-    def horizontal_guides(self, mostrar_cero=True):
+    def horizontal_guides(
+        self,
+        mostrar_cero: bool = True,
+        side: str = "left",
+        ax=None,
+        linestyle: str = "--",
+        linewidth: float = 0.5,
+        color: str = "gray",
+        alpha: float = 0.35,
+        zero_color: str | None = None,
+        zero_linestyle: str | None = None,
+        zero_linewidth: float = 0.8,
+        zero_alpha: float | None = None,
+        zorder: int = 0,
+    ):
         """
-        Add horizontal guide lines to the active axis.
+        Add horizontal guide lines to one or both y-axes.
 
         Parameters
         ----------
-        mostrar_cero : bool, default True
+        mostrar_cero:
             Whether to add a highlighted horizontal line at y=0.
+        side:
+            Axis side where guides should be applied. Use 'left', 'right', or 'both'.
+        ax:
+            Explicit Matplotlib axis to apply guides to. If provided, side is ignored
+            for axis selection.
+        linestyle:
+            Grid line style.
+        linewidth:
+            Grid line width.
+        color:
+            Grid line color.
+        alpha:
+            Grid line transparency.
+        zero_color:
+            Color of the zero line. If None, uses color.
+        zero_linestyle:
+            Style of the zero line. If None, uses linestyle.
+        zero_linewidth:
+            Width of the zero line.
+        zero_alpha:
+            Transparency of the zero line. If None, uses alpha.
+        zorder:
+            Drawing order of the guide lines.
 
         Returns
         -------
-        None
-            Grid lines are applied directly to the active axis.
+        Graph_base
+            Current graph object.
         """
+        if ax is not None:
+            axes = [ax]
 
-        self._ax.yaxis.grid(
-            True,
-            linestyle='--',
-            linewidth=0.5,
-            color='gray',
-            alpha=0.35
-        )
-        self._ax.set_axisbelow(True)
-        if mostrar_cero:
-            self._ax.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+        elif side == "left":
+            axes = [self._ax]
+
+        elif side == "right":
+            if getattr(self, "_right_ax", None) is None:
+                raise RuntimeError("No right axis exists for the active chart.")
+            axes = [self._right_ax]
+
+        elif side == "both":
+            axes = [self._ax]
+
+            if getattr(self, "_right_ax", None) is not None:
+                axes.append(self._right_ax)
+
+        else:
+            raise ValueError("side must be 'left', 'right', or 'both'.")
+
+        for target_ax in axes:
+            if target_ax is None:
+                continue
+
+            target_ax.yaxis.grid(
+                True,
+                linestyle=linestyle,
+                linewidth=linewidth,
+                color=color,
+                alpha=alpha,
+                zorder=zorder,
+            )
+
+            target_ax.set_axisbelow(True)
+
+            if mostrar_cero:
+                target_ax.axhline(
+                    0,
+                    color=zero_color if zero_color is not None else color,
+                    linestyle=zero_linestyle if zero_linestyle is not None else linestyle,
+                    linewidth=zero_linewidth,
+                    alpha=zero_alpha if zero_alpha is not None else alpha,
+                    zorder=zorder,
+                )
+
+        return self
 
     def tag(
         self,
@@ -885,7 +1214,7 @@ class Graph_base(Graph_meta_data):
         text_edge_color: str | None = None,
         text_edge_width: float = 0.0,
         zorder: int = 6,
-    ):
+    ) -> Self:
         """
         Add a text annotation to a specific chart coordinate.
 
@@ -992,6 +1321,8 @@ class Graph_base(Graph_meta_data):
             annotation.set_path_effects([
                 path_effects.withStroke(linewidth=text_edge_width, foreground=text_edge_color)
             ])
+
+        return self
     
     def dot(
         self,
@@ -1000,7 +1331,7 @@ class Graph_base(Graph_meta_data):
         color="red",
         size=30,
         zorder=5
-    ):
+    ) -> Self:
         """
         Add a highlighted point marker to the active chart.
 
@@ -1062,6 +1393,8 @@ class Graph_base(Graph_meta_data):
             zorder=zorder
         )
 
+        return self
+
     def shade_x(
         self,
         periods,
@@ -1073,7 +1406,7 @@ class Graph_base(Graph_meta_data):
         ymin=0.0,
         ymax=1.0,
         clip_to_xlim=True,
-    ):
+    ) -> Self:
         """
         Add shaded vertical regions to the active chart.
 
@@ -1347,46 +1680,205 @@ class Graph_base(Graph_meta_data):
                 hatch=hat
             )
 
-    def horizontal_lines(
-            self,
-            y_values: list[float] | float | None = None,
-            linestyle: str | None = None,
-            linewidth: float = 0.5,
-            color: str = "gray",
-    ) -> None:
+        return self
+
+    # =========================
+    # Metodos de lineas
+    # =========================
+    def vertical_lines(
+        self: Self,
+        x_values: list[float | str | pd.Timestamp] | float | str | pd.Timestamp | None = None,
+        linestyle: str | None = None,
+        linewidth: float = 0.5,
+        color: str = "gray",
+        alpha: float = 1.0,
+        ymin: float = 0.0,
+        ymax: float = 1.0,
+        labels: list[str] | str | None = None,
+        zorder: int = 4,
+    ) -> Self:
         """
-        Add one or more horizontal reference lines to the active axis.
+        Add one or more vertical reference lines to the active axis.
+
+        This method supports standard numeric, datetime, categorical, and
+        Bloomberg-style x-axis modes. It is intended to be used as a chainable
+        public helper after a chart has been created.
 
         Parameters
         ----------
-        y_values : float, list[float], or None, optional
-            Y-axis value or values where horizontal lines should be drawn. If None,
-            no lines are added.
-        linestyle : str or None, optional
+        x_values:
+            X-axis value or values where vertical lines should be drawn.
+            If None, no lines are added.
+        linestyle:
             Matplotlib line style used for the reference lines.
-        linewidth : float, default 0.5
+        linewidth:
             Width of the reference lines.
-        color : str, default "gray"
+        color:
             Color of the reference lines.
+        alpha:
+            Transparency of the reference lines.
+        ymin:
+            Lower vertical bound of the line in axis-relative coordinates.
+        ymax:
+            Upper vertical bound of the line in axis-relative coordinates.
+        labels:
+            Optional label or list of labels for legend integration.
+        zorder:
+            Drawing order of the reference lines.
 
         Returns
         -------
-        None
-            Horizontal lines are added directly to the active axis.
+        Graph_base
+            The current graph object.
+        """
+        if x_values is None:
+            return self
+
+        if not hasattr(self, "_ax") or self._ax is None:
+            raise RuntimeError("No active axis found. Create a chart before adding vertical lines.")
+
+        if not isinstance(x_values, (list, tuple, set)):
+            x_values = [x_values]
+        else:
+            x_values = list(x_values)
+
+        if labels is None:
+            labels = [None] * len(x_values)
+        elif isinstance(labels, str):
+            labels = [labels] + [None] * (len(x_values) - 1)
+        else:
+            labels = list(labels)
+            if len(labels) < len(x_values):
+                labels = labels + [None] * (len(x_values) - len(labels))
+
+        mode = self._x_axis_mode
+
+        for i, x in enumerate(x_values):
+            label = labels[i] if i < len(labels) else None
+
+            if mode == "bbg":
+                x_plot = self._coerce_to_bbg_x(x)
+
+            elif mode == "datetime":
+                try:
+                    x_conv = pd.to_datetime(x)
+                except Exception:
+                    x_conv = x
+
+                x_plot = self._ax.convert_xunits(x_conv)
+
+                if np.ndim(x_plot) > 0:
+                    x_plot = np.asarray(x_plot).item()
+
+            elif mode == "categorical":
+                x_plot = x
+
+                if isinstance(x, str):
+                    xticklabels = [tick.get_text() for tick in self._ax.get_xticklabels()]
+
+                    if x in xticklabels:
+                        x_plot = xticklabels.index(x)
+
+            else:
+                x_plot = x
+
+            self._ax.axvline(
+                x=x_plot,
+                ymin=ymin,
+                ymax=ymax,
+                color=color,
+                linestyle=linestyle,
+                linewidth=linewidth,
+                alpha=alpha,
+                label=label,
+                zorder=zorder,
+            )
+
+        return self
+
+    def horizontal_lines(
+        self,
+        y_values: list[float] | float | None = None,
+        linestyle: str | None = None,
+        linewidth: float = 0.5,
+        color: str = "gray",
+        alpha: float = 1.0,
+        side: str = "left",
+        ax=None,
+        label: str | None = None,
+        zorder: int = 4,
+    ):
+        """
+        Add one or more horizontal reference lines to one y-axis.
+
+        Parameters
+        ----------
+        y_values:
+            Y-axis value or values where horizontal lines should be drawn.
+            If None, no lines are added.
+        linestyle:
+            Matplotlib line style used for the reference lines.
+        linewidth:
+            Width of the reference lines.
+        color:
+            Color of the reference lines.
+        alpha:
+            Transparency of the reference lines.
+        side:
+            Axis side where lines should be added. Use 'left' or 'right'.
+        ax:
+            Explicit Matplotlib axis to use. If provided, side is ignored for
+            axis selection.
+        label:
+            Optional legend label. Applied only to the first line to avoid duplicates.
+        zorder:
+            Drawing order of the reference lines.
+
+        Returns
+        -------
+        Graph_base
+            Current graph object.
         """
         if y_values is None:
-            return None
+            return self
+
+        if ax is not None:
+            target_ax = ax
+
+        elif side == "right":
+            if getattr(self, "_right_ax", None) is None:
+                raise RuntimeError("No right axis exists for the active chart.")
+            target_ax = self._right_ax
+
+        elif side == "left":
+            target_ax = self._ax
+
+        else:
+            raise ValueError("side must be either 'left' or 'right'.")
+
+        if target_ax is None:
+            raise RuntimeError("No axis available. Create a chart before adding lines.")
 
         if isinstance(y_values, (int, float)):
             y_values = [y_values]
-        
-        for y in y_values:
-            self._ax.axhline(y, color=color, linestyle=linestyle, linewidth=linewidth)
+
+        for i, y in enumerate(y_values):
+            target_ax.axhline(
+                y,
+                color=color,
+                linestyle=linestyle,
+                linewidth=linewidth,
+                alpha=alpha,
+                label=label if i == 0 else None,
+                zorder=zorder,
+            )
+
+        return self
 
     # =========================
     # Metodos para agregar recesiones a las graficas
     # =========================
-    def add_recesiones(
+    def add_recessions(
             self,
             country: str = "United States",
             data_frame: bool = False,

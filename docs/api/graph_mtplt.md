@@ -78,7 +78,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 --------
 ## Titles
 --------
-::: helpers_ps.MtpltGraph.base.Graph_base.set_titles
+::: helpers_ps.MtpltGraph.base.Graph_base.add_titles
     options:
       heading_level: 3
       show_root_heading: true
@@ -154,6 +154,24 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 ---------
 
 ::: helpers_ps.MtpltGraph.base.Graph_base.horizontal_lines
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+---------
+
+::: helpers_ps.MtpltGraph.base.Graph_base.vertical_lines
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+---------
+
+::: helpers_ps.MtpltGraph.base.Graph_base.add_recessions
     options:
       heading_level: 3
       show_root_heading: true

@@ -5,17 +5,11 @@ import locale
 import warnings
 from dataclasses import dataclass, field
 from importlib.resources import files
-
-import matplotlib as mpl
 import matplotlib.dates as mdates
-import matplotlib.font_manager as fm
 import matplotlib.patheffects as path_effects
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter, MultipleLocator
+from typing import Self
 
 try:
     from helpers_ps.GlobVars.var_globs import PALETA_COLORES
@@ -116,33 +110,54 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # Legend metadata
         self._custom_legend_handles = []
 
+        # Secondary y-axis metadata
+        self._right_ax = None
+        self._axis_map = None
+        self._right_axis_enabled = False
+        self._right_axis_config = None
+        self._y_axis_right = None
+
     def graph_line(
         self,
         # --- Configuración del grafico
         figsize: tuple[float, float] = (6.00, 5.00),                        # Tamaño del grafico configuración general es (6,4.8) --> tamaño estandard
+        
         # --- Configuración de los elementos adicionales del grafico
         titles: dict | None = None,                                         # titulo de la grafica
         source: dict | None = None,                                         # Fuente de datos del grafico
+        
         # --- Configuración de df
         df_index: int = 0,                                                  # índice del dataframe a usar (en caso de tener varios)
+
         # --- Configuración de las series
         tickers: list[str] | str = "all",                                   # tickers en evaluación del dataframe
         labels: list[str] | str | None = None,                              # etiquetas de los tickers en el orden dado, sino defaultea a los tickers
         colors: list["str"] | str = PALETA_COLORES,                         # Lista de colors para cada uno de los tickers en evaluación
         lw: float=1.6,                                                      # grosor de línea
+
         # --- Configuración de etiquetas en la linea
         tag_dot: dict = None,
-        # --- Configuración del eje y
+
+        # --- Configuración del eje y izquierdo
         y_axis: dict = None,
+
+        # --- Configuración del eje y derecho
+        axis_side: str | list[str] | dict[str, str] | None = None,
+        y_axis_right: dict | None = None,
+        right_axis: dict | None = None,
+
         # --- Configuración del eje x
         x_axis: dict = None,
+        
         # --- Configuración Leyenda
         legend: dict | None = None,                                    # None = auto (solo si hay >1 serie y labels)
+        
         # --- Configuración lineas horizontales
         hlines: dict | None = None,                           # agregar lineas horizontales en el grafico
+        
         # --- Mostrar guias horizontales
         show_hguide: bool = False
-    ) -> None:
+    ) -> Self:
 
         """
         Create an institutional line chart from selected DataFrame columns.
@@ -157,7 +172,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         figsize : tuple[float, float], default (6.00, 5.00)
             Figure size in inches.
         titles : dict or None, optional
-            Configuration passed to `set_titles` to define chart titles and subtitles.
+            Configuration passed to `add_titles` to define chart titles and subtitles.
         source : dict or None, optional
             Configuration passed to `add_source` to display the data source note.
         df_index : int, default 0
@@ -233,12 +248,54 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # --- 5. Asignación de ticker label color
         self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i,t in enumerate(tickers)]
 
+        # --- 5B. Normalización del eje por serie: left / right
+        # Backward compatibility:
+        # If axis_side is None, every ticker is plotted on the left axis.
+        if axis_side is None:
+            axis_map = {t: "left" for t in tickers}
+        elif isinstance(axis_side, str):
+            if axis_side not in {"left", "right"}:
+                raise ValueError(
+                    "axis_side must be 'left', 'right', a list, or a dictionary."
+                )
+
+            axis_map = {t: axis_side for t in tickers}
+        elif isinstance(axis_side, list):
+            if len(axis_side) < len(tickers):
+                axis_side = axis_side + ["left"] * (len(tickers) - len(axis_side))
+
+            axis_map = {
+                t: axis_side[i]
+                for i, t in enumerate(tickers)
+            }
+        elif isinstance(axis_side, dict):
+            axis_map = {
+                t: axis_side.get(t, "left")
+                for t in tickers
+            }
+        else:
+            raise TypeError(
+                "axis_side must be None, str, list, or dict."
+            )
+
+        self._axis_map = axis_map
+
+        invalid_axis_values = {
+            side for side in axis_map.values()
+            if side not in {"left", "right"}
+        }
+
+        if invalid_axis_values:
+            raise ValueError(
+                "axis_side values must be only 'left' or 'right'."
+            )
+
         # --- 6. revision de dicts
         x_axis = x_axis if x_axis is not None else dict()
         y_axis = y_axis if y_axis is not None else dict()
+        y_axis_right = y_axis_right if y_axis_right is not None else dict()
+        right_axis = right_axis if right_axis is not None else dict()
         titles = titles if titles is not None else dict()
-        y_axis = y_axis if y_axis is not None else dict()
-        legend = legend if legend is not None else dict()
         legend = legend if legend is not None else dict()
         hlines = hlines if hlines is not None else dict()
         source = source if source is not None else dict()
@@ -247,8 +304,23 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         if not hasattr(self, "_ax") or self._ax is None:
             self.plot(figsize=figsize)
 
+        # --- 7B. Crear eje derecho solo si alguna serie lo requiere
+        left_ax = self._ax
+        right_ax = getattr(self, "_right_ax", None)
+
+        needs_right_axis = any(side == "right" for side in axis_map.values())
+
+        if needs_right_axis:
+            if right_ax is None:
+                right_ax = left_ax.twinx()
+
+            self._right_ax = right_ax
+            self._right_axis_enabled = True
+        else:
+            self._right_axis_enabled = right_ax is not None
+
         # --- 8. Agregar titulos globales
-        self.set_titles(**titles)
+        self.add_titles(**titles)
         self.add_source(**source)
 
         # --- 9. Manejo del eje x
@@ -264,32 +336,187 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             lab = labels[i] if labels is not None and i < len(labels) else None
             col = colors[i] if colors is not None and i < len(colors) else "#2F71E5"
 
+            selected_side = axis_map.get(t, "left")
+            plot_ax = right_ax if selected_side == "right" else left_ax
+
+            if plot_ax is None:
+                raise RuntimeError("Right axis was not initialized correctly.")
+
             if self._x_axis_mode == "bbg":
-                # Alinear series al calendario común
                 serie = s.reindex(self._x_axis_fechas)[t]
 
-                self._ax.plot(self._x_vals, serie.to_numpy(), color=col, lw=lw, label=lab)
+                plot_ax.plot(
+                    self._x_vals,
+                    serie.to_numpy(),
+                    color=col,
+                    lw=lw,
+                    label=lab,
+                )
 
             else:
-                self._ax.plot(s.index, s[t], color=col, lw=lw, label=lab)
+                plot_ax.plot(
+                    s.index,
+                    s[t],
+                    color=col,
+                    lw=lw,
+                    label=lab,
+                )
         
 
         # --- 11 Graficar ultimo valores
-        self._line_label_generate(tag_dot)
+        if tag_dot:
+            tag_dot_left = {}
+            tag_dot_right = {}
 
-        # --- 12. Configuración del eje y
-        self.prep_y_axis(**y_axis)
+            for control_name, control in tag_dot.items():
+                ticker = control.get("ticker")
+
+                if ticker is None:
+                    tag_dot_left[control_name] = control
+                    continue
+
+                if axis_map.get(ticker, "left") == "right":
+                    tag_dot_right[control_name] = control
+                else:
+                    tag_dot_left[control_name] = control
+
+            if tag_dot_left:
+                self._ax = left_ax
+                self._line_label_generate(tag_dot_left)
+
+            if tag_dot_right:
+                if right_ax is None:
+                    raise RuntimeError(
+                        "Right axis was not initialized for right-side tags."
+                    )
+
+                self._ax = right_ax
+                self._line_label_generate(tag_dot_right)
+
+            self._ax = left_ax
+
+        # --- 12. Configuración del eje y izquierdo
+        self.prep_y_axis(
+            ax=left_ax,
+            side="left",
+            **y_axis,
+        )
+
+        # --- 12B. Configuración del eje y derecho
+        if right_ax is not None:
+            right_y_axis = right_axis.copy()
+            right_y_axis.update(y_axis_right)
+
+            self.prep_y_axis(
+                ax=right_ax,
+                side="right",
+                **right_y_axis,
+            )
+
+        self._ax = left_ax
+
+        # --- 12B. Configuración del eje y derecho
+        if right_ax is not None:
+            self._ax = right_ax
+            self.prep_y_axis(**y_axis_right)
+
+            right_label = right_axis.get("label")
+            right_label_color = right_axis.get("label_color", "#333333")
+            right_tick_color = right_axis.get("tick_color", right_label_color)
+            right_spine_color = right_axis.get("spine_color", right_tick_color)
+
+            if right_label is not None:
+                right_ax.set_ylabel(
+                    right_label,
+                    color=right_label_color,
+                    fontsize=right_axis.get("labelsize", 8),
+                )
+
+            right_ax.tick_params(
+                axis="y",
+                colors=right_tick_color,
+                labelsize=right_axis.get("fontsize", 7),
+            )
+
+            right_ax.spines["right"].set_color(right_spine_color)
+
+        self._ax = left_ax
 
         # -- 13. Agregar lineas horizontales
-        self.horizontal_lines(**hlines)
-        
+        self.horizontal_lines(
+            side="left",
+            **hlines,
+        )
+
         # -- 14. Agregar guias horizontales
         if show_hguide:
-            self.horizontal_guides(mostrar_cero=False)
+            guide_side = "both" if right_ax is not None else "left"
+
+            self.horizontal_guides(
+                side=guide_side,
+                mostrar_cero=False,
+            )
             
 
         # --- 15. Agregar leyenda
-        self.add_legend(**legend)
+        if right_ax is None:
+            self._ax = left_ax
+            self.add_legend(**legend)
+
+        else:
+            show_legend = legend.get("show", False)
+
+            if show_legend:
+                legend_config = legend.copy()
+                legend_config.pop("show", None)
+
+                left_handles, left_labels = left_ax.get_legend_handles_labels()
+                right_handles, right_labels = right_ax.get_legend_handles_labels()
+
+                handles = left_handles + right_handles
+                legend_labels = left_labels + right_labels
+
+                custom_handles = getattr(self, "_custom_legend_handles", None)
+
+                if custom_handles:
+                    handles = handles + custom_handles
+                    legend_labels = legend_labels + [
+                        h.get_label()
+                        for h in custom_handles
+                    ]
+
+                final_handles = []
+                final_labels = []
+                seen = set()
+
+                for handle, label in zip(handles, legend_labels):
+                    if label is None or label == "" or label.startswith("_"):
+                        continue
+
+                    if label in seen:
+                        continue
+
+                    final_handles.append(handle)
+                    final_labels.append(label)
+                    seen.add(label)
+
+                if final_handles:
+                    left_ax.legend(
+                        final_handles,
+                        final_labels,
+                        loc=legend_config.get("loc", "upper left"),
+                        bbox_to_anchor=legend_config.get("bbox_to_anchor"),
+                        ncol=legend_config.get("ncol", 3),
+                        fontsize=legend_config.get("fontsize", 7),
+                        frameon=legend_config.get("frameon", True),
+                        edgecolor=legend_config.get("edgecolor", "white"),
+                        facecolor=legend_config.get("facecolor", "white"),
+                        framealpha=legend_config.get("framealpha", 0.6),
+                    )
+
+        self._ax = left_ax
+
+        return self
 
     def graph_bar(
         self,
@@ -312,6 +539,11 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         x_axis: dict | None = None,
         y_axis: dict | None = None,
 
+        # --- Configuración del eje y derecho
+        axis_side: str | list[str] | dict[str, str] | None = None,
+        y_axis_right: dict | None = None,
+        right_axis: dict | None = None,
+
         # --- Configuración de barras
         bar_mode: str = "auto",       # "auto" | "time" | "last"
         stacked: bool = False,
@@ -330,7 +562,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
         # --- Mostrar guias horizontales
         show_hguide: bool = False
-    ) -> None:
+    ) -> Self:
 
         """
         Create an institutional bar chart from selected DataFrame columns.
@@ -345,7 +577,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         figsize : tuple[float, float], default (6.00, 5.00)
             Figure size in inches.
         titles : dict or None, optional
-            Configuration passed to `set_titles` to define chart titles and subtitles.
+            Configuration passed to `add_titles` to define chart titles and subtitles.
         source : dict or None, optional
             Configuration passed to `add_source` to display the data source note.
         df_index : int, default 0
@@ -447,19 +679,100 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # --- 5. Asignación de ticker label color
         self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i in range(len(tickers))]
 
+        # --- 5B. Normalización del eje por serie: left / right
+        # Backward compatibility:
+        # If axis_side is None, every ticker is plotted on the left axis.
+        if axis_side is None:
+            axis_map = {t: "left" for t in tickers}
+
+        elif isinstance(axis_side, str):
+            if axis_side not in {"left", "right"}:
+                raise ValueError(
+                    "axis_side must be 'left', 'right', a list, or a dictionary."
+                )
+
+            axis_map = {t: axis_side for t in tickers}
+
+        elif isinstance(axis_side, list):
+            if len(axis_side) < len(tickers):
+                axis_side = axis_side + ["left"] * (len(tickers) - len(axis_side))
+
+            axis_map = {
+                t: axis_side[i]
+                for i, t in enumerate(tickers)
+            }
+
+        elif isinstance(axis_side, dict):
+            axis_map = {
+                t: axis_side.get(t, "left")
+                for t in tickers
+            }
+
+        else:
+            raise TypeError(
+                "axis_side must be None, str, list, or dict."
+            )
+
+        invalid_axis_values = {
+            side for side in axis_map.values()
+            if side not in {"left", "right"}
+        }
+
+        if invalid_axis_values:
+            raise ValueError(
+                "axis_side values must be only 'left' or 'right'."
+            )
+
+        self._axis_map = axis_map
+
+        if stacked and len(set(axis_map.values())) > 1:
+            raise ValueError(
+                "Mixed left/right axis sides are not supported for stacked bars. "
+                "Use one axis side for the full stack, or use grouped=True."
+            )
+
         # --- 6. Revisión de dicts
         x_axis = x_axis if x_axis is not None else dict()
         y_axis = y_axis if y_axis is not None else dict()
+        y_axis_right = y_axis_right if y_axis_right is not None else dict()
+        right_axis = right_axis if right_axis is not None else dict()
         titles = titles if titles is not None else dict()
         source = source if source is not None else dict()
         legend = legend if legend is not None else dict()
         hlines = hlines if hlines is not None else dict()
         bar_labels = bar_labels if bar_labels is not None else dict()
 
+        self._right_axis_config = right_axis.copy()
+        self._y_axis_right = y_axis_right.copy()
 
         # --- 7. Generación del gráfico y el plot en caso no exista
         if not hasattr(self, "_ax") or self._ax is None:
             self.plot(figsize=figsize)
+
+        # --- 7B. Crear o reutilizar eje derecho
+        left_ax = self._ax
+        right_ax = getattr(self, "_right_ax", None)
+
+        needs_right_axis = any(side == "right" for side in axis_map.values())
+
+        if needs_right_axis:
+            if right_ax is None:
+                right_ax = left_ax.twinx()
+
+            self._right_ax = right_ax
+            self._right_axis_enabled = True
+        else:
+            self._right_axis_enabled = right_ax is not None
+
+        def _get_plot_axis(ticker: str):
+            selected_side = axis_map.get(ticker, "left")
+
+            if selected_side == "right":
+                if right_ax is None:
+                    raise RuntimeError("Right axis was not initialized correctly.")
+                return right_ax
+
+            return left_ax
 
         # --- 8. Definición automática del modo
         if bar_mode == "auto":
@@ -471,7 +784,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._bar_mode = bar_mode
 
         # --- 9. Agregar títulos globales
-        self.set_titles(**titles)
+        self.add_titles(**titles)
         self.add_source(**source)
 
         bars_data = {}
@@ -494,11 +807,12 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             # --- A. Un ticker
             if m == 1:
                 t = tickers[0]
+                plot_ax = _get_plot_axis(t)
                 s = db[[t]].copy()
 
                 if self._x_axis_mode == "bbg":
                     serie = s.reindex(self._x_axis_fechas)[t]
-                    bars = self._ax.bar(
+                    bars = plot_ax.bar(
                         self._x_vals,
                         serie.to_numpy(),
                         width=min(bar_width, 0.85),
@@ -508,7 +822,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                         zorder=3
                     )
                 else:
-                    bars = self._ax.bar(
+                    bars = plot_ax.bar(
                         s.index,
                         s[t],
                         width=min(bar_width, 0.85),
@@ -531,10 +845,11 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                         width = min(bar_width / m, 0.8 / m)
 
                         for i, t in enumerate(tickers):
+                            plot_ax = _get_plot_axis(t)
                             serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
                             offset = (i - (m - 1) / 2) * width
 
-                            bars = self._ax.bar(
+                            bars = plot_ax.bar(
                                 base_x + offset,
                                 serie.to_numpy(),
                                 width=width,
@@ -561,8 +876,10 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                             width = group_total / m
 
                             for i, t in enumerate(tickers):
+                                plot_ax = _get_plot_axis(t)
                                 offset = (i - (m - 1) / 2) * width
-                                bars = self._ax.bar(
+
+                                bars = plot_ax.bar(
                                     x_num + offset,
                                     np.asarray(db[t].values, dtype=float),
                                     width=width,
@@ -586,8 +903,10 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                             width = group_total / m
 
                             for i, t in enumerate(tickers):
+                                plot_ax = _get_plot_axis(t)
                                 offset = (i - (m - 1) / 2) * width
-                                bars = self._ax.bar(
+
+                                bars = plot_ax.bar(
                                     x_num + offset,
                                     np.asarray(db[t].values, dtype=float),
                                     width=width,
@@ -607,8 +926,10 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                             width = min(bar_width / m, 0.8 / m)
 
                             for i, t in enumerate(tickers):
+                                plot_ax = _get_plot_axis(t)
                                 offset = (i - (m - 1) / 2) * width
-                                bars = self._ax.bar(
+
+                                bars = plot_ax.bar(
                                     x + offset,
                                     np.asarray(db[t].values, dtype=float),
                                     width=width,
@@ -622,12 +943,13 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                                     "bars": bars
                                 }
 
-                            self._ax.set_xticks(x)
+                            left_ax.set_xticks(x)
                             _x_font = x_axis.get("fontsize", 8)
-                            self._ax.set_xticklabels([str(v) for v in db.index], fontsize=_x_font)
+                            left_ax.set_xticklabels([str(v) for v in db.index], fontsize=_x_font)
 
                 # -------- stacked --------
                 else:
+                    stack_axis = _get_plot_axis(tickers[0])
                     if self._x_axis_mode == "bbg":
                         bottom_pos = np.zeros(len(self._x_vals), dtype=float)
                         bottom_neg = np.zeros(len(self._x_vals), dtype=float)
@@ -643,7 +965,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                             bars_neg = None
 
                             if np.any(y_pos != 0):
-                                bars_pos = self._ax.bar(
+                                bars_pos = stack_axis.bar(
                                     self._x_vals,
                                     y_pos,
                                     width=min(bar_width, 0.85),
@@ -656,7 +978,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                                 bottom_pos = bottom_pos + y_pos
 
                             if np.any(y_neg != 0):
-                                bars_neg = self._ax.bar(
+                                bars_neg = stack_axis.bar(
                                     self._x_vals,
                                     y_neg,
                                     width=min(bar_width, 0.85),
@@ -745,10 +1067,11 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 width = min(bar_width / max(m, 1), 0.8 / max(m, 1))
 
                 for i, t in enumerate(tickers):
+                    plot_ax = _get_plot_axis(t)
                     offset = (i - (m - 1) / 2) * width
                     y = vals_matrix[:, i]
 
-                    bars = self._ax.bar(
+                    bars = plot_ax.bar(
                         x + offset,
                         y,
                         width=width,
@@ -764,6 +1087,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
             # -------- stacked --------
             elif stacked:
+                stack_axis = _get_plot_axis(tickers[0])
                 bottom_pos = np.zeros(len(x), dtype=float)
                 bottom_neg = np.zeros(len(x), dtype=float)
 
@@ -777,7 +1101,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                     bars_neg = None
 
                     if np.any(y_pos != 0):
-                        bars_pos = self._ax.bar(
+                        bars_pos = stack_axis.bar(
                             x,
                             y_pos,
                             width=min(bar_width, 0.85),
@@ -790,7 +1114,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                         bottom_pos = bottom_pos + y_pos
 
                     if np.any(y_neg != 0):
-                        bars_neg = self._ax.bar(
+                        bars_neg = stack_axis.bar(
                             x,
                             y_neg,
                             width=min(bar_width, 0.85),
@@ -809,9 +1133,11 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                     }
             # -------- default: first ticker only --------
             else:
+                t = tickers[0]
+                plot_ax = _get_plot_axis(t)
                 y = vals_matrix[:, 0]
 
-                bars = self._ax.bar(
+                bars = plot_ax.bar(
                     x,
                     y,
                     width=min(bar_width, 0.85),
@@ -825,9 +1151,9 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                     "bars": bars
                 }
 
-            self._ax.set_xticks(x)
-            _x_font = x_axis.get("fontsize", 8)
-            self._ax.set_xticklabels(cats, fontsize=_x_font)
+                left_ax.set_xticks(x)
+                _x_font = x_axis.get("fontsize", 8)
+                left_ax.set_xticklabels(cats, fontsize=_x_font)
 
         else:
             raise ValueError("bar_mode must be one of: 'auto', 'time', 'last'")
@@ -836,21 +1162,134 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._bars_data = bars_data
         self._bars_stacked = stacked
 
-        # --- 10. Configuración del eje y
-        self.prep_y_axis(**y_axis)
+        # --- 10. Configuración del eje y izquierdo
+        self.prep_y_axis(
+            ax=left_ax,
+            side="left",
+            **y_axis,
+        )
+
+        # --- 10B. Configuración del eje y derecho
+        if right_ax is not None:
+            right_y_axis = right_axis.copy()
+            right_y_axis.update(y_axis_right)
+
+            self.prep_y_axis(
+                ax=right_ax,
+                side="right",
+                **right_y_axis,
+            )
+
+        self._ax = left_ax
 
         # --- 11. Agregar lineas horizontales
-        self.horizontal_lines(**hlines)
+        self.horizontal_lines(
+            side="left",
+            **hlines,
+        )
 
+        if show_hguide:
+            guide_side = "both" if right_ax is not None else "left"
+
+            self.horizontal_guides(
+                side=guide_side,
+                mostrar_cero=False,
+            )
+
+        
         # --- 12. Agregar guias horizontales
         if show_hguide:
             self.horizontal_guides(mostrar_cero=False)
 
         # --- 13. Agregar leyenda
-        self.add_legend(**legend)
+        if right_ax is None:
+            self._ax = left_ax
+            self.add_legend(**legend)
 
+        else:
+            show_legend = legend.get("show", False)
+
+            if show_legend:
+                legend_config = legend.copy()
+                legend_config.pop("show", None)
+
+                left_handles, left_labels = left_ax.get_legend_handles_labels()
+                right_handles, right_labels = right_ax.get_legend_handles_labels()
+
+                handles = left_handles + right_handles
+                legend_labels = left_labels + right_labels
+
+                custom_handles = getattr(self, "_custom_legend_handles", None)
+
+                if custom_handles:
+                    handles = handles + custom_handles
+                    legend_labels = legend_labels + [
+                        h.get_label()
+                        for h in custom_handles
+                    ]
+
+                final_handles = []
+                final_labels = []
+                seen = set()
+
+                for handle, label in zip(handles, legend_labels):
+                    if label is None or label == "" or label.startswith("_"):
+                        continue
+
+                    if label in seen:
+                        continue
+
+                    final_handles.append(handle)
+                    final_labels.append(label)
+                    seen.add(label)
+
+                if final_handles:
+                    left_ax.legend(
+                        final_handles,
+                        final_labels,
+                        loc=legend_config.get("loc", "upper left"),
+                        bbox_to_anchor=legend_config.get("bbox_to_anchor"),
+                        ncol=legend_config.get("ncol", 3),
+                        fontsize=legend_config.get("fontsize", 7),
+                        frameon=legend_config.get("frameon", True),
+                        edgecolor=legend_config.get("edgecolor", "white"),
+                        facecolor=legend_config.get("facecolor", "white"),
+                        framealpha=legend_config.get("framealpha", 0.6),
+                    )
+
+        # --- 14. Bar tags
         if bar_labels:
-            self._bar_value_label_generate_dict(label_dict=bar_labels)
+            bar_labels_left = {}
+            bar_labels_right = {}
+
+            for control_name, control in bar_labels.items():
+                ticker = control.get("ticker")
+
+                if ticker is None:
+                    bar_labels_left[control_name] = control
+                    continue
+
+                if axis_map.get(ticker, "left") == "right":
+                    bar_labels_right[control_name] = control
+                else:
+                    bar_labels_left[control_name] = control
+
+            if bar_labels_left:
+                self._ax = left_ax
+                self._bar_value_label_generate_dict(label_dict=bar_labels_left)
+
+            if bar_labels_right:
+                if right_ax is None:
+                    raise RuntimeError(
+                        "Right axis was not initialized for right-side bar labels."
+                    )
+
+                self._ax = right_ax
+                self._bar_value_label_generate_dict(label_dict=bar_labels_right)
+
+            self._ax = left_ax
+
+        return self
 
     def graph_pie(
         self,
@@ -877,7 +1316,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         text_edge_width: float = 0.0,
         label_color: str = "black",
         autopct_color: str = "white",
-    ) -> None:
+    ) -> Self:
 
         """
         Create an institutional pie or donut chart from a selected DataFrame row.
@@ -892,7 +1331,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         figsize : tuple[float, float], default (6.00, 5.00)
             Figure size in inches.
         titles : dict or None, optional
-            Configuration passed to `set_titles` to define chart titles and subtitles.
+            Configuration passed to `add_titles` to define chart titles and subtitles.
         source : str, list[str], or None, optional
             Source note displayed below the chart.
         df_index : int, default 0
@@ -1033,7 +1472,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             self.plot(figsize=figsize)
 
         self._ax.clear()
-        self.set_titles(**titles)
+        self.add_titles(**titles)
         if source:
             self.add_source(source)
 
@@ -1092,6 +1531,8 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             bottom=0.18
         )
 
+        return self
+
     def graph_box_whiskers(
         self,
         # --- Configuración del gráfico ---
@@ -1130,7 +1571,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # --- Configuración de otros factores ---
         hlines: dict | None = None,
         show_hguide: bool = False,
-    ):
+    ) -> Self:
 
         """
         Create an institutional box-and-whisker chart from selected DataFrame columns.
@@ -1146,7 +1587,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         figsize : tuple[float, float], default (6.00, 5.00)
             Figure size in inches.
         titles : dict or None, optional
-            Configuration passed to `set_titles` to define chart titles and subtitles.
+            Configuration passed to `add_titles` to define chart titles and subtitles.
         source : dict or None, optional
             Configuration passed to `add_source` to display the data source note.
         df_index : int, default 0
@@ -1255,7 +1696,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             self.plot(figsize=figsize)
 
         # --- 8. Agregar titulos globales
-        self.set_titles(**titles)
+        self.add_titles(**titles)
         self.add_source(**source)
 
         # --- 9. Manejo del eje x
@@ -1527,4 +1968,6 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self.prep_y_axis(**y_axis)
 
         self.add_legend(**legend)
+
+        return self
 
