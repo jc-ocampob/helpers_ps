@@ -16,6 +16,10 @@ except Exception:
     __version__ = "0.0.0"
 
 
+from GlobVars import (
+    PALETA_COLORES
+)
+
 # ============================================================
 # API pública - paquetes alternos
 # ============================================================
@@ -49,5 +53,6 @@ __all__ = [
     "FinCalculations",
     "BBGHelper"
     "Powerpoint",
-    "Excel"
+    "Excel",
+    "PALETA_COLORES"
 ]
