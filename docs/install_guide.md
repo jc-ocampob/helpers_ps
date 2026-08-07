@@ -3,7 +3,7 @@
 ## Downloading the package
 
 ```bash
-pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.13
+pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.0
 ```
 
 ---

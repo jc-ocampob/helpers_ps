@@ -2,28 +2,28 @@
 # 1. make code changes
 
 # 2. bump version in pyproject.toml
-# example: 0.1.0 -> 0.2.14
+# example: 0.1.0 -> 0.3.0
 
 # 3. optional: build locally to validate packaging
 python -m build
 
 # 4. commit
 git add .
-git commit -m "Release v0.2.14"
+git commit -m "Release v0.3.0"
 
 # 5. push branch
 git push origin main
 
 # 6. create tag
-git tag v0.2.14
-git push origin v0.2.14
+git tag v0.3.0
+git push origin v0.3.0
 
 
 # 7. Para instalaciones hacer lo siguiente reemplazando por la version v0.2.13
-pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.14"
+pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.0
 
 # Para instalaciones ignorando las dependencias del paquete
-pip install --no-deps helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.14
+pip install --no-deps helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.0
 
 # si es que la paqueteria ya esta instalada entonces usar la funcion de aquí
-pip install --upgrade helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.14
+pip install --upgrade helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.0

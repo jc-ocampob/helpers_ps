@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: helpers_ps
-Version: 0.2.14
+Version: 0.3.0
 Summary: Internal helper package
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
@@ -39,7 +39,7 @@ Internal library developed for financial analisis, institutional graph generatio
 ## Install
 
 ```bash
-pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.10"
+pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.0
 ```
 
 ------

@@ -6,7 +6,7 @@ Internal library developed for financial analisis, institutional graph generatio
 ## Install
 
 ```bash
-pip install "helpers_ps @ git+https://github.com/jc-ocampob/helpers_ps.git@v0.2.10"
+pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.0
 ```
 
 ------

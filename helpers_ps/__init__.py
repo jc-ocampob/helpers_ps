@@ -16,7 +16,7 @@ except Exception:
     __version__ = "0.0.0"
 
 
-from GlobVars import (
+from helpers_ps.GlobVars import (
     PALETA_COLORES
 )
 
