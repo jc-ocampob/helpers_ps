@@ -17,13 +17,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-try:
-    from helpers_ps.GlobVars.var_globs import PALETA_COLORES
-except Exception:
-    PALETA_COLORES = [
-        "#2F71E5", "#00A6A6", "#F28E2B", "#E15759", "#76B7B2",
-        "#59A14F", "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F"
-    ]
+from ._colors import PALETA_COLORES
 
 class Bar_tags:
     """
@@ -60,7 +54,7 @@ class Bar_tags:
         This docstring was added during the modular refactor to make the API easier
         to understand for new users and maintainers.
         """
-        if not hasattr(self, "_bars_x_reference"):
+        if not self._bars_x_reference:
             raise ValueError(
                 "No existe self._bars_x_reference. Guarda la referencia del eje x dentro de graph_bar."
             )

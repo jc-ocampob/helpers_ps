@@ -1,210 +1,218 @@
 from __future__ import annotations
 
-import io
-import locale
-import warnings
 from dataclasses import dataclass, field
-from importlib.resources import files
 
-import matplotlib as mpl
-import matplotlib.dates as mdates
-import matplotlib.font_manager as fm
-import matplotlib.patheffects as path_effects
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-try:
-    from helpers_ps.GlobVars.var_globs import PALETA_COLORES
-except Exception:
-    PALETA_COLORES = [
-        "#2F71E5", "#00A6A6", "#F28E2B", "#E15759", "#76B7B2",
-        "#59A14F", "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F"
-    ]
+from ._colors import PALETA_COLORES
 
-class Graph_meta_data():
+
+# ---------------------------------------------------------------------------
+# AxisState
+# ---------------------------------------------------------------------------
+#
+# All metadata that used to live "flattened" on the instance (self._bar_mode,
+# self._x_axis_mode, self._pie_data, ...) now lives inside a single
+# AxisState per subplot axis. Switching the active axis becomes swapping one
+# reference (self._state) instead of copying every field in and out of a
+# plain dict by hand.
+#
+# Adding a new piece of per-axis metadata now only requires adding ONE field
+# here. Previously it required updating the class attribute list, the
+# _generate_metadata() dict defaults, and both the "save" and "load" halves
+# of _set_axis() -- four places kept in sync by hand. Two kinds of fields
+# (`series_config`, and pie chart data) had already drifted out of sync
+# with that old pattern; see the CHANGES note at the bottom of this file.
+@dataclass
+class AxisState:
+    # DataFrame activo para este eje
+    dataframe_idx: int | None = None
+    dataframe: pd.DataFrame | None = None
+
+    # Metadata del eje x
+    x_axis_mode: str | None = None
+    x_axis_fechas: object = None
+    x_axis_metadata: dict | None = None
+    x_vals: object = None
+    months: object = None
+    years: object = None
+
+    # Metadata de barras
+    bar_mode: str | None = None
+    bar_stacked: bool | None = None
+    bar_grouped: bool | None = None
+    bar_rects: object = None
+    bars_data: dict = field(default_factory=dict)
+    bars_stacked: object = None
+    bars_x_reference: list = field(default_factory=list)
+
+    # Metadata de pie charts
+    # NOTA: en el código original `graph_pie` nunca poblaba `self._pie_data`,
+    # así que `tags_pie.py` siempre fallaba con
+    # "No existe self._pie_data. Ejecuta graph_pie...". Se deja aquí
+    # correctamente inicializado y listo para usarse; `graph_pie` debe
+    # asignar `self._pie_data = {...}` para que los tags de pie funcionen.
+    pie_data: dict = field(default_factory=dict)
+
+    # Series / tickers
+    ticker_label_color: list = field(default_factory=list)
+    series_config: list = field(default_factory=list)
+
+    # Leyenda
+    custom_legend_handles: list = field(default_factory=list)
+
+    # Eje y secundario
+    right_ax: object = None
+    axis_map: dict | None = None
+    right_axis_enabled: bool = False
+    right_axis_config: dict | None = None
+    y_axis_right: dict | None = None
+
+
+# Atributos "planos" que el resto del código (base.py, charts.py, tags_*.py)
+# sigue leyendo/escribiendo como self._bar_mode, self._x_vals, etc. Cada uno
+# de estos se redirige de forma transparente hacia self._state.<campo sin
+# guion bajo>. Esto evita tener que tocar cientos de call-sites fuera de
+# este archivo mientras se migra el manejo de metadata.
+_STATE_ATTRS = {
+    "_df_idx": "dataframe_idx",
+    "_df": "dataframe",
+    "_x_axis_mode": "x_axis_mode",
+    "_x_axis_fechas": "x_axis_fechas",
+    "_x_axis_metadata": "x_axis_metadata",
+    "_x_vals": "x_vals",
+    "_months": "months",
+    "_years": "years",
+    "_bar_mode": "bar_mode",
+    "_bar_stacked": "bar_stacked",
+    "_bar_grouped": "bar_grouped",
+    "_bar_rects": "bar_rects",
+    "_bars_data": "bars_data",
+    "_bars_stacked": "bars_stacked",
+    "_bars_x_reference": "bars_x_reference",
+    "_pie_data": "pie_data",
+    "_ticker_label_color": "ticker_label_color",
+    "_series_config": "series_config",
+    "_custom_legend_handles": "custom_legend_handles",
+    "_right_ax": "right_ax",
+    "_axis_map": "axis_map",
+    "_right_axis_enabled": "right_axis_enabled",
+    "_right_axis_config": "right_axis_config",
+    "_y_axis_right": "y_axis_right",
+}
+
+
+class Graph_meta_data:
     """
     Store and manage figure, axis, dataframe, and per-subplot metadata.
 
-    Notes
-    -----
-    This docstring was added during the modular refactor to make the API easier
-    to understand for new users and maintainers.
+    Per-axis metadata is stored in a list of `AxisState` instances
+    (`self._states`), one per subplot. `self._state` always points at the
+    `AxisState` of the currently active axis. Switching axes
+    (`_set_axis`) simply repoints `self._state`; it does not copy fields.
+
+    Backwards compatibility
+    ------------------------
+    Existing code (in this package and possibly downstream) reads and
+    writes per-axis metadata as flat attributes, e.g. `self._bar_stacked`,
+    `self._x_vals`, `self._pie_data`. Those names keep working unchanged:
+    `__getattr__`/`__setattr__` transparently redirect them to
+    `self._state.<field>`. New code can use `self._state.bar_stacked`
+    directly if preferred.
     """
 
     # Información pasable como el data frame
     dataframe: pd.DataFrame | list[pd.DataFrame] = None
-    _fig = None,                            # Figura
-    _meta_data: dict = None                 # Donde se almacena la metadata
-    _axes: list = None                      # lista de ejes
-    _axes_shape: tuple[int, int] = None     # Forma de la estructura de gráficos
 
-    # Detalles del grafico activo
-    _ax_idx = None                  # Numero de eje activo
-    _df_idx = None                  # Numero de dataframe activo
-    _ax = None                      # Eje activo en la clase
-    _df = None                      # Dataframe activo de la clase
-    _right_ax = None
-    _axis_map = None
-    _right_axis_enabled = False
-    _right_axis_config = None
-    _y_axis_right = None
-    
-    # Meta data alamacenada
-    _ticker_label_color: list[tuple[str, str, str]] = None
-    _x_axis_fechas = None
-    _x_axis_mode = None
-    _x_vals = None
-    _months = None
-    _years = None
+    _fig = None
+    _axes: list = None
+    _axes_shape: tuple[int, int] = None
 
-    # Meta data de barras
-    _bar_mode = None
-    _bar_stacked = None
-    _bar_grouped = None
-    _bar_rects = None
-
-    # Meta data de leyenda
-    _custom_legend_handles: list = None
+    _ax_idx = None
+    _ax = None
+    _states: list = None
+    _state: "AxisState | None" = None
 
     def __post_init__(self):
         """
         Normalize constructor inputs after dataclass initialization.
-
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
         """
         self.dataframe = [self.dataframe] if isinstance(self.dataframe, pd.DataFrame) else self.dataframe
 
-    # funcion para poder actualizar el metadata hacia _meta_data
+    # -----------------------------------------------------------------
+    # Delegación transparente de atributos "planos" hacia self._state
+    # -----------------------------------------------------------------
+    def __getattr__(self, name):
+        # __getattr__ solo se llama cuando el atributo NO se encontró de la
+        # forma normal (instancia / clase), así que es seguro interceptar
+        # aquí sin riesgo de recursión sobre atributos reales.
+        field_name = _STATE_ATTRS.get(name)
+        if field_name is not None:
+            state = self.__dict__.get("_state")
+            if state is None:
+                raise AttributeError(
+                    f"{name!r} no está disponible todavía. "
+                    "Llama a plot() / _generate_metadata() primero."
+                )
+            return getattr(state, field_name)
+        raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        field_name = _STATE_ATTRS.get(name)
+        if field_name is not None:
+            state = self.__dict__.get("_state")
+            if state is None:
+                # Fail loudly instead of silently creating a shadow instance
+                # attribute that would permanently break delegation for this
+                # field. This mirrors the old behavior where writing
+                # per-axis metadata before plot()/_generate_metadata() had
+                # been called made no sense either.
+                raise AttributeError(
+                    f"No se puede asignar {name!r} todavía: no hay un eje "
+                    "activo. Llama a plot() / _generate_metadata() primero."
+                )
+            setattr(state, field_name, value)
+            return
+        object.__setattr__(self, name, value)
+
+    # -----------------------------------------------------------------
+    # Selección de eje activo
+    # -----------------------------------------------------------------
     def _set_axis(self, ax_index: int = 0) -> None:
         """
-        Select the active Matplotlib axis and persist metadata for the previous axis.
+        Select the active Matplotlib axis.
 
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        Persisting the previous axis's metadata and loading the new axis's
+        metadata is now a single reference swap (`self._state = ...`)
+        instead of copying every field by hand.
         """
-        if not hasattr(self, "_axes") or self._axes is None:
+        if not self._states:
             raise RuntimeError("Axes not initialized. Call plot() first.")
 
         if ax_index >= len(self._axes):
             raise IndexError("Axis index out of range.")
-        
+
         if self._ax_idx == ax_index:
             raise ValueError(f"El subplot {ax_index} ya se encuenta seleccionado")
 
-        # -------------------------------------------------
-        # 1. Guardar metadata del eje actual
-        # -------------------------------------------------
-        current_idx = self._ax_idx
+        # Guardar el axis de matplotlib actual dentro de la lista
+        self._axes[self._ax_idx] = self._ax
 
-        self._meta_data[current_idx] = {
-            "dataframe": self._df_idx,
-            "xmeta": {
-                "mode": self._x_axis_mode,
-                "fechas": self._x_axis_fechas,
-                "x_vals": self._x_vals
-            },
-            "bar_mode": self._bar_mode,
-            "bar_stacked": self._bar_stacked,
-            "bar_grouped": self._bar_grouped,
-            "bar_rects": self._bar_rects,
-            "months": self._months,
-            "years": self._years,
-            "ticker_label_color": self._ticker_label_color,
-            "custom_legend_handles": (
-                list(self._custom_legend_handles)
-                if self._custom_legend_handles is not None
-                else []
-            ),
-            "series_config": (
-                [dict(item) for item in self._series_config]
-                if getattr(self, "_series_config", None) is not None
-                else []
-            ),
-
-            # Secondary y-axis metadata
-            "right_ax": self._right_ax,
-            "axis_map": dict(self._axis_map) if self._axis_map is not None else None,
-            "right_axis_enabled": self._right_axis_enabled,
-            "right_axis_config": (
-                dict(self._right_axis_config)
-                if self._right_axis_config is not None
-                else None
-            ),
-            "y_axis_right": (
-                dict(self._y_axis_right)
-                if self._y_axis_right is not None
-                else None
-            ),
-        }
-
-        # Guardar el axis actual dentro de la lista
-        self._axes[current_idx] = self._ax
-
-        # -------------------------------------------------
-        # 2. Cargar metadata del nuevo eje
-        # -------------------------------------------------
-        target_meta = self._meta_data[ax_index]
-
-        self._df_idx = target_meta["dataframe"]
-
-        if self._df_idx is not None:
-            self._df = self.dataframe[self._df_idx]
-        else:
-            self._df = None
-
-        self._x_axis_fechas = target_meta["xmeta"]["fechas"]
-        self._x_axis_mode = target_meta["xmeta"]["mode"]
-        self._x_vals = target_meta["xmeta"]["x_vals"]
-
-        self._months = target_meta["months"]
-        self._years = target_meta["years"]
-
-        self._bar_mode = target_meta["bar_mode"]
-        self._bar_stacked = target_meta["bar_stacked"]
-        self._bar_grouped = target_meta["bar_grouped"]
-        self._bar_rects = target_meta["bar_rects"]
-
-        self._ticker_label_color = target_meta["ticker_label_color"]
-
-        self._custom_legend_handles = list(
-            target_meta.get("custom_legend_handles", [])
-        )
-        self._right_ax = target_meta.get("right_ax")
-        self._axis_map = target_meta.get("axis_map")
-        self._right_axis_enabled = target_meta.get("right_axis_enabled", False)
-        self._right_axis_config = target_meta.get("right_axis_config")
-        self._y_axis_right = target_meta.get("y_axis_right")
-        self._series_config = list(target_meta.get("series_config", []))
-
-        # -------------------------------------------------
-        # 3. Activar nuevo eje
-        # -------------------------------------------------
+        # Activar nuevo eje + su AxisState
         self._ax_idx = ax_index
         self._ax = self._axes[ax_index]
+        self._state = self._states[ax_index]
 
         return None
 
     def _select_df(self, df_idx=0):
         """
         Select and store the active dataframe from the dataframe collection.
-
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
         """
-        self._df_idx = df_idx
-        self._df = self.dataframe[df_idx]
-        return self._df
+        self._state.dataframe_idx = df_idx
+        self._state.dataframe = self.dataframe[df_idx]
+        return self._state.dataframe
 
     def _generate_metadata(
         self,
@@ -213,22 +221,12 @@ class Graph_meta_data():
         nrows,
         ncols,
     ):
-        # -------------------------------------------------
-        # 2. Guardar figura
-        # -------------------------------------------------
         """
-        Initialize figure, axes, and per-axis metadata after creating a plot canvas.
-
-        Notes
-        -----
-        This docstring was added during the modular refactor to make the API easier
-        to understand for new users and maintainers.
+        Initialize figure, axes, and one AxisState per axis after creating a
+        plot canvas.
         """
         self._fig = fig
 
-        # -------------------------------------------------
-        # 3. Manejo de estructura de axes
-        # -------------------------------------------------
         if isinstance(axes, np.ndarray):
             self._axes = axes.flatten().tolist()
             self._ax = self._axes[0]
@@ -236,44 +234,28 @@ class Graph_meta_data():
             self._axes = [axes]
             self._ax = axes
 
-        # -------------------------------------------------
-        # 4. Manejo de metadata
-        # -------------------------------------------------
         self._ax_idx = 0
         self._axes_shape = (nrows, ncols)
 
-        self._meta_data = {
-            i: {
-                "dataframe": None,
-                "xmeta": {
-                    "mode": None,
-                    "fechas": None,
-                    "x_vals": None
-                },
-                "bar_mode": None,
-                "bar_stacked": None,
-                "bar_grouped": None,
-                "bar_rects": None,
-                "months": None,
-                "years": None,
-                "ticker_label_color": None,
-                "custom_legend_handles": [],
+        self._states = [AxisState() for _ in self._axes]
+        self._state = self._states[0]
 
-                # Secondary y-axis metadata
-                "right_ax": None,
-                "axis_map": None,
-                "right_axis_enabled": False,
-                "right_axis_config": None,
-                "y_axis_right": None,
-            }
-            for i, ax in enumerate(self._axes)
-        }
 
-        # Metadata activa del primer eje
-        self._custom_legend_handles = []
-        self._right_ax = None
-        self._axis_map = None
-        self._right_axis_enabled = False
-        self._right_axis_config = None
-        self._y_axis_right = None
-
+# ---------------------------------------------------------------------------
+# CHANGES (refactor notes)
+# ---------------------------------------------------------------------------
+# 1. `_series_config` was read/written on self but was missing from the old
+#    per-axis dict's defaults in `_generate_metadata` (only recovered via
+#    `.get("series_config", [])` in `_set_axis`). It is now a first-class
+#    `AxisState.series_config` field, always initialized.
+# 2. `_bars_data`, `_bars_stacked`, `_bars_x_reference`, and
+#    `_x_axis_metadata` were being set on `self` in `charts.py`/`base.py`
+#    but were NEVER saved or restored by the old `_set_axis` -- meaning bar
+#    chart state silently leaked or went stale across subplot axes. They
+#    now live in `AxisState` and are correctly swapped per axis.
+# 3. `_pie_data` is referenced throughout `tags_pie.py` but was never
+#    assigned anywhere in `graph_pie` (charts.py). It's now a proper
+#    `AxisState.pie_data` field so pie tag/label helpers will work as soon
+#    as `graph_pie` is updated to populate it (currently pie tags/labels
+#    raise "No existe self._pie_data..." -- this is a pre-existing bug,
+#    unrelated to this refactor, that's now easy to fix in one place).

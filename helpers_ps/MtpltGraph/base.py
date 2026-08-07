@@ -18,13 +18,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-try:
-    from helpers_ps.GlobVars.var_globs import PALETA_COLORES
-except Exception:
-    PALETA_COLORES = [
-        "#2F71E5", "#00A6A6", "#F28E2B", "#E15759", "#76B7B2",
-        "#59A14F", "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F"
-    ]
+from ._colors import PALETA_COLORES
 
 from .metadata import Graph_meta_data
 from .config import buffers
@@ -1422,29 +1416,12 @@ class Graph_base(Graph_meta_data):
 
         if reset_buffers:
             self._fig = None
-            self._meta_data = None
             self._axes = None
             self._axes_shape = None
-
             self._ax_idx = None
-            self._df_idx = None
             self._ax = None
-            self._df = None
-
-            self._ticker_label_color = None
-            self._series_config = []
-            self._x_axis_fechas = None
-            self._x_axis_mode = None
-            self._x_vals = None
-            self._months = None
-            self._years = None
-
-            self._bar_mode = None
-            self._bar_stacked = None
-            self._bar_grouped = None
-            self._bar_rects = None
-
-            self._custom_legend_handles = []
+            self._states = None
+            self._state = None
 
         return self
 

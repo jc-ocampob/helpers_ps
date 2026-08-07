@@ -6,13 +6,7 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import locale
 
-try:
-    from helpers_ps.GlobVars.var_globs import PALETA_COLORES
-except Exception:
-    PALETA_COLORES = [
-        "#2F71E5", "#00A6A6", "#F28E2B", "#E15759", "#76B7B2",
-        "#59A14F", "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F"
-    ]
+from ._colors import PALETA_COLORES
 
 buffers: dict[str, object] = {}
 

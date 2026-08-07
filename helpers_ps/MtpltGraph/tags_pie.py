@@ -17,13 +17,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-try:
-    from helpers_ps.GlobVars.var_globs import PALETA_COLORES
-except Exception:
-    PALETA_COLORES = [
-        "#2F71E5", "#00A6A6", "#F28E2B", "#E15759", "#76B7B2",
-        "#59A14F", "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F"
-    ]
+from ._colors import PALETA_COLORES
 
 class Pie_tags():
 
@@ -73,7 +67,7 @@ class Pie_tags():
         This docstring was added during the modular refactor to make the API easier
         to understand for new users and maintainers.
         """
-        if not hasattr(self, "_pie_data"):
+        if not self._pie_data:
             raise ValueError(
                 "No existe self._pie_data. Ejecuta graph_pie antes de usar este helper."
             )
@@ -107,7 +101,7 @@ class Pie_tags():
         if not label_dict:
             return
 
-        if not hasattr(self, "_pie_data"):
+        if not self._pie_data:
             raise ValueError(
                 "No existe self._pie_data. Ejecuta graph_pie antes de usar este helper."
             )
@@ -207,7 +201,7 @@ class Pie_tags():
         if not tag_dict:
             return
 
-        if not hasattr(self, "_pie_data"):
+        if not self._pie_data:
             raise ValueError(
                 "No existe self._pie_data. Ejecuta graph_pie antes de usar este helper."
             )

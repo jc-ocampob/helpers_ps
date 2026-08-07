@@ -11,13 +11,7 @@ import numpy as np
 import pandas as pd
 from typing import Self
 
-try:
-    from helpers_ps.GlobVars.var_globs import PALETA_COLORES
-except Exception:
-    PALETA_COLORES = [
-        "#2F71E5", "#00A6A6", "#F28E2B", "#E15759", "#76B7B2",
-        "#59A14F", "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F"
-    ]
+from ._colors import PALETA_COLORES
 
 from .base import Graph_base
 from .tags_line import Line_tags
@@ -81,42 +75,19 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         """
         self.dataframe = [dataframe] if isinstance(dataframe, pd.DataFrame) else dataframe
 
-        # Figure and axis state
+        # Figure and axis state. Per-axis metadata (dataframe index, x-axis
+        # config, bar/pie state, legend handles, secondary axis, etc.) lives
+        # in AxisState objects (see metadata.py) and is (re)created by
+        # _generate_metadata() the first time plot() runs. Until then,
+        # self._state is None and any attempt to read per-axis metadata
+        # raises a clear AttributeError instead of silently returning None.
         self._fig = None
-        self._meta_data = None
         self._axes = None
         self._axes_shape = None
-
-        # Active graph state
         self._ax_idx = None
-        self._df_idx = None
         self._ax = None
-        self._df = None
-
-        # X-axis metadata
-        self._ticker_label_color = None
-        self._series_config = []
-        self._x_axis_fechas = None
-        self._x_axis_mode = None
-        self._x_vals = None
-        self._months = None
-        self._years = None
-
-        # Bar metadata
-        self._bar_mode = None
-        self._bar_stacked = None
-        self._bar_grouped = None
-        self._bar_rects = None
-
-        # Legend metadata
-        self._custom_legend_handles = []
-
-        # Secondary y-axis metadata
-        self._right_ax = None
-        self._axis_map = None
-        self._right_axis_enabled = False
-        self._right_axis_config = None
-        self._y_axis_right = None
+        self._states = None
+        self._state = None
         
 
     def graph_line(
@@ -1373,6 +1344,21 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             wedgeprops=wedgeprops,
             normalize=normalize,
         )
+
+        # Guardar metadata de wedges/valores/porcentajes para que tags_pie.py
+        # (dot/tag helpers de pie charts) pueda ubicar cada slice por
+        # ticker. Antes de este fix, self._pie_data nunca se asignaba y
+        # cualquier llamada a los helpers de pie tags fallaba con
+        # "No existe self._pie_data. Ejecuta graph_pie...".
+        total = serie.sum()
+        self._pie_data = {
+            ticker: {
+                "wedge": pie_out[0][i],
+                "value": serie.iloc[i],
+                "pct": (serie.iloc[i] / total * 100.0) if total else 0.0,
+            }
+            for i, ticker in enumerate(plot_tickers)
+        }
 
         # labels (texto)
         if len(pie_out) > 1:
