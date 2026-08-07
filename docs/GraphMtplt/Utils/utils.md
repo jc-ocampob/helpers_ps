@@ -43,7 +43,7 @@
 --------
 ## Titles
 --------
-::: helpers_ps.MtpltGraph.base.Graph_base.set_titles
+::: helpers_ps.MtpltGraph.base.Graph_base.add_titles
     options:
       heading_level: 3
       show_root_heading: true
