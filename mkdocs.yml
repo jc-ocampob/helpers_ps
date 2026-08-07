@@ -64,11 +64,11 @@ nav:
   - Instalation: install_guide.md
   
   - GraphMtplt:
-    - Getting Started: GraphMtplt/getting_started.md
+    - Getting Started: GraphMtplt/getting_started.ipynb
     
     - Line Chart: 
-      - Graph: GraphMtplt/Line/graph.md
-      - Tags: GraphMtplt/Line/tags.md
+      - Graph: GraphMtplt/Line/graph.ipynb
+      - Tags: GraphMtplt/Line/tags.ipynb
       - Examples:
         - Simple Line: GraphMtplt/Line/examples/simple_line.ipynb 
         - Tags Usage: GraphMtplt/Line/examples/tags.ipynb
@@ -82,7 +82,8 @@ nav:
     - Box Whiskers Chart:
       - Graph: GraphMtplt/Box/graph.md
     
-    - Utils: GraphMtplt/Utils/Utils.md
+    - Utils:
+      - Utils: GraphMtplt/Utils/utils.md
 
   - FinCalculations:
     - Getting Started: FinCalculations/getting_started.md
