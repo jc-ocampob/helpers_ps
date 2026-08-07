@@ -209,7 +209,20 @@ class Graph_meta_data:
     def _select_df(self, df_idx=0):
         """
         Select and store the active dataframe from the dataframe collection.
+
+        Notes
+        -----
+        `graph_line`/`graph_bar`/`graph_pie`/`graph_box_whiskers` all call
+        this *before* `plot()` creates the figure/axes on the very first
+        call (`plot()` only runs afterwards, and only if no axis exists
+        yet). At that point `self._state` doesn't exist yet, so a
+        placeholder `AxisState` is created here to hold the selection.
+        `_generate_metadata()` adopts this placeholder as axis 0's state
+        once `plot()` actually runs, instead of discarding it.
         """
+        if self._state is None:
+            self._state = AxisState()
+
         self._state.dataframe_idx = df_idx
         self._state.dataframe = self.dataframe[df_idx]
         return self._state.dataframe
@@ -224,7 +237,16 @@ class Graph_meta_data:
         """
         Initialize figure, axes, and one AxisState per axis after creating a
         plot canvas.
+
+        If `_select_df()` already created a placeholder `AxisState` (see its
+        docstring) before this ran, that state is kept as axis 0's state so
+        the dataframe selection made just before `plot()` isn't lost.
         """
+        # `self._states` is only falsy here on a fresh instance (or right
+        # after reset). If a dataframe was pre-selected via `_select_df()`,
+        # `self._state` will hold that placeholder; adopt it for axis 0.
+        pending_state = self._state if not self._states else None
+
         self._fig = fig
 
         if isinstance(axes, np.ndarray):
@@ -237,7 +259,10 @@ class Graph_meta_data:
         self._ax_idx = 0
         self._axes_shape = (nrows, ncols)
 
-        self._states = [AxisState() for _ in self._axes]
+        self._states = [
+            pending_state if i == 0 and pending_state is not None else AxisState()
+            for i in range(len(self._axes))
+        ]
         self._state = self._states[0]
 
 
