@@ -95,6 +95,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
 
         # X-axis metadata
         self._ticker_label_color = None
+        self._series_config = []
         self._x_axis_fechas = None
         self._x_axis_mode = None
         self._x_vals = None
@@ -116,6 +117,7 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         self._right_axis_enabled = False
         self._right_axis_config = None
         self._y_axis_right = None
+        
 
     def graph_line(
         self,
@@ -214,81 +216,32 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # --- 1. Importación y setteo del dataframe 
         db = self._select_df(df_idx=df_index)
         
-        # --- 3. Normalización de los tickers
-        if isinstance(tickers, str):
-            if tickers == "all":
-                tickers = db.columns.tolist()
-            else:
-                tickers = [tickers]
+        # --- 3. Normalize series configuration
+        series_config = self._normalize_series_config(
+            dataframe=db,
+            tickers=tickers,
+            labels=labels,
+            colors=colors,
+            axis_side=axis_side,
+        )
 
-        # 
+        tickers = [item["ticker"] for item in series_config]
+        labels = [item["label"] for item in series_config]
+        colors = [item["color"] for item in series_config]
 
-        # --- 4. Asignación de etiquetas
-        if isinstance(labels, str):
-            labels = [labels]
-        elif isinstance(labels, list):
-            if len(labels) < len(db.columns.tolist()):
-                add = db.columns.tolist()
-                add = add[len(labels):]
-                labels = labels + add
-        else:
-            labels = db.columns.tolist()
-        
-        # --- 4. Normalización de los colores
-        if isinstance(colors, str):
-            colors = [colors]
-        elif isinstance(colors, list):
-            if len(colors) < len(db.columns.tolist()):
-                add = PALETA_COLORES
-                add = add[len(colors):]
-                colors = colors + add
-        else:
-            colors = PALETA_COLORES
-        
-        # --- 5. Asignación de ticker label color
-        self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i,t in enumerate(tickers)]
-
-        # --- 5B. Normalización del eje por serie: left / right
-        # Backward compatibility:
-        # If axis_side is None, every ticker is plotted on the left axis.
-        if axis_side is None:
-            axis_map = {t: "left" for t in tickers}
-        elif isinstance(axis_side, str):
-            if axis_side not in {"left", "right"}:
-                raise ValueError(
-                    "axis_side must be 'left', 'right', a list, or a dictionary."
-                )
-
-            axis_map = {t: axis_side for t in tickers}
-        elif isinstance(axis_side, list):
-            if len(axis_side) < len(tickers):
-                axis_side = axis_side + ["left"] * (len(tickers) - len(axis_side))
-
-            axis_map = {
-                t: axis_side[i]
-                for i, t in enumerate(tickers)
-            }
-        elif isinstance(axis_side, dict):
-            axis_map = {
-                t: axis_side.get(t, "left")
-                for t in tickers
-            }
-        else:
-            raise TypeError(
-                "axis_side must be None, str, list, or dict."
-            )
-
-        self._axis_map = axis_map
-
-        invalid_axis_values = {
-            side for side in axis_map.values()
-            if side not in {"left", "right"}
+        axis_map = {
+            item["ticker"]: item["axis_side"]
+            for item in series_config
         }
 
-        if invalid_axis_values:
-            raise ValueError(
-                "axis_side values must be only 'left' or 'right'."
-            )
+        self._series_config = series_config
+        self._axis_map = axis_map
+
+        # Backward compatibility for existing tag helpers
+        self._ticker_label_color = [
+            (item["ticker"], item["label"], item["color"])
+            for item in series_config
+        ]
 
         # --- 6. revision de dicts
         x_axis = x_axis if x_axis is not None else dict()
@@ -327,16 +280,17 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         db = self.prep_x_axis(dataframe=db, **x_axis)
 
         # --- 10 Graficar las lineas
-        for i, t in enumerate(tickers):
+        for item in series_config:
+            t = item["ticker"]
+            lab = item["label"]
+            col = item["color"]
+            selected_side = item["axis_side"]
+
             s = db[[t]].copy()
 
             if s.empty:
                 continue
 
-            lab = labels[i] if labels is not None and i < len(labels) else None
-            col = colors[i] if colors is not None and i < len(colors) else "#2F71E5"
-
-            selected_side = axis_map.get(t, "left")
             plot_ax = right_ax if selected_side == "right" else left_ax
 
             if plot_ax is None:
@@ -352,16 +306,16 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                     lw=lw,
                     label=lab,
                 )
-
             else:
+                x_plot = self._x_vals if self._x_axis_mode == "categorical" else s.index
+
                 plot_ax.plot(
-                    s.index,
+                    x_plot,
                     s[t],
                     color=col,
                     lw=lw,
                     label=lab,
                 )
-        
 
         # --- 11 Graficar ultimo valores
         if tag_dot:
@@ -401,19 +355,6 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
             side="left",
             **y_axis,
         )
-
-        # --- 12B. Configuración del eje y derecho
-        if right_ax is not None:
-            right_y_axis = right_axis.copy()
-            right_y_axis.update(y_axis_right)
-
-            self.prep_y_axis(
-                ax=right_ax,
-                side="right",
-                **right_y_axis,
-            )
-
-        self._ax = left_ax
 
         # --- 12B. Configuración del eje y derecho
         if right_ax is not None:
@@ -639,91 +580,34 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
         # --- 1. Importación y setteo del dataframe
         db = self._select_df(df_idx=df_index)
 
-        # --- 2. Normalización de los tickers
-        if isinstance(tickers, str):
-            if tickers == "all":
-                tickers = db.columns.tolist()
-            else:
-                tickers = [tickers]
+        # --- 2. Normalize series configuration
+        series_config = self._normalize_series_config(
+            dataframe=db,
+            tickers=tickers,
+            labels=labels,
+            colors=colors,
+            axis_side=axis_side,
+        )
 
-        tickers = [t for t in tickers if t in db.columns]
-        if len(tickers) == 0:
-            raise ValueError("No hay tickers válidos para graficar.")
-        
-        db = db[tickers].copy()  # filtrar solo los tickers seleccionados
+        tickers = [item["ticker"] for item in series_config]
+        labels = [item["label"] for item in series_config]
+        colors = [item["color"] for item in series_config]
 
-        # --- 3. Asignación de etiquetas
-        if isinstance(labels, str):
-            labels = [labels]
-        elif isinstance(labels, list):
-            if len(labels) < len(tickers):
-                labels = labels + tickers[len(labels):]
-        else:
-            labels = tickers.copy()
-
-        # --- 4. Normalización de los colores
-        if isinstance(colors, str):
-            colors = [colors]
-        elif isinstance(colors, list):
-            if len(colors) < len(tickers):
-                add = PALETA_COLORES.copy()
-                colors = colors + add[:max(0, len(tickers) - len(colors))]
-        else:
-            colors = PALETA_COLORES.copy()
-
-        colors = [
-            colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
-            for i in range(len(tickers))
-        ]
-
-        # --- 5. Asignación de ticker label color
-        self._ticker_label_color = [(tickers[i], labels[i], colors[i]) for i in range(len(tickers))]
-
-        # --- 5B. Normalización del eje por serie: left / right
-        # Backward compatibility:
-        # If axis_side is None, every ticker is plotted on the left axis.
-        if axis_side is None:
-            axis_map = {t: "left" for t in tickers}
-
-        elif isinstance(axis_side, str):
-            if axis_side not in {"left", "right"}:
-                raise ValueError(
-                    "axis_side must be 'left', 'right', a list, or a dictionary."
-                )
-
-            axis_map = {t: axis_side for t in tickers}
-
-        elif isinstance(axis_side, list):
-            if len(axis_side) < len(tickers):
-                axis_side = axis_side + ["left"] * (len(tickers) - len(axis_side))
-
-            axis_map = {
-                t: axis_side[i]
-                for i, t in enumerate(tickers)
-            }
-
-        elif isinstance(axis_side, dict):
-            axis_map = {
-                t: axis_side.get(t, "left")
-                for t in tickers
-            }
-
-        else:
-            raise TypeError(
-                "axis_side must be None, str, list, or dict."
-            )
-
-        invalid_axis_values = {
-            side for side in axis_map.values()
-            if side not in {"left", "right"}
+        axis_map = {
+            item["ticker"]: item["axis_side"]
+            for item in series_config
         }
 
-        if invalid_axis_values:
-            raise ValueError(
-                "axis_side values must be only 'left' or 'right'."
-            )
+        db = db[tickers].copy()
 
+        self._series_config = series_config
         self._axis_map = axis_map
+
+        # Backward compatibility for existing tag helpers
+        self._ticker_label_color = [
+            (item["ticker"], item["label"], item["color"])
+            for item in series_config
+        ]
 
         if stacked and len(set(axis_map.values())) > 1:
             raise ValueError(

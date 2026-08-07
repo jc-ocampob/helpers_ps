@@ -124,6 +124,11 @@ class Graph_meta_data():
                 if self._custom_legend_handles is not None
                 else []
             ),
+            "series_config": (
+                [dict(item) for item in self._series_config]
+                if getattr(self, "_series_config", None) is not None
+                else []
+            ),
 
             # Secondary y-axis metadata
             "right_ax": self._right_ax,
@@ -178,6 +183,7 @@ class Graph_meta_data():
         self._right_axis_enabled = target_meta.get("right_axis_enabled", False)
         self._right_axis_config = target_meta.get("right_axis_config")
         self._y_axis_right = target_meta.get("y_axis_right")
+        self._series_config = list(target_meta.get("series_config", []))
 
         # -------------------------------------------------
         # 3. Activar nuevo eje

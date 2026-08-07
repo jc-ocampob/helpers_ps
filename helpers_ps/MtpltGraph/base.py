@@ -266,27 +266,232 @@ class Graph_base(Graph_meta_data):
         pos = int(np.clip(pos, 0, len(fechas) - 1))
         return float(pos)
 
+    def _normalize_series_config(
+        self,
+        dataframe: pd.DataFrame,
+        tickers: list[str] | str = "all",
+        labels: list[str] | str | dict[str, str] | None = None,
+        colors: list[str] | str | dict[str, str] | None = None,
+        axis_side: str | list[str] | dict[str, str] | None = None,
+        default_axis_side: str = "left",
+    ) -> list[dict]:
+        """
+        Normalize tickers, labels, colors, and axis-side configuration into a
+        single list of series dictionaries.
+
+        This helper keeps backward compatibility with the current public API while
+        avoiding fragile parallel-list handling internally.
+
+        Parameters
+        ----------
+        dataframe:
+            DataFrame used to validate available columns.
+        tickers:
+            Selected columns to plot. Use "all" to select all columns.
+        labels:
+            Labels for each ticker. Can be None, str, list, tuple, or dict keyed by ticker.
+        colors:
+            Colors for each ticker. Can be None, str, list, tuple, or dict keyed by ticker.
+        axis_side:
+            Axis side for each ticker. Can be None, "left", "right", list, tuple, or dict.
+        default_axis_side:
+            Default axis side used when no side is provided for a ticker.
+
+        Returns
+        -------
+        list[dict]
+            List of dictionaries with ticker, label, color, and axis_side.
+        """
+
+        if dataframe is None or not isinstance(dataframe, pd.DataFrame):
+            raise TypeError("`dataframe` must be a pandas DataFrame.")
+
+        available_columns = dataframe.columns.tolist()
+
+        # -------------------------------------------------
+        # 1. Normalize tickers
+        # -------------------------------------------------
+        if isinstance(tickers, str):
+            if tickers == "all":
+                tickers = available_columns.copy()
+            else:
+                tickers = [tickers]
+        elif isinstance(tickers, (tuple, set)):
+            tickers = list(tickers)
+        elif not isinstance(tickers, list):
+            raise TypeError("`tickers` must be 'all', a string, or a list-like object.")
+
+        tickers = [ticker for ticker in tickers if ticker in available_columns]
+
+        if len(tickers) == 0:
+            raise ValueError("No valid tickers were found in the dataframe.")
+
+        # -------------------------------------------------
+        # 2. Normalize labels
+        # -------------------------------------------------
+        if labels is None:
+            labels_map = {ticker: ticker for ticker in tickers}
+
+        elif isinstance(labels, str):
+            labels_map = {
+                ticker: ticker
+                for ticker in tickers
+            }
+            labels_map[tickers[0]] = labels
+
+        elif isinstance(labels, dict):
+            labels_map = {
+                ticker: labels.get(ticker, ticker)
+                for ticker in tickers
+            }
+
+        elif isinstance(labels, (list, tuple)):
+            labels = list(labels)
+            labels_map = {
+                ticker: labels[i] if i < len(labels) else ticker
+                for i, ticker in enumerate(tickers)
+            }
+
+        else:
+            raise TypeError(
+                "`labels` must be None, a string, a list-like object, or a dictionary."
+            )
+
+        # -------------------------------------------------
+        # 3. Normalize colors
+        # -------------------------------------------------
+        if colors is None:
+            colors = PALETA_COLORES.copy()
+
+        if isinstance(colors, str):
+            colors_map = {ticker: colors for ticker in tickers}
+
+        elif isinstance(colors, dict):
+            colors_map = {
+                ticker: colors.get(ticker, PALETA_COLORES[i % len(PALETA_COLORES)])
+                for i, ticker in enumerate(tickers)
+            }
+
+        elif isinstance(colors, (list, tuple)):
+            colors = list(colors)
+            colors_map = {
+                ticker: colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
+                for i, ticker in enumerate(tickers)
+            }
+
+        else:
+            colors_map = {
+                ticker: PALETA_COLORES[i % len(PALETA_COLORES)]
+                for i, ticker in enumerate(tickers)
+            }
+
+        # -------------------------------------------------
+        # 4. Normalize axis side
+        # -------------------------------------------------
+        if axis_side is None:
+            axis_map = {
+                ticker: default_axis_side
+                for ticker in tickers
+            }
+
+        elif isinstance(axis_side, str):
+            if axis_side not in {"left", "right"}:
+                raise ValueError("`axis_side` must be either 'left' or 'right'.")
+
+            axis_map = {
+                ticker: axis_side
+                for ticker in tickers
+            }
+
+        elif isinstance(axis_side, dict):
+            axis_map = {
+                ticker: axis_side.get(ticker, default_axis_side)
+                for ticker in tickers
+            }
+
+        elif isinstance(axis_side, (list, tuple)):
+            axis_side = list(axis_side)
+            axis_map = {
+                ticker: axis_side[i] if i < len(axis_side) else default_axis_side
+                for i, ticker in enumerate(tickers)
+            }
+
+        else:
+            raise TypeError(
+                "`axis_side` must be None, a string, a list-like object, or a dictionary."
+            )
+
+        invalid_sides = {
+            side for side in axis_map.values()
+            if side not in {"left", "right"}
+        }
+
+        if invalid_sides:
+            raise ValueError("`axis_side` values must be only 'left' or 'right'.")
+
+        # -------------------------------------------------
+        # 5. Build normalized config
+        # -------------------------------------------------
+        return [
+            {
+                "ticker": ticker,
+                "label": labels_map[ticker],
+                "color": colors_map[ticker],
+                "axis_side": axis_map[ticker],
+            }
+            for ticker in tickers
+        ]
+
+    def _get_series_meta(self, ticker: str) -> dict:
+        """
+        Return normalized metadata for a plotted ticker.
+
+        Parameters
+        ----------
+        ticker:
+            Ticker/column name to search in the current series configuration.
+
+        Returns
+        -------
+        dict
+            Metadata dictionary with ticker, label, color, and axis_side.
+        """
+
+        for item in getattr(self, "_series_config", []):
+            if item.get("ticker") == ticker:
+                return item
+
+        raise KeyError(f"No series metadata found for ticker: {ticker}")
+
     # =========================
     # Metodos de los ejes
     # =========================
     def prep_x_axis(
-            self,
-            dataframe: pd.DataFrame = None,
-            bbg_format: bool = False,
-            tick_step: int = 6,
-            fmt: str = None,
-            year_y_offset: float = -0.08,
-            lim: tuple[float, float] = None,
-            fontsize: float = 8,
-            return_dataframe: bool = True,
-        ) -> pd.DataFrame:
+        self,
+        dataframe: pd.DataFrame = None,
+        bbg_format: bool = False,
+        tick_step: int = 6,
+        fmt: str = None,
+        year_y_offset: float = -0.08,
+        lim: tuple[float, float] = None,
+        fontsize: float = 8,
+        return_dataframe: bool = True,
+        tick_values: list | tuple | pd.Index | np.ndarray | None = None,
+        tick_labels: list[str] | tuple[str, ...] | None = None,
+        tick_label_map: dict | None = None,
+        rotation: float = 0,
+        ha: str = "center",
+        label_color: str | None = None,
+        show_years: bool = True,
+    ) -> pd.DataFrame:
         """
         Prepare the x-axis format, ticks, labels, limits, and internal metadata.
 
         This method detects whether the DataFrame index is datetime-like, numeric,
-        or categorical, and applies the appropriate x-axis formatting. It also
-        supports a Bloomberg-style date axis, where dates are represented as
-        sequential integer positions with month labels and year labels.
+        or categorical, and applies the appropriate x-axis formatting. It supports
+        automatic tick selection through `tick_step`, explicit tick selection through
+        `tick_values`, and custom label replacement through `tick_labels` or
+        `tick_label_map`.
 
         Parameters
         ----------
@@ -296,7 +501,8 @@ class Graph_base(Graph_meta_data):
         bbg_format : bool, default False
             Whether to use the Bloomberg-style x-axis format for datetime indexes.
         tick_step : int, default 6
-            Step used to determine the frequency of visible x-axis tick labels.
+            Step used to determine the frequency of visible x-axis tick labels when
+            `tick_values` is not provided.
         fmt : str or None, optional
             Format string used for datetime or numeric tick labels.
         year_y_offset : float, default -0.08
@@ -308,6 +514,24 @@ class Graph_base(Graph_meta_data):
         return_dataframe : bool, default True
             Kept for API compatibility. The method returns the transformed or
             filtered DataFrame.
+        tick_values : list, tuple, pandas.Index, numpy.ndarray, or None, optional
+            Explicit x-axis values to display as ticks. Values should match the
+            DataFrame index for datetime, numeric, or categorical axes. In
+            Bloomberg-style mode, datetime values are mapped to internal positions.
+        tick_labels : list[str], tuple[str, ...], or None, optional
+            Explicit labels to use for `tick_values`. Must have the same length as
+            the resolved tick positions.
+        tick_label_map : dict or None, optional
+            Mapping used to rename selected tick labels. Keys are matched against
+            original index values and stringified labels.
+        rotation : float, default 0
+            Rotation applied to x-axis tick labels.
+        ha : str, default "center"
+            Horizontal alignment of x-axis tick labels.
+        label_color : str or None, optional
+            Optional color applied to x-axis tick labels.
+        show_years : bool, default True
+            Whether to draw year labels in Bloomberg-style mode.
 
         Returns
         -------
@@ -317,89 +541,393 @@ class Graph_base(Graph_meta_data):
         Notes
         -----
         The method updates internal x-axis metadata such as `_x_axis_mode`,
-        `_x_axis_fechas`, `_x_vals`, `_months`, and `_years`.
+        `_x_axis_fechas`, `_x_vals`, `_months`, `_years`, and `_x_axis_metadata`.
         """
+
+        # -------------------------------------------------
+        # 1. Basic validation
+        # -------------------------------------------------
         if dataframe is None:
             dataframe = self._df
-        fechas = None
-        x_vals = None
+
+        if dataframe is None:
+            raise ValueError("No dataframe was provided and `self._df` is None.")
+
+        if not isinstance(dataframe, pd.DataFrame):
+            raise TypeError("`dataframe` must be a pandas DataFrame.")
+
+        if dataframe.empty:
+            raise ValueError("Cannot prepare x-axis because the dataframe is empty.")
+
+        if tick_step is None:
+            tick_step = 1
+
+        if not isinstance(tick_step, int):
+            raise TypeError("`tick_step` must be an integer.")
+
+        if tick_step <= 0:
+            raise ValueError("`tick_step` must be greater than zero.")
+
+        dataframe = dataframe.copy()
+
+        # -------------------------------------------------
+        # 2. Apply limits before detecting index type
+        # -------------------------------------------------
+        if lim is not None:
+            if not isinstance(lim, tuple) or len(lim) != 2:
+                raise ValueError("`lim` must be a tuple with two values: (start, end).")
+
+            start_value_x, end_value_x = lim
+
+            if start_value_x is not None:
+                dataframe = dataframe.loc[dataframe.index >= start_value_x].copy()
+
+            if end_value_x is not None:
+                dataframe = dataframe.loc[dataframe.index <= end_value_x].copy()
+
+            if dataframe.empty:
+                raise ValueError("The dataframe is empty after applying `lim`.")
+
         x_index = dataframe.index
 
-        if lim is not None and isinstance(lim, tuple):
-            start_value_x, end_value_x = lim
-            if start_value_x is not None:
-                dataframe = dataframe[dataframe.index >= start_value_x].copy()
-            if end_value_x is not None:
-                dataframe = dataframe[dataframe.index <= end_value_x].copy()
-
-        # validar el tipo de información
         is_datetime = pd.api.types.is_datetime64_any_dtype(x_index)
         is_numeric = pd.api.types.is_numeric_dtype(x_index)
-      
-        # -- si el eje es fecha con formato bbg 
+
+        fechas = None
+        x_vals = None
+
+        tick_label_map = {} if tick_label_map is None else tick_label_map
+
+        # -------------------------------------------------
+        # 3. Helpers
+        # -------------------------------------------------
+        def _as_list(value):
+            if value is None:
+                return None
+            if isinstance(value, pd.Index):
+                return value.tolist()
+            if isinstance(value, np.ndarray):
+                return value.tolist()
+            if isinstance(value, (list, tuple)):
+                return list(value)
+            return [value]
+
+        def _format_tick_label(value, axis_mode: str):
+            if axis_mode in {"datetime", "bbg"}:
+                try:
+                    dt = pd.to_datetime(value)
+                    date_format = fmt if fmt is not None else "%b-%y"
+                    label = dt.strftime(date_format)
+                except Exception:
+                    label = str(value)
+
+            elif axis_mode == "numeric":
+                num_format = fmt if fmt is not None else ",.0f"
+                try:
+                    label = f"{value:{num_format}}"
+                except Exception:
+                    label = str(value)
+
+            else:
+                label = str(value)
+
+            if value in tick_label_map:
+                return tick_label_map[value]
+
+            if str(value) in tick_label_map:
+                return tick_label_map[str(value)]
+
+            if label in tick_label_map:
+                return tick_label_map[label]
+
+            return label
+
+        def _validate_tick_labels(resolved_positions, resolved_labels):
+            if resolved_labels is None:
+                return
+
+            if len(resolved_positions) != len(resolved_labels):
+                raise ValueError(
+                    "`tick_labels` must have the same length as the resolved tick positions."
+                )
+
+        def _style_x_ticks():
+            tick_params = {
+                "axis": "x",
+                "labelsize": fontsize,
+            }
+
+            if label_color is not None:
+                tick_params["colors"] = label_color
+
+            self._ax.tick_params(**tick_params)
+
+            for label in self._ax.get_xticklabels():
+                label.set_rotation(rotation)
+                label.set_ha(ha)
+
+                if label_color is not None:
+                    label.set_color(label_color)
+
+        # -------------------------------------------------
+        # 4. Bloomberg-style datetime axis
+        # -------------------------------------------------
         if bbg_format and is_datetime:
-            fechas = pd.Index(dataframe.index.sort_values().unique())
-            x_vals = np.arange(len(fechas))
+            fechas = pd.Index(pd.Series(x_index).dropna().sort_values().unique())
+
+            if len(fechas) == 0:
+                raise ValueError("Datetime index only contains NaT values.")
+
+            date_to_position = {
+                pd.Timestamp(date): position
+                for position, date in enumerate(fechas)
+            }
+
+            x_vals = pd.Index(x_index).map(
+                lambda value: date_to_position.get(pd.Timestamp(value), np.nan)
+            ).to_numpy(dtype=float)
+
+            if np.isnan(x_vals).any():
+                raise ValueError(
+                    "Some x-axis dates could not be mapped to Bloomberg-style positions."
+                )
+
             self._months_years(fechas)
-            month_change = pd.Series(fechas).dt.to_period("M").ne(
-                pd.Series(fechas).dt.to_period("M").shift()
-            )
-            month_idx = np.where(month_change)[0]
-            tick_idx = month_idx[::tick_step]
-            self._ax.set_xticks(tick_idx)
-            self._ax.set_xticklabels([self._months[i] for i in tick_idx], fontsize=fontsize)
-            self._years_xaxis(y_offset=year_y_offset, fontsize=fontsize)
+
+            if tick_values is not None:
+                raw_tick_values = _as_list(tick_values)
+
+                tick_positions = []
+                tick_source_values = []
+
+                for value in raw_tick_values:
+                    try:
+                        dt_value = pd.Timestamp(value)
+                    except Exception:
+                        dt_value = value
+
+                    if dt_value in date_to_position:
+                        tick_positions.append(date_to_position[dt_value])
+                        tick_source_values.append(dt_value)
+                    elif isinstance(value, (int, float, np.integer, np.floating)):
+                        position = int(value)
+                        if 0 <= position < len(fechas):
+                            tick_positions.append(position)
+                            tick_source_values.append(fechas[position])
+                    else:
+                        raise ValueError(
+                            f"`tick_values` contains a value not found in the x-axis: {value}"
+                        )
+
+                tick_positions = np.asarray(tick_positions, dtype=float)
+
+            else:
+                periods = pd.Series(fechas).dt.to_period("M")
+                month_change = periods.ne(periods.shift())
+                month_idx = np.where(month_change.to_numpy())[0]
+
+                tick_positions = month_idx[::tick_step]
+                tick_source_values = [fechas[i] for i in tick_positions]
+
+            if tick_labels is not None:
+                final_labels = list(tick_labels)
+            else:
+                final_labels = [
+                    _format_tick_label(value, "bbg")
+                    for value in tick_source_values
+                ]
+
+                # Preserve your Bloomberg-style month abbreviation default
+                if fmt is None and tick_values is None:
+                    final_labels = [self._months[int(i)] for i in tick_positions]
+
+            _validate_tick_labels(tick_positions, final_labels)
+
+            self._ax.set_xticks(tick_positions)
+            self._ax.set_xticklabels(final_labels, fontsize=fontsize)
+
+            if show_years:
+                self._years_xaxis(
+                    y_offset=year_y_offset,
+                    fontsize=fontsize,
+                )
+
+            _style_x_ticks()
+
             self._x_axis_mode = "bbg"
             self._x_axis_fechas = fechas
 
+        # -------------------------------------------------
+        # 5. Regular datetime axis
+        # -------------------------------------------------
         elif is_datetime:
-            x_vals = dataframe.index.values
-            x_axis_format = fmt if fmt is not None else "%B-%y"
-            locator = mdates.MonthLocator(interval=tick_step)
-            formatter = mdates.DateFormatter(x_axis_format)
-            self._ax.xaxis.set_major_locator(locator)
-            self._ax.xaxis.set_major_formatter(formatter)
-            self._ax.tick_params(axis='x', labelsize=fontsize)
+            x_vals = x_index.to_numpy()
             self._x_axis_mode = "datetime"
-        
+
+            if tick_values is not None:
+                raw_tick_values = _as_list(tick_values)
+                tick_positions = [pd.to_datetime(value) for value in raw_tick_values]
+
+                if tick_labels is not None:
+                    final_labels = list(tick_labels)
+                else:
+                    final_labels = [
+                        _format_tick_label(value, "datetime")
+                        for value in tick_positions
+                    ]
+
+                _validate_tick_labels(tick_positions, final_labels)
+
+                self._ax.set_xticks(tick_positions)
+                self._ax.set_xticklabels(final_labels, fontsize=fontsize)
+
+            else:
+                x_axis_format = fmt if fmt is not None else "%b-%y"
+                locator = mdates.MonthLocator(interval=tick_step)
+                formatter = mdates.DateFormatter(x_axis_format)
+
+                self._ax.xaxis.set_major_locator(locator)
+                self._ax.xaxis.set_major_formatter(formatter)
+
+            _style_x_ticks()
+
+        # -------------------------------------------------
+        # 6. Numeric axis
+        # -------------------------------------------------
         elif is_numeric:
-            x_axis_format = fmt if fmt is not None else ",.0f"
-            x_vals = dataframe.index.values
-            # sample ticks every N observations
-            tick_idx = np.arange(0, len(x_vals), tick_step)
-            self._ax.set_xticks(x_vals[tick_idx])
-            # formatting (optional)
-            self._ax.set_xticklabels(
-                [f"{x_vals[i]:{x_axis_format}}" for i in tick_idx],  # adjust format if needed
-                fontsize=fontsize
-            )
-            self._ax.tick_params(axis='x', labelsize=fontsize)
+            x_vals = x_index.to_numpy()
             self._x_axis_mode = "numeric"
 
-        # --- Preparar eje X: Fall back ---
+            if tick_values is not None:
+                tick_positions = np.asarray(_as_list(tick_values))
+
+                if tick_labels is not None:
+                    final_labels = list(tick_labels)
+                else:
+                    final_labels = [
+                        _format_tick_label(value, "numeric")
+                        for value in tick_positions
+                    ]
+
+            else:
+                tick_idx = np.arange(0, len(x_vals), tick_step)
+                tick_positions = x_vals[tick_idx]
+
+                if tick_labels is not None:
+                    final_labels = list(tick_labels)
+                else:
+                    final_labels = [
+                        _format_tick_label(value, "numeric")
+                        for value in tick_positions
+                    ]
+
+            _validate_tick_labels(tick_positions, final_labels)
+
+            self._ax.set_xticks(tick_positions)
+            self._ax.set_xticklabels(final_labels, fontsize=fontsize)
+            _style_x_ticks()
+
+        # -------------------------------------------------
+        # 7. Categorical axis
+        # -------------------------------------------------
         else:
-            x_vals = dataframe.index.values
-            self._ax.tick_params(axis='x', labelsize=fontsize)
+            categories = x_index.astype(str).to_numpy()
+            x_vals = np.arange(len(categories), dtype=float)
+
+            category_to_position = {
+                category: position
+                for position, category in enumerate(categories)
+            }
+
             self._x_axis_mode = "categorical"
-        
+            self._x_axis_fechas = None
+
+            if tick_values is not None:
+                raw_tick_values = _as_list(tick_values)
+
+                tick_positions = []
+                tick_source_values = []
+
+                for value in raw_tick_values:
+                    if isinstance(value, (int, np.integer)):
+                        position = int(value)
+                        if 0 <= position < len(categories):
+                            tick_positions.append(position)
+                            tick_source_values.append(categories[position])
+                        else:
+                            raise ValueError(
+                                f"`tick_values` contains an out-of-range position: {value}"
+                            )
+
+                    elif str(value) in category_to_position:
+                        tick_positions.append(category_to_position[str(value)])
+                        tick_source_values.append(str(value))
+
+                    else:
+                        raise ValueError(
+                            f"`tick_values` contains a category not found in the x-axis: {value}"
+                        )
+
+                tick_positions = np.asarray(tick_positions, dtype=float)
+
+            else:
+                tick_positions = np.arange(0, len(categories), tick_step, dtype=float)
+                tick_source_values = [categories[int(i)] for i in tick_positions]
+
+            if tick_labels is not None:
+                final_labels = list(tick_labels)
+            else:
+                final_labels = [
+                    _format_tick_label(value, "categorical")
+                    for value in tick_source_values
+                ]
+
+            _validate_tick_labels(tick_positions, final_labels)
+
+            self._ax.set_xticks(tick_positions)
+            self._ax.set_xticklabels(final_labels, fontsize=fontsize)
+            _style_x_ticks()
+
+        # -------------------------------------------------
+        # 8. Store metadata
+        # -------------------------------------------------
         self._x_vals = x_vals
 
-        # layout adjust con el formato bbg
+        self._x_axis_metadata = {
+            "mode": self._x_axis_mode,
+            "fechas": self._x_axis_fechas,
+            "x_vals": self._x_vals,
+            "tick_step": tick_step,
+            "tick_values": tick_values,
+            "tick_labels": tick_labels,
+            "tick_label_map": tick_label_map,
+            "fmt": fmt,
+            "fontsize": fontsize,
+            "rotation": rotation,
+            "ha": ha,
+            "label_color": label_color,
+            "bbg_format": bbg_format,
+            "lim": lim,
+        }
+
+        # -------------------------------------------------
+        # 9. Layout adjustment
+        # -------------------------------------------------
         if self._x_axis_mode == "bbg":
             self._fig.subplots_adjust(
                 left=0.15,
                 right=0.93,
                 top=0.80,
-                bottom=0.21
+                bottom=0.21,
             )
         else:
             self._fig.subplots_adjust(
                 left=0.15,
                 right=0.93,
                 top=0.80,
-                bottom=0.18
+                bottom=0.18,
             )
-        
+
         return dataframe
 
     def prep_y_axis(
@@ -701,7 +1229,7 @@ class Graph_base(Graph_meta_data):
             show: bool = False,
             loc: str = "upper left",
             bbox_to_anchor: tuple = None,
-            ncol: int = 3,
+            ncol: int = 1,
             fontsize: int = 7,
             frameon: bool = True,
             edgecolor: str = "white",
@@ -904,6 +1432,7 @@ class Graph_base(Graph_meta_data):
             self._df = None
 
             self._ticker_label_color = None
+            self._series_config = []
             self._x_axis_fechas = None
             self._x_axis_mode = None
             self._x_vals = None
