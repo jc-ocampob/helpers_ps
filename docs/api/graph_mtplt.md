@@ -178,4 +178,24 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_root_full_path: false
       separate_signature: true
       show_signature_annotations: true
+
+--------
+## Helper Mutations
+--------
+::: helpers_ps.MtpltGraph.base.Graph_base.pipe
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
+---------
+
+::: helpers_ps.MtpltGraph.base.Graph_base.tap
+    options:
+      heading_level: 3
+      show_root_heading: true
+      show_root_full_path: false
+      separate_signature: true
+      show_signature_annotations: true
 ---------
