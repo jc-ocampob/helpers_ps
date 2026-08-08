@@ -3,12 +3,34 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 import matplotlib.dates as mdates
+from ..config_models import XAxisConfig, YAxisConfig, coerce_config, config_to_dict
 
 
 class AxesMixin:
     """
     Provides x-axis and y-axis preparation utilities.
     """
+    def prep_x_axis_config(
+        self,
+        dataframe: pd.DataFrame | None = None,
+        config: XAxisConfig | dict | None = None,
+    ) -> pd.DataFrame:
+        cfg = coerce_config(config, XAxisConfig)
+        kwargs = config_to_dict(cfg)
+        return self.prep_x_axis(
+            dataframe=dataframe,
+            **kwargs,
+        )
+
+
+    def prep_y_axis_config(
+        self,
+        config: YAxisConfig | dict | None = None,
+    ):
+        cfg = coerce_config(config, YAxisConfig)
+        kwargs = config_to_dict(cfg)
+        return self.prep_y_axis(**kwargs)
+
 
     def _months_years(self, fechas):
         """
@@ -77,6 +99,66 @@ class AxesMixin:
                 fontsize=fontsize,
                 color=color
             )
+
+
+    def _coerce_to_bbg_x(self, x):
+        """
+        Convert an x-axis input value into the internal Bloomberg-style position.
+
+        Bloomberg-style charts use integer positions instead of the original
+        datetime values. This helper converts dates, timestamps, or numeric values
+        into the corresponding numeric x-coordinate used by the active axis.
+
+        Parameters
+        ----------
+        x : int, float, str, pandas.Timestamp, or datetime-like
+            Input x-axis value to convert.
+
+        Returns
+        -------
+        float
+            Numeric x-axis position compatible with the Bloomberg-style axis.
+
+        Notes
+        -----
+        If the internal Bloomberg date index is not available, the function attempts
+        to return the input value as a float.
+        """
+
+        fechas = self._x_axis_fechas
+        if fechas is None or len(fechas) == 0:
+            return float(x)
+
+        if isinstance(x, (int, float, np.integer, np.floating)):
+            return float(x)
+
+        try:
+            dt = pd.to_datetime(x)
+        except Exception:
+            return float(x)
+
+        arr = fechas.values
+        pos = np.searchsorted(arr, np.datetime64(dt), side="left")
+        pos = int(np.clip(pos, 0, len(fechas) - 1))
+        return float(pos)
+
+
+    def _resolve_line_axes(self, axis_map: dict[str, str]):
+        left_ax = self._ax
+        right_ax = getattr(self, "_right_ax", None)
+
+        needs_right_axis = any(
+            side == "right"
+            for side in axis_map.values()
+        )
+
+        if needs_right_axis and right_ax is None:
+            right_ax = left_ax.twinx()
+
+        self._right_ax = right_ax
+        self._right_axis_enabled = right_ax is not None
+
+        return left_ax, right_ax
 
 
     def prep_x_axis(
@@ -709,3 +791,4 @@ class AxesMixin:
             target_ax.spines[spine_name].set_color(final_spine_color)
 
         return self
+

@@ -1,25 +1,8 @@
 from __future__ import annotations
-
-import io
-import locale
-import warnings
-from dataclasses import dataclass, field
-from importlib.resources import files
-
-import matplotlib as mpl
-import matplotlib.dates as mdates
-import matplotlib.font_manager as fm
-import matplotlib.patheffects as path_effects
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter, MultipleLocator
 from collections.abc import Mapping
 from typing import Any
-
-from ._colors import PALETA_COLORES
 
 class LineTags():
     # funcion para procesar diccionario de controles de annotaciones
@@ -149,3 +132,54 @@ class LineTags():
         for control_name, controls in control_dict.items():
             _generate(**controls)
 
+    def _split_tag_controls_by_axis(
+        self,
+        tag_dot: dict | None,
+        axis_map: dict[str, str],
+    ) -> tuple[dict, dict]:
+        if not tag_dot:
+            return {}, {}
+
+        tag_dot_left = {}
+        tag_dot_right = {}
+
+        for control_name, control in tag_dot.items():
+            ticker = control.get("ticker")
+
+            if ticker is None:
+                tag_dot_left[control_name] = control
+                continue
+
+            if axis_map.get(ticker, "left") == "right":
+                tag_dot_right[control_name] = control
+            else:
+                tag_dot_left[control_name] = control
+
+        return tag_dot_left, tag_dot_right
+
+    def _apply_line_tags_by_axis(
+        self,
+        tag_dot: dict | None,
+        axis_map: dict[str, str],
+        left_ax,
+        right_ax,
+    ) -> None:
+        tag_dot_left, tag_dot_right = self._split_tag_controls_by_axis(
+            tag_dot=tag_dot,
+            axis_map=axis_map,
+        )
+
+        if tag_dot_left:
+            self._ax = left_ax
+            self._line_label_generate(tag_dot_left)
+
+        if tag_dot_right:
+            if right_ax is None:
+                raise RuntimeError(
+                    "Right axis was not initialized for right-side tags."
+                )
+
+            self._ax = right_ax
+            self._line_label_generate(tag_dot_right)
+
+        self._ax = left_ax

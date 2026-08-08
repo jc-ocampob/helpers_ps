@@ -1,16 +1,10 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
-
 import numpy as np
 import pandas as pd
-
 from .tags._colors import PALETA_COLORES
 
 
-# ---------------------------------------------------------------------------
-# AxisState
-# ---------------------------------------------------------------------------
 @dataclass
 class AxisState:
     # DataFrame activo para este eje
@@ -119,7 +113,7 @@ class GraphMetaData:
     _ax_idx = None
     _ax = None
     _states: list = None
-    _state: "AxisState | None" = None
+    _state: list[AxisState] | AxisState | None = None
 
     def __post_init__(self):
         """
@@ -252,22 +246,200 @@ class GraphMetaData:
         ]
         self._state = self._states[0]
 
+    def _normalize_series_config(
+        self,
+        dataframe: pd.DataFrame,
+        tickers: list[str] | str = "all",
+        labels: list[str] | str | dict[str, str] | None = None,
+        colors: list[str] | str | dict[str, str] | None = None,
+        axis_side: str | list[str] | dict[str, str] | None = None,
+        default_axis_side: str = "left",
+    ) -> list[dict]:
+        """
+        Normalize tickers, labels, colors, and axis-side configuration into a
+        single list of series dictionaries.
 
-# ---------------------------------------------------------------------------
-# CHANGES (refactor notes)
-# ---------------------------------------------------------------------------
-# 1. `_series_config` was read/written on self but was missing from the old
-#    per-axis dict's defaults in `_generate_metadata` (only recovered via
-#    `.get("series_config", [])` in `_set_axis`). It is now a first-class
-#    `AxisState.series_config` field, always initialized.
-# 2. `_bars_data`, `_bars_stacked`, `_bars_x_reference`, and
-#    `_x_axis_metadata` were being set on `self` in `charts.py`/`base.py`
-#    but were NEVER saved or restored by the old `_set_axis` -- meaning bar
-#    chart state silently leaked or went stale across subplot axes. They
-#    now live in `AxisState` and are correctly swapped per axis.
-# 3. `_pie_data` is referenced throughout `tags_pie.py` but was never
-#    assigned anywhere in `graph_pie` (charts.py). It's now a proper
-#    `AxisState.pie_data` field so pie tag/label helpers will work as soon
-#    as `graph_pie` is updated to populate it (currently pie tags/labels
-#    raise "No existe self._pie_data..." -- this is a pre-existing bug,
-#    unrelated to this refactor, that's now easy to fix in one place).
+        This helper keeps backward compatibility with the current public API while
+        avoiding fragile parallel-list handling internally.
+
+        Parameters
+        ----------
+        dataframe:
+            DataFrame used to validate available columns.
+        tickers:
+            Selected columns to plot. Use "all" to select all columns.
+        labels:
+            Labels for each ticker. Can be None, str, list, tuple, or dict keyed by ticker.
+        colors:
+            Colors for each ticker. Can be None, str, list, tuple, or dict keyed by ticker.
+        axis_side:
+            Axis side for each ticker. Can be None, "left", "right", list, tuple, or dict.
+        default_axis_side:
+            Default axis side used when no side is provided for a ticker.
+
+        Returns
+        -------
+        list[dict]
+            List of dictionaries with ticker, label, color, and axis_side.
+        """
+
+        if dataframe is None or not isinstance(dataframe, pd.DataFrame):
+            raise TypeError("`dataframe` must be a pandas DataFrame.")
+
+        available_columns = dataframe.columns.tolist()
+
+        # -------------------------------------------------
+        # 1. Normalize tickers
+        # -------------------------------------------------
+        if isinstance(tickers, str):
+            if tickers == "all":
+                tickers = available_columns.copy()
+            else:
+                tickers = [tickers]
+        elif isinstance(tickers, (tuple, set)):
+            tickers = list(tickers)
+        elif not isinstance(tickers, list):
+            raise TypeError("`tickers` must be 'all', a string, or a list-like object.")
+
+        tickers = [ticker for ticker in tickers if ticker in available_columns]
+
+        if len(tickers) == 0:
+            raise ValueError("No valid tickers were found in the dataframe.")
+
+        # -------------------------------------------------
+        # 2. Normalize labels
+        # -------------------------------------------------
+        if labels is None:
+            labels_map = {ticker: ticker for ticker in tickers}
+
+        elif isinstance(labels, str):
+            labels_map = {
+                ticker: ticker
+                for ticker in tickers
+            }
+            labels_map[tickers[0]] = labels
+
+        elif isinstance(labels, dict):
+            labels_map = {
+                ticker: labels.get(ticker, ticker)
+                for ticker in tickers
+            }
+
+        elif isinstance(labels, (list, tuple)):
+            labels = list(labels)
+            labels_map = {
+                ticker: labels[i] if i < len(labels) else ticker
+                for i, ticker in enumerate(tickers)
+            }
+
+        else:
+            raise TypeError(
+                "`labels` must be None, a string, a list-like object, or a dictionary."
+            )
+
+        # -------------------------------------------------
+        # 3. Normalize colors
+        # -------------------------------------------------
+        if colors is None:
+            colors = PALETA_COLORES.copy()
+
+        if isinstance(colors, str):
+            colors_map = {ticker: colors for ticker in tickers}
+
+        elif isinstance(colors, dict):
+            colors_map = {
+                ticker: colors.get(ticker, PALETA_COLORES[i % len(PALETA_COLORES)])
+                for i, ticker in enumerate(tickers)
+            }
+
+        elif isinstance(colors, (list, tuple)):
+            colors = list(colors)
+            colors_map = {
+                ticker: colors[i] if i < len(colors) else PALETA_COLORES[i % len(PALETA_COLORES)]
+                for i, ticker in enumerate(tickers)
+            }
+
+        else:
+            colors_map = {
+                ticker: PALETA_COLORES[i % len(PALETA_COLORES)]
+                for i, ticker in enumerate(tickers)
+            }
+
+        # -------------------------------------------------
+        # 4. Normalize axis side
+        # -------------------------------------------------
+        if axis_side is None:
+            axis_map = {
+                ticker: default_axis_side
+                for ticker in tickers
+            }
+
+        elif isinstance(axis_side, str):
+            if axis_side not in {"left", "right"}:
+                raise ValueError("`axis_side` must be either 'left' or 'right'.")
+
+            axis_map = {
+                ticker: axis_side
+                for ticker in tickers
+            }
+
+        elif isinstance(axis_side, dict):
+            axis_map = {
+                ticker: axis_side.get(ticker, default_axis_side)
+                for ticker in tickers
+            }
+
+        elif isinstance(axis_side, (list, tuple)):
+            axis_side = list(axis_side)
+            axis_map = {
+                ticker: axis_side[i] if i < len(axis_side) else default_axis_side
+                for i, ticker in enumerate(tickers)
+            }
+
+        else:
+            raise TypeError(
+                "`axis_side` must be None, a string, a list-like object, or a dictionary."
+            )
+
+        invalid_sides = {
+            side for side in axis_map.values()
+            if side not in {"left", "right"}
+        }
+
+        if invalid_sides:
+            raise ValueError("`axis_side` values must be only 'left' or 'right'.")
+
+        # -------------------------------------------------
+        # 5. Build normalized config
+        # -------------------------------------------------
+        return [
+            {
+                "ticker": ticker,
+                "label": labels_map[ticker],
+                "color": colors_map[ticker],
+                "axis_side": axis_map[ticker],
+            }
+            for ticker in tickers
+        ]
+
+    def _get_series_meta(self, ticker: str) -> dict:
+        """
+        Return normalized metadata for a plotted ticker.
+
+        Parameters
+        ----------
+        ticker:
+            Ticker/column name to search in the current series configuration.
+
+        Returns
+        -------
+        dict
+            Metadata dictionary with ticker, label, color, and axis_side.
+        """
+
+        for item in getattr(self, "_series_config", []):
+            if item.get("ticker") == ticker:
+                return item
+
+        raise KeyError(f"No series metadata found for ticker: {ticker}")
+

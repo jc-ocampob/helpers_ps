@@ -186,3 +186,51 @@ class LegendMixin:
             seen.add(label)
 
         return final_handles, final_labels
+
+
+    def add_combined_legend(
+        self,
+        ax=None,
+        include_right_axis: bool = True,
+        show: bool = False,
+        loc: str = "upper left",
+        bbox_to_anchor: tuple | None = None,
+        ncol: int = 3,
+        fontsize: int = 7,
+        frameon: bool = True,
+        edgecolor: str = "white",
+        facecolor: str = "white",
+        framealpha: float = 0.6,
+    ):
+        if not show:
+            return self
+
+        target_ax = self._ax if ax is None else ax
+
+        handles, labels = self._collect_legend_handles_labels(
+            ax=target_ax,
+            include_right_axis=include_right_axis,
+        )
+
+        final_handles, final_labels = self._deduplicate_legend_handles(
+            handles,
+            labels,
+        )
+
+        if not final_handles:
+            return self
+
+        target_ax.legend(
+            final_handles,
+            final_labels,
+            loc=loc,
+            bbox_to_anchor=bbox_to_anchor,
+            ncol=ncol,
+            fontsize=fontsize,
+            frameon=frameon,
+            edgecolor=edgecolor,
+            facecolor=facecolor,
+            framealpha=framealpha,
+        )
+
+        return self

@@ -1,23 +1,6 @@
 from __future__ import annotations
-
-import io
-import locale
-import warnings
-from dataclasses import dataclass, field
-from importlib.resources import files
-
-import matplotlib as mpl
-import matplotlib.dates as mdates
-import matplotlib.font_manager as fm
-import matplotlib.patheffects as path_effects
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter, MultipleLocator
-
-from ._colors import PALETA_COLORES
 
 class BarTags:
     """

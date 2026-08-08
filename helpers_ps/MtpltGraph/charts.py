@@ -1,26 +1,38 @@
 from __future__ import annotations
 
-import io
-import locale
-import warnings
-from dataclasses import dataclass, field
-from importlib.resources import files
+from dataclasses import dataclass
 import matplotlib.dates as mdates
 import matplotlib.patheffects as path_effects
 import numpy as np
 import pandas as pd
 from typing import Self
+from .config_models import (
+    XAxisConfig,
+    YAxisConfig,
+    LegendConfig,
+    TitleConfig,
+    SourceConfig,
+    coerce_configs,
+)
 
 from .tags._colors import PALETA_COLORES
 
-from .base import Graph_base
-from .tags.line import LineTags
-from .tags.bar import BarTags
-from .tags.pie import PieTags
-from .tags.box import BoxWTags
+from .base import GraphBase
+from .tags import (
+    LineTags,
+    BoxWTags,
+    BarTags,
+    PieTags
+)
 
-@dataclass
-class GraphMtplt(Graph_base, LineTags, BarTags, PieTags, BoxWTags):
+
+class GraphMtplt(
+    GraphBase,
+    LineTags,
+    BarTags,
+    PieTags,
+    BoxWTags
+):
     """
     High-level Matplotlib chart builder for institutional reporting.
 
@@ -75,191 +87,23 @@ class GraphMtplt(Graph_base, LineTags, BarTags, PieTags, BoxWTags):
         """
         self.dataframe = [dataframe] if isinstance(dataframe, pd.DataFrame) else dataframe
 
-        # Figure and axis state. Per-axis metadata (dataframe index, x-axis
-        # config, bar/pie state, legend handles, secondary axis, etc.) lives
-        # in AxisState objects (see metadata.py) and is (re)created by
-        # _generate_metadata() the first time plot() runs. Until then,
-        # self._state is None and any attempt to read per-axis metadata
-        # raises a clear AttributeError instead of silently returning None.
-        self._fig = None
-        self._axes = None
-        self._axes_shape = None
-        self._ax_idx = None
-        self._ax = None
-        self._states = None
-        self._state = None
-        
-
-    def graph_line(
+    def _plot_line_series(
         self,
-        # --- Configuración del grafico
-        figsize: tuple[float, float] = (6.00, 5.00),                        # Tamaño del grafico configuración general es (6,4.8) --> tamaño estandard
-        
-        # --- Configuración de los elementos adicionales del grafico
-        titles: dict | None = None,                                         # titulo de la grafica
-        source: dict | None = None,                                         # Fuente de datos del grafico
-        
-        # --- Configuración de df
-        df_index: int = 0,                                                  # índice del dataframe a usar (en caso de tener varios)
-
-        # --- Configuración de las series
-        tickers: list[str] | str = "all",                                   # tickers en evaluación del dataframe
-        labels: list[str] | str | None = None,                              # etiquetas de los tickers en el orden dado, sino defaultea a los tickers
-        colors: list["str"] | str = PALETA_COLORES,                         # Lista de colors para cada uno de los tickers en evaluación
-        lw: float=1.6,                                                      # grosor de línea
-
-        # --- Configuración de etiquetas en la linea
-        tag_dot: dict = None,
-
-        # --- Configuración del eje y izquierdo
-        y_axis: dict = None,
-
-        # --- Configuración del eje y derecho
-        axis_side: str | list[str] | dict[str, str] | None = None,
-        y_axis_right: dict | None = None,
-        right_axis: dict | None = None,
-
-        # --- Configuración del eje x
-        x_axis: dict = None,
-        
-        # --- Configuración Leyenda
-        legend: dict | None = None,                                    # None = auto (solo si hay >1 serie y labels)
-        
-        # --- Configuración lineas horizontales
-        hlines: dict | None = None,                           # agregar lineas horizontales en el grafico
-        
-        # --- Mostrar guias horizontales
-        show_hguide: bool = False
-    ) -> Self:
-
-        """
-        Create an institutional line chart from selected DataFrame columns.
-
-        This method plots one or multiple time series or indexed series from the
-        selected DataFrame. It supports custom titles, source notes, labels, colors,
-        line widths, x-axis and y-axis formatting, horizontal reference lines,
-        optional horizontal guides, legends, and line-end value annotations.
-
-        Parameters
-        ----------
-        figsize : tuple[float, float], default (6.00, 5.00)
-            Figure size in inches.
-        titles : dict or None, optional
-            Configuration passed to `add_titles` to define chart titles and subtitles.
-        source : dict or None, optional
-            Configuration passed to `add_source` to display the data source note.
-        df_index : int, default 0
-            Index of the DataFrame to use when multiple DataFrames are available.
-        tickers : list[str] or str, default "all"
-            Columns to plot. Use `"all"` to plot every column in the selected
-            DataFrame.
-        labels : list[str], str, or None, optional
-            Display labels for the selected series. If not provided, column names
-            are used as labels.
-        colors : list[str] or str, default PALETA_COLORES
-            Colors assigned to each plotted series.
-        lw : float, default 1.6
-            Line width.
-        tag_dot : dict or None, optional
-            Configuration for line-end labels or point annotations.
-        y_axis : dict or None, optional
-            Configuration passed to `prep_y_axis`.
-        x_axis : dict or None, optional
-            Configuration passed to `prep_x_axis`.
-        legend : dict or None, optional
-            Legend configuration passed to `add_legend`.
-        hlines : dict or None, optional
-            Horizontal reference line configuration passed to `horizontal_lines`.
-        show_hguide : bool, default False
-            Whether to display horizontal guide lines.
-
-        Returns
-        -------
-        None
-            The chart is drawn on the active Matplotlib axis.
-
-        Notes
-        -----
-        If no active axis exists, the method automatically creates a new figure and
-        axis using `plot()`.
-        """
-
-        # --- 1. Importación y setteo del dataframe 
-        db = self._select_df(df_idx=df_index)
-        
-        # --- 3. Normalize series configuration
-        series_config = self._normalize_series_config(
-            dataframe=db,
-            tickers=tickers,
-            labels=labels,
-            colors=colors,
-            axis_side=axis_side,
-        )
-
-        tickers = [item["ticker"] for item in series_config]
-        labels = [item["label"] for item in series_config]
-        colors = [item["color"] for item in series_config]
-
-        axis_map = {
-            item["ticker"]: item["axis_side"]
-            for item in series_config
-        }
-
-        self._series_config = series_config
-        self._axis_map = axis_map
-
-        # Backward compatibility for existing tag helpers
-        self._ticker_label_color = [
-            (item["ticker"], item["label"], item["color"])
-            for item in series_config
-        ]
-
-        # --- 6. revision de dicts
-        x_axis = x_axis if x_axis is not None else dict()
-        y_axis = y_axis if y_axis is not None else dict()
-        y_axis_right = y_axis_right if y_axis_right is not None else dict()
-        right_axis = right_axis if right_axis is not None else dict()
-        titles = titles if titles is not None else dict()
-        legend = legend if legend is not None else dict()
-        hlines = hlines if hlines is not None else dict()
-        source = source if source is not None else dict()
-
-        # --- 7. Generación del gráfico y el plot en caso no exista
-        if not hasattr(self, "_ax") or self._ax is None:
-            self.plot(figsize=figsize)
-
-        # --- 7B. Crear eje derecho solo si alguna serie lo requiere
-        left_ax = self._ax
-        right_ax = getattr(self, "_right_ax", None)
-
-        needs_right_axis = any(side == "right" for side in axis_map.values())
-
-        if needs_right_axis:
-            if right_ax is None:
-                right_ax = left_ax.twinx()
-
-            self._right_ax = right_ax
-            self._right_axis_enabled = True
-        else:
-            self._right_axis_enabled = right_ax is not None
-
-        # --- 8. Agregar titulos globales
-        self.add_titles(**titles)
-        self.add_source(**source)
-
-        # --- 9. Manejo del eje x
-        db = self.prep_x_axis(dataframe=db, **x_axis)
-
-        # --- 10 Graficar las lineas
+        dataframe: pd.DataFrame,
+        series_config: list[dict],
+        left_ax,
+        right_ax,
+        lw: float,
+    ) -> None:
         for item in series_config:
-            t = item["ticker"]
-            lab = item["label"]
-            col = item["color"]
+            ticker = item["ticker"]
+            label = item["label"]
+            color = item["color"]
             selected_side = item["axis_side"]
 
-            s = db[[t]].copy()
+            serie_df = dataframe[[ticker]].copy()
 
-            if s.empty:
+            if serie_df.empty:
                 continue
 
             plot_ax = right_ax if selected_side == "right" else left_ax
@@ -268,163 +112,144 @@ class GraphMtplt(Graph_base, LineTags, BarTags, PieTags, BoxWTags):
                 raise RuntimeError("Right axis was not initialized correctly.")
 
             if self._x_axis_mode == "bbg":
-                serie = s.reindex(self._x_axis_fechas)[t]
+                serie = serie_df.reindex(self._x_axis_fechas)[ticker]
 
                 plot_ax.plot(
                     self._x_vals,
                     serie.to_numpy(),
-                    color=col,
+                    color=color,
                     lw=lw,
-                    label=lab,
+                    label=label,
                 )
             else:
-                x_plot = self._x_vals if self._x_axis_mode == "categorical" else s.index
+                x_plot = (
+                    self._x_vals
+                    if self._x_axis_mode == "categorical"
+                    else serie_df.index
+                )
 
                 plot_ax.plot(
                     x_plot,
-                    s[t],
-                    color=col,
+                    serie_df[ticker],
+                    color=color,
                     lw=lw,
-                    label=lab,
-                )
+                    label=label,
+                ) 
 
-        # --- 11 Graficar ultimo valores
-        if tag_dot:
-            tag_dot_left = {}
-            tag_dot_right = {}
+    def graph_line(
+        self,
+        figsize: tuple[float, float] = (6.00, 5.00),
+        titles: dict | TitleConfig | None = None,
+        source: dict | SourceConfig | None = None,
+        df_index: int = 0,
+        tickers: list[str] | str = "all",
+        labels: list[str] | str | None = None,
+        colors: list[str] | str = PALETA_COLORES,
+        lw: float = 1.6,
+        tag_dot: dict | None = None,
+        y_axis: dict | YAxisConfig | None = None,
+        axis_side: str | list[str] | dict[str, str] | None = None,
+        y_axis_right: dict | YAxisConfig | None = None,
+        x_axis: dict | XAxisConfig | None = None,
+        legend: dict | LegendConfig | None = None,
+        hlines: dict | None = None,
+        show_hguide: bool = False,
+    ) -> Self:
 
-            for control_name, control in tag_dot.items():
-                ticker = control.get("ticker")
+        db = self._select_df(df_idx=df_index)
 
-                if ticker is None:
-                    tag_dot_left[control_name] = control
-                    continue
+        series_config = self._normalize_series_config(
+            dataframe=db,
+            tickers=tickers,
+            labels=labels,
+            colors=colors,
+            axis_side=axis_side,
+        )
 
-                if axis_map.get(ticker, "left") == "right":
-                    tag_dot_right[control_name] = control
-                else:
-                    tag_dot_left[control_name] = control
+        axis_map = {
+            item["ticker"]: item["axis_side"]
+            for item in series_config
+        }
 
-            if tag_dot_left:
-                self._ax = left_ax
-                self._line_label_generate(tag_dot_left)
+        self._series_config = series_config
+        self._axis_map = axis_map
+        self._ticker_label_color = [
+            (item["ticker"], item["label"], item["color"])
+            for item in series_config
+        ]
 
-            if tag_dot_right:
-                if right_ax is None:
-                    raise RuntimeError(
-                        "Right axis was not initialized for right-side tags."
-                    )
+        configs = coerce_configs(
+            x_axis=(x_axis, XAxisConfig),
+            y_axis=(y_axis, YAxisConfig),
+            y_axis_right=(y_axis_right, YAxisConfig),
+            titles=(titles, TitleConfig),
+            legend=(legend, LegendConfig),
+            source=(source, SourceConfig),
+        )
 
-                self._ax = right_ax
-                self._line_label_generate(tag_dot_right)
+        x_axis = configs["x_axis"]
+        y_axis = configs["y_axis"]
+        y_axis_right = configs["y_axis_right"]
+        titles = configs["titles"]
+        legend = configs["legend"]
+        source = configs["source"]
+        hlines = hlines if hlines is not None else {}
 
-            self._ax = left_ax
+        if not hasattr(self, "_ax") or self._ax is None:
+            self.plot(figsize=figsize)
 
-        # --- 12. Configuración del eje y izquierdo
+        left_ax, right_ax = self._resolve_line_axes(axis_map)
+
+        self.add_titles(**titles)
+        self.add_source(**source)
+
+        db = self.prep_x_axis(dataframe=db, **x_axis)
+
+        self._plot_line_series(
+            dataframe=db,
+            series_config=series_config,
+            left_ax=left_ax,
+            right_ax=right_ax,
+            lw=lw,
+        )
+
+        self._apply_line_tags_by_axis(
+            tag_dot=tag_dot,
+            axis_map=axis_map,
+            left_ax=left_ax,
+            right_ax=right_ax,
+        )
+
         self.prep_y_axis(
             ax=left_ax,
             side="left",
             **y_axis,
         )
 
-        # --- 12B. Configuración del eje y derecho
         if right_ax is not None:
-            self._ax = right_ax
-            self.prep_y_axis(**y_axis_right)
-
-            right_label = right_axis.get("label")
-            right_label_color = right_axis.get("label_color", "#333333")
-            right_tick_color = right_axis.get("tick_color", right_label_color)
-            right_spine_color = right_axis.get("spine_color", right_tick_color)
-
-            if right_label is not None:
-                right_ax.set_ylabel(
-                    right_label,
-                    color=right_label_color,
-                    fontsize=right_axis.get("labelsize", 8),
-                )
-
-            right_ax.tick_params(
-                axis="y",
-                colors=right_tick_color,
-                labelsize=right_axis.get("fontsize", 7),
+            self.prep_y_axis(
+                ax=right_ax,
+                side="right",
+                **y_axis_right,
             )
-
-            right_ax.spines["right"].set_color(right_spine_color)
 
         self._ax = left_ax
 
-        # -- 13. Agregar lineas horizontales
-        self.horizontal_lines(
-            side="left",
-            **hlines,
-        )
+        if hlines:
+            hlines.setdefault("side", "left")
+            self.horizontal_lines(**hlines)
 
-        # -- 14. Agregar guias horizontales
         if show_hguide:
-            guide_side = "both" if right_ax is not None else "left"
-
             self.horizontal_guides(
-                side=guide_side,
+                side="both" if right_ax is not None else "left",
                 mostrar_cero=False,
             )
-            
 
-        # --- 15. Agregar leyenda
-        if right_ax is None:
-            self._ax = left_ax
-            self.add_legend(**legend)
-
-        else:
-            show_legend = legend.get("show", False)
-
-            if show_legend:
-                legend_config = legend.copy()
-                legend_config.pop("show", None)
-
-                left_handles, left_labels = left_ax.get_legend_handles_labels()
-                right_handles, right_labels = right_ax.get_legend_handles_labels()
-
-                handles = left_handles + right_handles
-                legend_labels = left_labels + right_labels
-
-                custom_handles = getattr(self, "_custom_legend_handles", None)
-
-                if custom_handles:
-                    handles = handles + custom_handles
-                    legend_labels = legend_labels + [
-                        h.get_label()
-                        for h in custom_handles
-                    ]
-
-                final_handles = []
-                final_labels = []
-                seen = set()
-
-                for handle, label in zip(handles, legend_labels):
-                    if label is None or label == "" or label.startswith("_"):
-                        continue
-
-                    if label in seen:
-                        continue
-
-                    final_handles.append(handle)
-                    final_labels.append(label)
-                    seen.add(label)
-
-                if final_handles:
-                    left_ax.legend(
-                        final_handles,
-                        final_labels,
-                        loc=legend_config.get("loc", "upper left"),
-                        bbox_to_anchor=legend_config.get("bbox_to_anchor"),
-                        ncol=legend_config.get("ncol", 3),
-                        fontsize=legend_config.get("fontsize", 7),
-                        frameon=legend_config.get("frameon", True),
-                        edgecolor=legend_config.get("edgecolor", "white"),
-                        facecolor=legend_config.get("facecolor", "white"),
-                        framealpha=legend_config.get("framealpha", 0.6),
-                    )
+        self.add_combined_legend(
+            ax=left_ax,
+            include_right_axis=right_ax is not None,
+            **legend,
+        )
 
         self._ax = left_ax
 

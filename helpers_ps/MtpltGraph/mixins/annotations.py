@@ -23,7 +23,7 @@ class AnnotationMixin:
         bg_color: str = "#ECEFF1",
         bg_alpha: float = 1.0,
         edge_color: str = "none",
-        show_bbox: bool = True,
+        show_bbox: bool = False,
         text_edge_color: str | None = None,
         text_edge_width: float = 0.0,
         zorder: int = 6,
