@@ -11,16 +11,16 @@ import numpy as np
 import pandas as pd
 from typing import Self
 
-from ._colors import PALETA_COLORES
+from .tags._colors import PALETA_COLORES
 
 from .base import Graph_base
-from .tags_line import Line_tags
-from .tags_bar import Bar_tags
-from .tags_pie import Pie_tags
-from .tags_box import BoxW_tags
+from .tags.line import LineTags
+from .tags.bar import BarTags
+from .tags.pie import PieTags
+from .tags.box import BoxWTags
 
 @dataclass
-class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
+class GraphMtplt(Graph_base, LineTags, BarTags, PieTags, BoxWTags):
     """
     High-level Matplotlib chart builder for institutional reporting.
 
@@ -1050,11 +1050,6 @@ class GraphMtplt(Graph_base, Line_tags, Bar_tags, Pie_tags, BoxW_tags):
                 side=guide_side,
                 mostrar_cero=False,
             )
-
-        
-        # --- 12. Agregar guias horizontales
-        if show_hguide:
-            self.horizontal_guides(mostrar_cero=False)
 
         # --- 13. Agregar leyenda
         if right_ax is None:

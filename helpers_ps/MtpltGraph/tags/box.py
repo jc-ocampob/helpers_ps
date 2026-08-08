@@ -19,7 +19,7 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator
 
 from ._colors import PALETA_COLORES
 
-class BoxW_tags():
+class BoxWTags():
     """
     Provide helper methods for box-and-whisker chart annotations.
 

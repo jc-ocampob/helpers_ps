@@ -19,7 +19,7 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator
 
 from ._colors import PALETA_COLORES
 
-class Bar_tags:
+class BarTags:
     """
     Provide helper methods for bar-chart labels, values, and tags.
 

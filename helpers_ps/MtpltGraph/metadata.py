@@ -5,25 +5,12 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from ._colors import PALETA_COLORES
+from .tags._colors import PALETA_COLORES
 
 
 # ---------------------------------------------------------------------------
 # AxisState
 # ---------------------------------------------------------------------------
-#
-# All metadata that used to live "flattened" on the instance (self._bar_mode,
-# self._x_axis_mode, self._pie_data, ...) now lives inside a single
-# AxisState per subplot axis. Switching the active axis becomes swapping one
-# reference (self._state) instead of copying every field in and out of a
-# plain dict by hand.
-#
-# Adding a new piece of per-axis metadata now only requires adding ONE field
-# here. Previously it required updating the class attribute list, the
-# _generate_metadata() dict defaults, and both the "save" and "load" halves
-# of _set_axis() -- four places kept in sync by hand. Two kinds of fields
-# (`series_config`, and pie chart data) had already drifted out of sync
-# with that old pattern; see the CHANGES note at the bottom of this file.
 @dataclass
 class AxisState:
     # DataFrame activo para este eje
@@ -102,8 +89,8 @@ _STATE_ATTRS = {
     "_y_axis_right": "y_axis_right",
 }
 
-
-class Graph_meta_data:
+@dataclass
+class GraphMetaData:
     """
     Store and manage figure, axis, dataframe, and per-subplot metadata.
 

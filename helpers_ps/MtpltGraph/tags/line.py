@@ -21,7 +21,7 @@ from typing import Any
 
 from ._colors import PALETA_COLORES
 
-class Line_tags():
+class LineTags():
     # funcion para procesar diccionario de controles de annotaciones
     """
     Provide helper methods for line-chart annotations.

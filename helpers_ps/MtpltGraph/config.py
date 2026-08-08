@@ -6,7 +6,7 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import locale
 
-from ._colors import PALETA_COLORES
+from .tags._colors import PALETA_COLORES
 
 buffers: dict[str, object] = {}
 

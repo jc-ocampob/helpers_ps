@@ -19,7 +19,7 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator
 
 from ._colors import PALETA_COLORES
 
-class Pie_tags():
+class PieTags():
 
     """
     Provide helper methods for pie-chart labels, values, and tags.
