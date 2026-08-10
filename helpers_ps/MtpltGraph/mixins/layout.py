@@ -326,7 +326,7 @@ class LayoutMixin:
         if researchtype:
             self._fig.add_artist(
                 Line2D(
-                    [0.01, 0.98], [0.95, 0.95],
+                    [0.0, 1.0], [0.95, 0.95],
                     transform=self._fig.transFigure,
                     color=color, lw=lw
                 )
@@ -334,7 +334,7 @@ class LayoutMixin:
 
             self._fig.add_artist(
                 Line2D(
-                    [0.01, 0.98], [0.12, 0.12],
+                    [0.0, 1.0], [0.12, 0.12],
                     transform=self._fig.transFigure,
                     color=color, lw=lw
                 )
