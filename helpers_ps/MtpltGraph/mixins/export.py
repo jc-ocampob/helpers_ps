@@ -68,12 +68,6 @@ class ExportMixin:
         plt.close(self._fig)
 
         if reset_buffers:
-            self._fig = None
-            self._axes = None
-            self._axes_shape = None
-            self._ax_idx = None
-            self._ax = None
-            self._states = None
-            self._state = None
+            self._reset_figure_metadata()
 
         return self

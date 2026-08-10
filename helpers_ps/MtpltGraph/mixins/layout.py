@@ -3,67 +3,100 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from typing import Self
 import numpy as np
+from typing import Literal
+from ..models import FigureTitle, FigureSubtitle, FigureSource
 
 class LayoutMixin:
     """
     Provide figure creation, layout, titles and source notes
     """
-
-    def add_titles(
+    # -----
+    # Figure level layout
+    # -----
+    def add_title(
         self,
-        title: str | None = None,
-        title_font_size: int = 12,
-        subtitle: str | None = None,
-        subtitle_font_size: int = 9
+        text: str,
+        *,
+        x: float = 0.02,
+        y: float = 0.93,
+        fontsize: int = 12,
+        color: str = "#000000",
+        fontweight: str = "bold",
+        ha: str = "left",
+        va: str = "top",
+        **kwargs,
     ) -> Self:
         """
-        Add a main title and subtitle to the active figure.
-
-        This method places figure-level text elements instead of using the default
-        axis title, allowing for a consistent institutional layout across different
-        chart types.
-
-        Parameters
-        ----------
-        title : str or None, optional
-            Main chart title.
-        title_font_size : int, default 12
-            Font size of the main title.
-        subtitle : str or None, optional
-            Subtitle displayed below the main title.
-        subtitle_font_size : int, default 9
-            Font size of the subtitle.
-
-        Returns
-        -------
-        None
-            Title and subtitle are added directly to the active figure.
+        Add a figure-level title.
         """
-        
-        # eliminar title del axis
+
         self._ax.set_title("")
 
-        # título principal (arriba del todo)
-        if title:
-            self._fig.text(
-                0.02, 0.93,
-                title,
-                ha="left",
-                va="top",
-                fontsize=title_font_size,
-                fontweight="bold"
-            )
+        self._fig.text(
+            x,
+            y,
+            text,
+            fontsize=fontsize,
+            color=color,
+            fontweight=fontweight,
+            ha=ha,
+            va=va,
+            **kwargs,
+        )
 
-        # subtítulo
-        if subtitle:
-            self._fig.text(
-                0.02, 0.88,
-                subtitle,
-                ha="left",
-                va="top",
-                fontsize=subtitle_font_size,
-                color="#333333"
-            )
+        self._title = FigureTitle(
+            text=text,
+            x=x,
+            y=y,
+            fontsize=fontsize,
+            color=color,
+            fontweight=fontweight,
+            ha=ha,
+            va=va,
+        )
+
+        return self
+
+
+    def add_subtitle(
+        self,
+        text: str,
+        *,
+        x: float = 0.02,
+        y: float = 0.88,
+        fontsize: int = 9,
+        color: str = "#333333",
+        fontweight: str = "normal",
+        ha: str = "left",
+        va: str = "top",
+        **kwargs,
+    ) -> Self:
+        """
+        Add a figure-level subtitle.
+        """
+
+        self._fig.text(
+            x,
+            y,
+            text,
+            fontsize=fontsize,
+            color=color,
+            fontweight=fontweight,
+            ha=ha,
+            va=va,
+            **kwargs,
+        )
+
+        self._subtitle = FigureSubtitle(
+            text=text,
+            x=x,
+            y=y,
+            fontsize=fontsize,
+            color=color,
+            fontweight=fontweight,
+            ha=ha,
+            va=va,
+        )
 
         return self
 
@@ -132,6 +165,15 @@ class LayoutMixin:
                 fontsize=fontsize,
                 color=color
             )
+
+        self._source = FigureSource(
+            text=text,
+            x=x,
+            y=y,
+            fontsize=fontsize,
+            color=color,
+            line_spacing=line_spacing,
+        )
 
         return self
 
@@ -309,5 +351,33 @@ class LayoutMixin:
                 top=0.80,
                 bottom=0.30
             )
+
+        return self
+
+    # -----
+    # Plot level layout
+    # -----
+    def add_plot_title(
+            self,
+            text: str,
+            loc: Literal["left", "right", "center"] = "center",
+            fontsize: int =7, 
+            fontweight: Literal["bold", "semibold", "normal"] = "bold", 
+            fontstyle: Literal["normal", "italic"] = "normal", 
+            color:str = "black", 
+            pad: int = 3,
+            y: int = 1.0
+    ) -> Self:
+
+        self._ax.set_title(
+            text,
+            loc=loc,
+            fontsize=fontsize,
+            fontweight=fontweight,
+            fontstyle=fontstyle,
+            color=color,
+            pad=pad,
+            y=y
+        )
 
         return self

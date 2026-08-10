@@ -1,8 +1,7 @@
-# MtpltGraph/config_models/__init__.py
+from __future__ import annotations
 
 from ._coerce import coerce_config, config_to_dict, clean_none, coerce_configs
-
-from .axis import XAxisConfig, YAxisConfig
+from .axes import XAxisConfig, YAxisConfig
 from .series import (
     AxisSide,
     SeriesSpec,
@@ -11,11 +10,11 @@ from .series import (
     series_to_legacy_ticker_label_color,
 )
 from .legend import LegendConfig
-from .layout import TitleConfig, SourceConfig, FigureConfig
+from .layout import FigureTitle, FigureSubtitle, FigureSource, FigureConfig
 from .tags import TagStyle, DotStyle, LineTagConfig
 
 __all__ = [
-    "coerce_configs"
+    "coerce_configs",
     "coerce_config",
     "config_to_dict",
     "clean_none",
@@ -27,8 +26,9 @@ __all__ = [
     "series_to_dicts",
     "series_to_legacy_ticker_label_color",
     "LegendConfig",
-    "TitleConfig",
-    "SourceConfig",
+    "FigureTitle",
+    "FigureSubtitle",
+    "FigureSource",
     "FigureConfig",
     "TagStyle",
     "DotStyle",

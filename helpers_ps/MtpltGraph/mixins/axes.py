@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 import matplotlib.dates as mdates
-from ..config_models import XAxisConfig, YAxisConfig, coerce_config, config_to_dict
+from ..models import XAxisConfig, YAxisConfig, coerce_config, config_to_dict
 
 
 class AxesMixin:
@@ -29,7 +29,7 @@ class AxesMixin:
     ):
         cfg = coerce_config(config, YAxisConfig)
         kwargs = config_to_dict(cfg)
-        return self.prep_y_axis(**kwargs)
+        return self.config_yaxis(**kwargs)
 
 
     def _months_years(self, fechas):
@@ -170,12 +170,12 @@ class AxesMixin:
         year_y_offset: float = -0.08,
         lim: tuple[float, float] = None,
         fontsize: float = 8,
-        return_dataframe: bool = True,
         tick_values: list | tuple | pd.Index | np.ndarray | None = None,
         tick_labels: list[str] | tuple[str, ...] | None = None,
         tick_label_map: dict | None = None,
         rotation: float = 0,
         ha: str = "center",
+        va: str = "center",
         label_color: str | None = None,
         show_years: bool = True,
     ) -> pd.DataFrame:
@@ -360,6 +360,7 @@ class AxesMixin:
             for label in self._ax.get_xticklabels():
                 label.set_rotation(rotation)
                 label.set_ha(ha)
+                label.set_va(va)
 
                 if label_color is not None:
                     label.set_color(label_color)
@@ -626,7 +627,7 @@ class AxesMixin:
         return dataframe
 
 
-    def prep_y_axis(
+    def config_yaxis(
         self,
         lim: tuple[float, float] | None = None,
         fmt: str | None = None,

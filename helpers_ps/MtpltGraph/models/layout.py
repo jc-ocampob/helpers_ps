@@ -6,15 +6,29 @@ from dataclasses import dataclass
 
 
 @dataclass(slots=True)
-class TitleConfig:
-    title: str | None = None
-    title_font_size: int = 12
-    subtitle: str | None = None
-    subtitle_font_size: int = 9
-
+class FigureTitle:
+    text: str = ""
+    x: float = 0.02
+    y: float = 0.93
+    fontsize: int = 12
+    color: str = "#000000"
+    fontweight: str = "bold"
+    ha: str = "left"
+    va: str = "top"
 
 @dataclass(slots=True)
-class SourceConfig:
+class FigureSubtitle:
+    text: str = ""
+    x: float = 0.02
+    y: float = 0.88
+    fontsize: int = 9
+    color: str = "#333333"
+    fontweight: str = "normal"
+    ha: str = "left"
+    va: str = "top"
+
+@dataclass(slots=True)
+class FigureSource:
     text: str | list[str] | None = None
     x: float = 0.02
     y: float = 0.022
