@@ -12,6 +12,7 @@ from ..models import (
     FigureSubtitle,
     FigureSource,
     coerce_configs,
+    config_to_dict
 )
 from ..tags._colors import PALETA_COLORES
 
@@ -215,10 +216,10 @@ class PieChartMixin:
             legend=(legend, LegendConfig),
         )
 
-        title = configs["title"]
-        subtitle = configs["subtitle"]
-        source = configs["source"]
-        legend = configs["legend"]
+        title = config_to_dict(configs["title"])
+        subtitle = config_to_dict(configs["subtitle"])
+        source = config_to_dict(configs["source"])
+        legend = config_to_dict(configs["legend"])
 
         textprops = textprops if textprops is not None else {}
         wedgeprops = wedgeprops if wedgeprops is not None else {}

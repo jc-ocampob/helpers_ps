@@ -13,6 +13,7 @@ from ..models import (
     FigureSubtitle,
     FigureSource,
     coerce_configs,
+    config_to_dict
 )
 from ..tags._colors import PALETA_COLORES
 
@@ -112,12 +113,12 @@ class BoxWChartMixin:
             legend=(legend, LegendConfig),
         )
 
-        x_axis = configs["x_axis"]
-        y_axis = configs["y_axis"]
-        title = configs["title"]
-        subtitle = configs["subtitle"]
-        source = configs["source"]
-        legend = configs["legend"]
+        x_axis = config_to_dict(configs["x_axis"])
+        y_axis = config_to_dict(configs["y_axis"])
+        title = config_to_dict(configs["title"])
+        subtitle = config_to_dict(configs["subtitle"])
+        source = config_to_dict(configs["source"])
+        legend = config_to_dict(configs["legend"])
 
         return {
             "db": db,
