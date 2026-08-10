@@ -6,6 +6,7 @@ Matplotlib charts.
 """
 
 from .config import set_graph_theme
+from .renderer import render_from_dict
 from .GraphMtplt import GraphMtplt
 from .models import (
     XAxisConfig,
@@ -21,4 +22,5 @@ from .models import (
 __all__ = [
     "set_graph_theme",
     "GraphMtplt",
+    "render_from_dict"
 ]

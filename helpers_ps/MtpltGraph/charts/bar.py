@@ -13,6 +13,7 @@ from ..models import (
     FigureSubtitle,
     FigureSource,
     coerce_configs,
+    config_to_dict
 )
 from ..tags._colors import PALETA_COLORES
 
@@ -88,13 +89,13 @@ class BarChartMixin:
             source=(source, FigureSource),
         )
 
-        x_axis = configs["x_axis"]
-        y_axis = configs["y_axis"]
-        y_axis_right = configs["y_axis_right"]
-        title = configs["title"]
-        subtitle = configs["subtitle"]
-        legend = configs["legend"]
-        source = configs["source"]
+        x_axis = config_to_dict(configs["x_axis"])
+        y_axis = config_to_dict(configs["y_axis"])
+        y_axis_right = config_to_dict(configs["y_axis_right"])
+        title = config_to_dict(configs["title"])
+        subtitle = config_to_dict(configs["subtitle"])
+        legend = config_to_dict(configs["legend"])
+        source = config_to_dict(configs["source"])
 
         right_axis = right_axis if right_axis is not None else {}
         hlines = hlines if hlines is not None else {}
@@ -633,14 +634,14 @@ class BarChartMixin:
         left_ax = context["left_ax"]
         right_ax = context["right_ax"]
         y_axis = context["y_axis"]
+        y_axis["side"] = "left"
         y_axis_right = context["y_axis_right"]
+        y_axis_right["side"] = "right"
         right_axis = context["right_axis"]
         hlines = context["hlines"]
         show_hguide = context["show_hguide"]
 
         self.config_yaxis(
-            ax=left_ax,
-            side="left",
             **y_axis,
         )
 
@@ -649,8 +650,6 @@ class BarChartMixin:
             right_y_axis.update(y_axis_right)
 
             self.config_yaxis(
-                ax=right_ax,
-                side="right",
                 **right_y_axis,
             )
 
