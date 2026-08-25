@@ -354,6 +354,13 @@ class LayoutMixin:
 
         return self
 
+    def subplot_adjust(
+            self,
+            **kwargs
+    ) -> Self:
+        self._fig.subplots_adjust(**kwargs)
+
+        return self
     # -----
     # Plot level layout
     # -----

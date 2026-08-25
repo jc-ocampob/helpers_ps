@@ -26,11 +26,11 @@ class ExportMixin:
 
     def save(
         self,
-        dir: dict = buffers,
+        dir: dict | None = None,
         name: str = "graph_1",
         dpi: int = 400,
         reset_buffers: bool = True
-    ) -> Self:
+    ) -> io.BytesIO | None:
         """
         Save the active figure into an in-memory PNG buffer.
 
@@ -64,10 +64,17 @@ class ExportMixin:
         buf = io.BytesIO()
         self._fig.savefig(buf, format="png", dpi=dpi)   # use figure-level save
         buf.seek(0)
-        dir[name] = buf
+
+        if dir is not None:
+            dir[name] = buf
+        
         plt.close(self._fig)
 
         if reset_buffers:
             self._reset_figure_metadata()
 
-        return self
+        if dir is None:
+            return buf
+
+        else:
+            return None
