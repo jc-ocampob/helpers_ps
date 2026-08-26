@@ -5,7 +5,7 @@
 ## Axis
 --------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.prep_x_axis
+::: helpers_ps.GraphMtplt.prep_x_axis
     options:
       heading_level: 3
       show_root_heading: true
@@ -14,7 +14,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.prep_y_axis
+::: helpers_ps.GraphMtplt.prep_y_axis
     options:
       heading_level: 3
       show_root_heading: true
@@ -22,7 +22,7 @@
       separate_signature: true
       show_signature_annotations: true
       
-::: helpers_ps.MtpltGraph.base.Graph_base.axis
+::: helpers_ps.GraphMtplt.axis
     options:
       heading_level: 3
       show_root_heading: true
@@ -31,7 +31,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.get_axis
+::: helpers_ps.GraphMtplt.get_axis
     options:
       heading_level: 3
       show_root_heading: true
@@ -43,7 +43,7 @@
 --------
 ## Titles
 --------
-::: helpers_ps.MtpltGraph.base.Graph_base.add_titles
+::: helpers_ps.GraphMtplt.add_titles
     options:
       heading_level: 3
       show_root_heading: true
@@ -52,7 +52,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.add_source
+::: helpers_ps.GraphMtplt.add_source
     options:
       heading_level: 3
       show_root_heading: true
@@ -61,7 +61,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.add_legend
+::: helpers_ps.GraphMtplt.add_legend
     options:
       heading_level: 3
       show_root_heading: true
@@ -70,7 +70,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.add_legend_point
+::: helpers_ps.GraphMtplt.add_legend_point
     options:
       heading_level: 3
       show_root_heading: true
@@ -82,7 +82,7 @@
 --------
 ## Tags, dots and shades
 --------
-::: helpers_ps.MtpltGraph.base.Graph_base.horizontal_guides
+::: helpers_ps.GraphMtplt.horizontal_guides
     options:
       heading_level: 3
       show_root_heading: true
@@ -91,7 +91,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.tag
+::: helpers_ps.GraphMtplt.tag
     options:
       heading_level: 3
       show_root_heading: true
@@ -100,7 +100,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.dot
+::: helpers_ps.GraphMtplt.dot
     options:
       heading_level: 3
       show_root_heading: true
@@ -109,7 +109,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.shade_x
+::: helpers_ps.GraphMtplt.shade_x
     options:
       heading_level: 3
       show_root_heading: true
@@ -118,7 +118,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.horizontal_lines
+::: helpers_ps.GraphMtplt.horizontal_lines
     options:
       heading_level: 3
       show_root_heading: true
@@ -127,7 +127,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.vertical_lines
+::: helpers_ps.GraphMtplt.vertical_lines
     options:
       heading_level: 3
       show_root_heading: true
@@ -136,7 +136,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.add_recessions
+::: helpers_ps.GraphMtplt.add_recessions
     options:
       heading_level: 3
       show_root_heading: true
@@ -147,7 +147,7 @@
 --------
 ## Helper Mutations
 --------
-::: helpers_ps.MtpltGraph.base.Graph_base.pipe
+::: helpers_ps.GraphMtplt.pipe
     options:
       heading_level: 3
       show_root_heading: true
@@ -156,7 +156,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.base.Graph_base.tap
+::: helpers_ps.GraphMtplt.tap
     options:
       heading_level: 3
       show_root_heading: true

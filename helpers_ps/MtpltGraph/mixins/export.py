@@ -3,6 +3,7 @@ import io
 import matplotlib.pyplot as plt
 from ..config import buffers
 from typing import Self
+import os
 
 class ExportMixin:
     """
@@ -78,3 +79,20 @@ class ExportMixin:
 
         else:
             return None
+
+
+    def render(
+        self,
+        name: str,
+        dir: str,
+        dpi: int = 400
+    ) -> None:
+
+        buf = self.save(dpi=dpi)
+        buf.seek(0)
+
+        file_path = os.path.join(dir, f"{name}.png")
+        with open(file_path, "wb") as f:
+            f.write(buf.getvalue())
+
+        return None
