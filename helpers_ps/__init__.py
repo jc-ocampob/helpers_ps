@@ -51,7 +51,7 @@ __all__ = [
 
     #Alternate packages
     "FinCalculations",
-    "BBGHelper"
+    "BBGHelper",
     "Powerpoint",
     "Excel",
     "PALETA_COLORES"

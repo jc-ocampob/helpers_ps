@@ -52,6 +52,8 @@ from .metrics import (
     rank_percentile
 )
 
+from . import styling
+
 
 __all__ = [
     "Metrics",
@@ -104,5 +106,8 @@ __all__ = [
     # Range and Transformations
     "mean_std_bands",
     "relative",
-    "rank_percentile"
+    "rank_percentile",
+
+    # Dataframe formating
+    "styling",
 ]

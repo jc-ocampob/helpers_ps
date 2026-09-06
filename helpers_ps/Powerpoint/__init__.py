@@ -1,3 +1,7 @@
+from .GraphPpt import (
+    GraphPpt
+)
+
 from .graphs import (
     LineChart,
     BarChart,
@@ -6,17 +10,20 @@ from .graphs import (
     WaterfallChart,
 )
 
+from .metadata import GraphPptMetaData
+
 from .utils import (
     replace_text_preserve_style,
     get_shape_by_name,
-    get_layout_by_name
+    get_layout_by_name,
 )
 
-from . import (
-    layouts
-)
+from . import layouts
+
 
 __all__ = [
+    "GraphPpt",
+    "GraphPptMetaData",
     "LineChart",
     "BarChart",
     "PieChart",
@@ -25,5 +32,5 @@ __all__ = [
     "replace_text_preserve_style",
     "get_shape_by_name",
     "get_layout_by_name",
-    "layouts"
+    "layouts",
 ]
