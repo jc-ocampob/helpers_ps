@@ -16,7 +16,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 ## Graphs
 --------
-::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_line
+::: helpers_ps.MtpltGraph.charts.LineChartMixin.graph_line
     options:
       heading_level: 3
       show_root_heading: true
@@ -27,7 +27,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 
 ---------
-::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_bar
+::: helpers_ps.MtpltGraph.charts.BarChartMixin.graph_bar
     options:
       heading_level: 3
       show_root_heading: true
@@ -37,7 +37,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
 
 ----------
 
-::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_pie
+::: helpers_ps.MtpltGraph.charts.PieChartMixin.graph_pie
     options:
       heading_level: 3
       show_root_heading: true
@@ -46,7 +46,7 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.charts.GraphMtplt.graph_box_whiskers
+::: helpers_ps.MtpltGraph.charts.BoxWChartMixin.graph_box_whiskers
     options:
       heading_level: 3
       show_root_heading: true
@@ -54,148 +54,3 @@ g = hp.GraphMtplt(dataframe = df | [df_1, df_2,...])
       separate_signature: true
       show_signature_annotations: true
   
---------
-## Axis
---------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.prep_x_axis
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.prep_y_axis
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
-
---------
-## Titles
---------
-::: helpers_ps.MtpltGraph.base.Graph_base.add_titles
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.add_source
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.add_legend
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.add_legend_point
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
---------
-## Tags, dots and shades
---------
-::: helpers_ps.MtpltGraph.base.Graph_base.horizontal_guides
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.tag
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.dot
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.shade_x
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.horizontal_lines
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.vertical_lines
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.add_recessions
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
-
---------
-## Helper Mutations
---------
-::: helpers_ps.MtpltGraph.base.Graph_base.pipe
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------
-
-::: helpers_ps.MtpltGraph.base.Graph_base.tap
-    options:
-      heading_level: 3
-      show_root_heading: true
-      show_root_full_path: false
-      separate_signature: true
-      show_signature_annotations: true
----------

@@ -17,6 +17,7 @@ from .metrics import (
     # Drawdownmetrics
     drawdown,
     max_drawdown,
+    calmar_ratio,
 
     # Benchmark relative
     active_return,
@@ -74,6 +75,7 @@ __all__ = [
     # Drawdownmetrics
     "drawdown",
     "max_drawdown",
+    "calmar_ratio",
 
     # Benchmark relative
     "active_return",

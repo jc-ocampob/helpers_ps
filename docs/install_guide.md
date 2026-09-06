@@ -16,5 +16,5 @@ import helpers_ps as hp
 ---
 ## Next Step
 
-The next step is to view the `GraphMtplt` class. [GraphMtplt](GraphMtplt/getting_started.md)
+The next step is to view the `GraphMtplt` class. [GraphMtplt](GraphMtplt/getting_started.ipynb)
 

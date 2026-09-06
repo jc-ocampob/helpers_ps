@@ -206,9 +206,6 @@ class AxesMixin:
             Optional lower and upper x-axis filter applied to the DataFrame index.
         fontsize : float, default 8
             Font size used for x-axis tick labels.
-        return_dataframe : bool, default True
-            Kept for API compatibility. The method returns the transformed or
-            filtered DataFrame.
         tick_values : list, tuple, pandas.Index, numpy.ndarray, or None, optional
             Explicit x-axis values to display as ticks. Values should match the
             DataFrame index for datetime, numeric, or categorical axes. In

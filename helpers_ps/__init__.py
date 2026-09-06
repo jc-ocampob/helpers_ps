@@ -24,8 +24,8 @@ from helpers_ps.GlobVars import (
 # API pública - paquetes alternos
 # ============================================================
 
-from helpers_ps import (
-    FinCalculations,
+from . import (
+    FinCalc,
     Powerpoint,
     Excel
 )
@@ -33,7 +33,7 @@ from helpers_ps import (
 # ============================================================
 # API pública - Paquete principal
 # ============================================================
-from helpers_ps.MtpltGraph import (
+from .MtpltGraph import (
     GraphMtplt,
     set_graph_theme
 )
@@ -50,7 +50,7 @@ __all__ = [
     "set_graph_theme",
 
     #Alternate packages
-    "FinCalculations",
+    "FinCalc",
     "BBGHelper",
     "Powerpoint",
     "Excel",
