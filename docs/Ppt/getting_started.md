@@ -1,12 +1,12 @@
-# `Powerpoint`
+# `Ppt`
 
 
-The `Powerpoint` module provides a range of classes and functions that simplify graphing and power point creation
+The `Ppt` module provides a range of classes and functions that simplify graphing and power point creation
 
 -----
 ## Classes
 
-::: helpers_ps.Powerpoint.graphs.LineChart
+::: helpers_ps.Ppt.graphs.LineChart
     options:
       heading_level: 3
       show_root_heading: true
@@ -14,7 +14,7 @@ The `Powerpoint` module provides a range of classes and functions that simplify 
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.Powerpoint.graphs.PieChart
+::: helpers_ps.Ppt.graphs.PieChart
     options:
       heading_level: 3
       show_root_heading: true
@@ -22,7 +22,7 @@ The `Powerpoint` module provides a range of classes and functions that simplify 
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.Powerpoint.graphs.BarChart
+::: helpers_ps.Ppt.graphs.BarChart
     options:
       heading_level: 3
       show_root_heading: true
@@ -30,7 +30,7 @@ The `Powerpoint` module provides a range of classes and functions that simplify 
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.Powerpoint.graphs.BubbleChart
+::: helpers_ps.Ppt.graphs.BubbleChart
     options:
       heading_level: 3
       show_root_heading: true
@@ -38,7 +38,7 @@ The `Powerpoint` module provides a range of classes and functions that simplify 
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.Powerpoint.graphs.WaterfallChart
+::: helpers_ps.Ppt.graphs.WaterfallChart
     options:
       heading_level: 3
       show_root_heading: true
@@ -50,7 +50,7 @@ The `Powerpoint` module provides a range of classes and functions that simplify 
 -----
 ## Functions
 
-::: helpers_ps.Powerpoint.utils.replace_text_preserve_style
+::: helpers_ps.Ppt.utils.replace_text_preserve_style
     options:
       heading_level: 3
       show_root_heading: true

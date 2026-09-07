@@ -1,11 +1,11 @@
-# `FinCalculations`
+# `Calcs`
 
-`FinCalculations` provides a range of functions that simplify the calculation of different metrics
+`Calcs` provides a range of functions that simplify the calculation of different metrics
 
 -----
 ## Period-to-date returns
 
-::: helpers_ps.FinCalc.wtd
+::: helpers_ps.Calcs.wtd
     options:
       heading_level: 3
       show_root_heading: true
@@ -13,7 +13,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.mtd
+::: helpers_ps.Calcs.mtd
     options:
       heading_level: 3
       show_root_heading: true
@@ -21,7 +21,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.qtd
+::: helpers_ps.Calcs.qtd
     options:
       heading_level: 3
       show_root_heading: true
@@ -29,7 +29,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.ytd
+::: helpers_ps.Calcs.ytd
     options:
       heading_level: 3
       show_root_heading: true
@@ -41,7 +41,7 @@
 -----
 ## Performance metrics
 
-::: helpers_ps.FinCalc.total_return
+::: helpers_ps.Calcs.total_return
     options:
       heading_level: 3
       show_root_heading: true
@@ -49,7 +49,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.annualized_return
+::: helpers_ps.Calcs.annualized_return
     options:
       heading_level: 3
       show_root_heading: true
@@ -57,7 +57,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.volatility
+::: helpers_ps.Calcs.volatility
     options:
       heading_level: 3
       show_root_heading: true
@@ -65,7 +65,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.sharpe_ratio
+::: helpers_ps.Calcs.sharpe_ratio
     options:
       heading_level: 3
       show_root_heading: true
@@ -73,7 +73,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.downside_std
+::: helpers_ps.Calcs.downside_std
     options:
       heading_level: 3
       show_root_heading: true
@@ -81,7 +81,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.sortino_ratio
+::: helpers_ps.Calcs.sortino_ratio
     options:
       heading_level: 3
       show_root_heading: true
@@ -93,7 +93,7 @@
 -----
 ## Drawdown metrics
 
-::: helpers_ps.FinCalc.drawdown
+::: helpers_ps.Calcs.drawdown
     options:
       heading_level: 3
       show_root_heading: true
@@ -101,7 +101,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.max_drawdown
+::: helpers_ps.Calcs.max_drawdown
     options:
       heading_level: 3
       show_root_heading: true
@@ -109,7 +109,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.calmar_ratio
+::: helpers_ps.Calcs.calmar_ratio
     options:
       heading_level: 3
       show_root_heading: true
@@ -121,7 +121,7 @@
 -----
 ## Benchmark-relative metrics
 
-::: helpers_ps.FinCalc.active_return
+::: helpers_ps.Calcs.active_return
     options:
       heading_level: 3
       show_root_heading: true
@@ -129,7 +129,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.beta
+::: helpers_ps.Calcs.beta
     options:
       heading_level: 3
       show_root_heading: true
@@ -137,7 +137,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.tracking_error
+::: helpers_ps.Calcs.tracking_error
     options:
       heading_level: 3
       show_root_heading: true
@@ -145,7 +145,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.rolling_tracking_error
+::: helpers_ps.Calcs.rolling_tracking_error
     options:
       heading_level: 3
       show_root_heading: true
@@ -153,7 +153,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.information_ratio
+::: helpers_ps.Calcs.information_ratio
     options:
       heading_level: 3
       show_root_heading: true
@@ -161,7 +161,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.rolling_information_ratio
+::: helpers_ps.Calcs.rolling_information_ratio
     options:
       heading_level: 3
       show_root_heading: true
@@ -169,7 +169,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.upside_capture
+::: helpers_ps.Calcs.upside_capture
     options:
       heading_level: 3
       show_root_heading: true
@@ -177,7 +177,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.downside_capture
+::: helpers_ps.Calcs.downside_capture
     options:
       heading_level: 3
       show_root_heading: true
@@ -185,7 +185,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.capture_ratio
+::: helpers_ps.Calcs.capture_ratio
     options:
       heading_level: 3
       show_root_heading: true
@@ -193,7 +193,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.hit_ratio
+::: helpers_ps.Calcs.hit_ratio
     options:
       heading_level: 3
       show_root_heading: true
@@ -201,7 +201,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.excess_return
+::: helpers_ps.Calcs.excess_return
     options:
       heading_level: 3
       show_root_heading: true
@@ -209,7 +209,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.consistency
+::: helpers_ps.Calcs.consistency
     options:
       heading_level: 3
       show_root_heading: true
@@ -220,7 +220,7 @@
 -----
 ## Risk metrics
 
-::: helpers_ps.FinCalc.value_at_risk
+::: helpers_ps.Calcs.value_at_risk
     options:
       heading_level: 3
       show_root_heading: true
@@ -228,7 +228,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.expected_shortfall
+::: helpers_ps.Calcs.expected_shortfall
     options:
       heading_level: 3
       show_root_heading: true
@@ -239,7 +239,7 @@
 -----
 ## Technical indicators
 
-::: helpers_ps.FinCalc.rsi
+::: helpers_ps.Calcs.rsi
     options:
       heading_level: 3
       show_root_heading: true
@@ -247,7 +247,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.sma
+::: helpers_ps.Calcs.sma
     options:
       heading_level: 3
       show_root_heading: true
@@ -255,7 +255,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.ema
+::: helpers_ps.Calcs.ema
     options:
       heading_level: 3
       show_root_heading: true
@@ -263,7 +263,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.zscore
+::: helpers_ps.Calcs.zscore
     options:
       heading_level: 3
       show_root_heading: true
@@ -271,7 +271,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.bollinger_bands
+::: helpers_ps.Calcs.bollinger_bands
     options:
       heading_level: 3
       show_root_heading: true
@@ -279,7 +279,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.macd
+::: helpers_ps.Calcs.macd
     options:
       heading_level: 3
       show_root_heading: true
@@ -287,7 +287,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.momentum
+::: helpers_ps.Calcs.momentum
     options:
       heading_level: 3
       show_root_heading: true
@@ -295,7 +295,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.momentum_sma
+::: helpers_ps.Calcs.momentum_sma
     options:
       heading_level: 3
       show_root_heading: true
@@ -307,7 +307,7 @@
 -----
 ## Range and transformation helpers
 
-::: helpers_ps.FinCalc.mean_std_bands
+::: helpers_ps.Calcs.mean_std_bands
     options:
       heading_level: 3
       show_root_heading: true
@@ -315,7 +315,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.relative
+::: helpers_ps.Calcs.relative
     options:
       heading_level: 3
       show_root_heading: true
@@ -323,7 +323,7 @@
       separate_signature: true
       show_signature_annotations: true
 
-::: helpers_ps.FinCalc.rank_percentile
+::: helpers_ps.Calcs.rank_percentile
     options:
       heading_level: 3
       show_root_heading: true

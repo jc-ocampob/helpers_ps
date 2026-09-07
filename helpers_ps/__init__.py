@@ -25,9 +25,10 @@ from helpers_ps.GlobVars import (
 # ============================================================
 
 from . import (
-    FinCalc,
-    Powerpoint,
-    Excel
+    Calcs,
+    Ppt,
+    Excel,
+    DfStyling
 )
 
 # ============================================================
@@ -37,6 +38,7 @@ from .MtpltGraph import (
     GraphMtplt,
     set_graph_theme
 )
+
 
 # ============================================================
 # Control explícito de objetos públicos
@@ -49,10 +51,12 @@ __all__ = [
     "GraphMtplt",
     "set_graph_theme",
 
+    #Styling de DF
+    "DfStyling",
+
     #Alternate packages
-    "FinCalc",
-    "BBGHelper",
-    "Powerpoint",
+    "Calcs",
+    "Ppt",
     "Excel",
     "PALETA_COLORES"
 ]

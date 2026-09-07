@@ -7,5 +7,5 @@ from .export import (
 __all__ = [
     "to_excel_open",
     "to_excel_closed",
-    "to_excel_closed_styled"
+    "to_excel_closed_styled",
 ]

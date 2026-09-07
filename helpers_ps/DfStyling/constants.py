@@ -11,3 +11,4 @@ DEFAULT_LINE_STYLE = {
     "style": "solid",
     "color": "black",
 }
+
