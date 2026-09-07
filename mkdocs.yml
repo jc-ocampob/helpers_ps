@@ -6,6 +6,7 @@ site_author: Equipo de Soluciones de Portafolio
 theme:
   name: material
   language: es
+
   palette:
     - scheme: default
       primary: black
@@ -20,6 +21,7 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+
   features:
     - navigation.tabs
     - navigation.sections
@@ -32,11 +34,18 @@ theme:
 
 plugins:
   - search
-  - mkdocs-jupyter
+
+  - mkdocs-jupyter:
+      execute: false
+
   - mkdocstrings:
       default_handler: python
+
       handlers:
         python:
+          paths:
+            - .
+
           options:
             docstring_style: numpy
             show_source: true
@@ -44,52 +53,63 @@ plugins:
             show_root_full_path: false
             show_signature_annotations: true
             members_order: source
+            inherited_members: true
 
 markdown_extensions:
   - admonition
+
   - toc:
       permalink: true
+
   - tables
+
   - pymdownx.details
+
   - pymdownx.superfences
+
   - pymdownx.highlight:
       anchor_linenums: true
+
   - pymdownx.inlinehilite
+
   - pymdownx.tabbed:
       alternate_style: true
 
 nav:
-  - Index: index.md
-  
-  - Instalation: install_guide.md
-  
-  - GraphMtplt:
-    - Getting Started: GraphMtplt/getting_started.ipynb
-    
-    - Line Chart: 
-      - Graph: GraphMtplt/Line/graph.ipynb
-      - Tags: GraphMtplt/Line/tags.ipynb
-      - Examples:
-        - Simple Line: GraphMtplt/Line/examples/simple_line.ipynb 
-        - Tags Usage: GraphMtplt/Line/examples/tags.ipynb
-      
-    - Bar Chart:
-      - Graph: GraphMtplt/Bar/graph.md
-    
-    - Pie Chart:
-      - Graph: GraphMtplt/Pie/graph.md
+  - Helpers PS: index.md
 
-    - Box Whiskers Chart:
-      - Graph: GraphMtplt/Box/graph.md
-    
-    - Utils:
-      - Utils: GraphMtplt/Utils/utils.md
+  - Instalation: install_guide.md
+
+  - GraphMtplt:
+      - Getting Started: GraphMtplt/getting_started.ipynb
+      - Plotting: GraphMtplt/plotting.ipynb
+      - Layout Annotations: GraphMtplt/layout.ipynb
+
+      - Line Chart:
+          - Graph: GraphMtplt/Line/graph.ipynb
+          - Tags: GraphMtplt/Line/tags.ipynb
+
+          - Examples:
+              - Simple Line: GraphMtplt/Line/examples/simple_line.ipynb
+              - Tags Usage: GraphMtplt/Line/examples/tags.ipynb
+
+      - Bar Chart:
+          - Graph: GraphMtplt/Bar/graph.md
+
+      - Pie Chart:
+          - Graph: GraphMtplt/Pie/graph.md
+
+      - Box Whiskers Chart:
+          - Graph: GraphMtplt/Box/graph.md
+
+      - Utils:
+          - Utils: GraphMtplt/Utils/utils.md
 
   - FinCalculations:
-    - Getting Started: FinCalculations/getting_started.md
-  
+      - Getting Started: FinCalculations/getting_started.md
+
   - Powerpoint:
-    - Getting Started: Powerpoint/getting_started.md
-  
+      - Getting Started: Powerpoint/getting_started.md
+
   - Excel:
-    - Getting Started: Excel/getting_started.md
+      - Getting Started: Excel/getting_started.md
