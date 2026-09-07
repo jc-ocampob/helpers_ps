@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-from typing import Self
+from collections.abc import Sequence
+from dataclasses import asdict
+from typing import Any, Self
 
 import numpy as np
 import pandas as pd
 
 from ..models import (
+    BoxSeriesConfig,
+    BoxSeriesDict,
+    BoxSeriesLike,
     XAxisConfig,
-    YAxisConfig,
-    LegendConfig,
-    FigureTitle,
-    FigureSubtitle,
-    FigureSource,
+    XAxisLike,
     coerce_configs,
-    config_to_dict
+    config_to_dict,
 )
 from ..tags._colors import PALETA_COLORES
 
@@ -21,156 +22,115 @@ from ..tags._colors import PALETA_COLORES
 class BoxWChartMixin:
     """
     Provides box-and-whisker chart construction logic for GraphMtplt.
-
-    This mixin follows the same architecture used by the other chart mixins:
-    prepare context, ensure figure, draw chart, store metadata, apply labels,
-    configure axes, and finalize legend.
     """
 
-    # ---------------------------------------------------------------------
-    # Context preparation
-    # ---------------------------------------------------------------------
-    def _prepare_box_context(
+    def _normalize_box_series(
         self,
-        *,
-        df_index: int,
-        tickers,
-        labels,
-        colors,
-        title,
-        subtitle,
-        source,
-        titles,
-        legend,
-        x_axis,
-        y_axis,
-        box_config,
-        box_style,
-        median_style,
-        whisker_style,
-        cap_style,
-        flier_style,
-        mean_style,
-        range_tag_high,
-        range_tag_low,
-        mean_tag,
-        tag_dot,
-        hlines,
-        box_face_alpha: float,
-    ) -> dict:
-        db_original = self._select_df(df_idx=df_index)
+        dataframe: pd.DataFrame,
+        series: Sequence[BoxSeriesLike] | None = None,
+    ) -> list[BoxSeriesDict]:
+        """
+        Normalize and validate box-series configurations.
 
-        series_config = self._normalize_series_config(
-            dataframe=db_original,
-            tickers=tickers,
-            labels=labels,
-            colors=colors,
-            axis_side=None,
-        )
+        If series is None, all DataFrame columns are included using
+        their default configuration.
+        """
+        if series is None:
+            series = [
+                BoxSeriesConfig(
+                    ticker=str(column),
+                )
+                for column in dataframe.columns
+            ]
 
-        tickers = [item["ticker"] for item in series_config]
-        labels = [item["label"] for item in series_config]
-        colors = [item["color"] for item in series_config]
+        if not series:
+            raise ValueError(
+                "'series' cannot be empty. "
+                "Use None to plot all DataFrame columns."
+            )
 
-        db = db_original[tickers].copy()
+        normalized: list[BoxSeriesConfig] = []
 
-        # Important:
-        # For boxplots, the active dataframe should be the selected columns only.
-        # BoxWTags depends on self._df and self._ticker_label_color.
-        state = self._ensure_active_state()
-        state.dataframe_idx = df_index
-        state.dataframe = db
-        state.series_config = series_config
-        state.axis_map = {item["ticker"]: "left" for item in series_config}
-        state.ticker_label_color = [
-            (item["ticker"], item["label"], item["color"])
-            for item in series_config
+        for position, item in enumerate(series):
+            if isinstance(item, BoxSeriesConfig):
+                config = item
+
+            elif isinstance(item, dict):
+                try:
+                    config = BoxSeriesConfig(**item)
+
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        "Invalid box-series configuration "
+                        f"at position {position}: {item}."
+                    ) from exc
+
+            else:
+                raise TypeError(
+                    "Each item in 'series' must be a "
+                    "dictionary or a BoxSeriesConfig instance."
+                )
+
+            if config.ticker not in dataframe.columns:
+                raise KeyError(
+                    f"Ticker '{config.ticker}' was not found "
+                    "in the selected DataFrame."
+                )
+
+            numeric_values = pd.to_numeric(
+                dataframe[config.ticker],
+                errors="coerce",
+            )
+
+            numeric_values = numeric_values.replace(
+                [np.inf, -np.inf],
+                np.nan,
+            ).dropna()
+
+            if numeric_values.empty:
+                raise ValueError(
+                    f"Ticker '{config.ticker}' contains no "
+                    "finite numeric observations."
+                )
+
+            normalized.append(config)
+
+        tickers = [
+            config.ticker
+            for config in normalized
         ]
 
-        # Backward-compatible metadata access through GraphMetaData.
-        self._df = db
-        self._ticker_label_color = state.ticker_label_color
+        if len(tickers) != len(set(tickers)):
+            raise ValueError(
+                "Duplicated tickers are not allowed in "
+                "'series'."
+            )
 
-        # Legacy support:
-        # If older code passes titles={...}, use it as title unless the new
-        # title/subtitle arguments were explicitly provided.
-        if titles is not None:
-            if title is None:
-                if isinstance(titles, dict) and "title" in titles:
-                    title = titles.get("title")
-                else:
-                    title = titles
+        if not PALETA_COLORES:
+            raise ValueError(
+                "PALETA_COLORES cannot be empty."
+            )
 
-            if subtitle is None and isinstance(titles, dict) and "subtitle" in titles:
-                subtitle = titles.get("subtitle")
+        for position, config in enumerate(normalized):
+            if config.label is None:
+                config.label = config.ticker
 
-        configs = coerce_configs(
-            x_axis=(x_axis, XAxisConfig),
-            y_axis=(y_axis, YAxisConfig),
-            title=(title, FigureTitle),
-            subtitle=(subtitle, FigureSubtitle),
-            source=(source, FigureSource),
-            legend=(legend, LegendConfig),
-        )
+            if config.color is None:
+                config.color = PALETA_COLORES[
+                    position % len(PALETA_COLORES)
+                ]
 
-        x_axis = config_to_dict(configs["x_axis"])
-        y_axis = config_to_dict(configs["y_axis"])
-        title = config_to_dict(configs["title"])
-        subtitle = config_to_dict(configs["subtitle"])
-        source = config_to_dict(configs["source"])
-        legend = config_to_dict(configs["legend"])
+        return [
+            BoxSeriesDict(**asdict(config))
+            for config in normalized
+        ]
 
-        return {
-            "db": db,
-            "state": state,
-            "series_config": series_config,
-            "tickers": tickers,
-            "labels": labels,
-            "colors": colors,
-            "title": title,
-            "subtitle": subtitle,
-            "source": source,
-            "legend": legend,
-            "x_axis": x_axis,
-            "y_axis": y_axis,
-            "box_config": box_config,
-            "box_style": box_style,
-            "median_style": median_style,
-            "whisker_style": whisker_style,
-            "cap_style": cap_style,
-            "flier_style": flier_style,
-            "mean_style": mean_style,
-            "range_tag_high": range_tag_high,
-            "range_tag_low": range_tag_low,
-            "mean_tag": mean_tag,
-            "tag_dot": tag_dot,
-            "hlines": hlines if hlines is not None else {},
-            "box_face_alpha": box_face_alpha,
-        }
-
-    # ---------------------------------------------------------------------
-    # Figure and layout
-    # ---------------------------------------------------------------------
-    def _ensure_box_figure(
+    def _default_box_config(
         self,
-        context: dict,
-        figsize: tuple[float, float],
-    ) -> dict:
-        if not hasattr(self, "_ax") or self._ax is None:
-            self.plot(figsize=figsize)
-
-        return context
-
-    def _apply_box_layout(self, context: dict) -> dict:
-        self.add_title(**context["title"])
-        self.add_subtitle(**context["subtitle"])
-        self.add_source(**context["source"])
-        return context
-
-    # ---------------------------------------------------------------------
-    # Defaults and style resolution
-    # ---------------------------------------------------------------------
-    def _default_box_config(self) -> dict:
+    ) -> dict[str, Any]:
+        """
+        Return the default Matplotlib boxplot configuration.
+        """
         return {
             "whis": (0, 100),
             "showfliers": False,
@@ -181,31 +141,56 @@ class BoxWChartMixin:
             "vert": True,
         }
 
-    def _default_box_style(self) -> dict:
+    def _default_box_style(
+        self,
+    ) -> dict[str, Any]:
+        """
+        Return default box-border properties.
+        """
         return {
             "color": "#6E6E6E",
-            "lw": 0.5,
+            "linewidth": 0.5,
         }
 
-    def _default_median_style(self) -> dict:
+    def _default_median_style(
+        self,
+    ) -> dict[str, Any]:
+        """
+        Return default median-line properties.
+        """
         return {
             "color": "#222222",
-            "lw": 1.5,
+            "linewidth": 1.5,
         }
 
-    def _default_whisker_style(self) -> dict:
+    def _default_whisker_style(
+        self,
+    ) -> dict[str, Any]:
+        """
+        Return default whisker properties.
+        """
         return {
             "color": "#6E6E6E",
-            "lw": 0.5,
+            "linewidth": 0.5,
         }
 
-    def _default_cap_style(self) -> dict:
+    def _default_cap_style(
+        self,
+    ) -> dict[str, Any]:
+        """
+        Return default cap properties.
+        """
         return {
             "color": "#6E6E6E",
-            "lw": 0.5,
+            "linewidth": 0.5,
         }
 
-    def _default_flier_style(self) -> dict:
+    def _default_flier_style(
+        self,
+    ) -> dict[str, Any]:
+        """
+        Return default outlier-marker properties.
+        """
         return {
             "marker": "o",
             "markersize": 3.5,
@@ -214,660 +199,521 @@ class BoxWChartMixin:
             "alpha": 0.85,
         }
 
-    def _default_mean_style(self) -> dict:
+    def _default_mean_style(
+        self,
+    ) -> dict[str, Any]:
+        """
+        Return default mean-line or mean-marker properties.
+        """
         return {
             "color": "#404040",
-            "lw": 0.5,
+            "linewidth": 0.5,
             "linestyle": "--",
         }
 
-    def _merge_style(
+    def _merge_box_style(
         self,
-        default: dict,
-        override: dict | None,
-    ) -> dict:
-        output = default.copy()
+        default: dict[str, Any],
+        override: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """
+        Merge user styling over default styling.
+        """
+        resolved = default.copy()
+
         if override is not None:
-            output.update(override)
+            resolved.update(override)
+
+        return resolved
+
+    def _build_box_data(
+        self,
+        dataframe: pd.DataFrame,
+        series_config: list[BoxSeriesDict],
+    ) -> list[np.ndarray]:
+        """
+        Build finite numeric arrays for each box series.
+        """
+        output = []
+
+        for item in series_config:
+            values = pd.to_numeric(
+                dataframe[item["ticker"]],
+                errors="coerce",
+            )
+
+            values = values.replace(
+                [np.inf, -np.inf],
+                np.nan,
+            ).dropna()
+
+            output.append(
+                values.to_numpy(dtype=float)
+            )
+
         return output
 
-    def _resolve_box_styles(self, context: dict) -> dict:
-        context["box_config"] = self._merge_style(
-            self._default_box_config(),
-            context["box_config"],
-        )
-        context["box_style"] = self._merge_style(
-            self._default_box_style(),
-            context["box_style"],
-        )
-        context["median_style"] = self._merge_style(
-            self._default_median_style(),
-            context["median_style"],
-        )
-        context["whisker_style"] = self._merge_style(
-            self._default_whisker_style(),
-            context["whisker_style"],
-        )
-        context["cap_style"] = self._merge_style(
-            self._default_cap_style(),
-            context["cap_style"],
-        )
-        context["flier_style"] = self._merge_style(
-            self._default_flier_style(),
-            context["flier_style"],
-        )
-        context["mean_style"] = self._merge_style(
-            self._default_mean_style(),
-            context["mean_style"],
-        )
-
-        return context
-
-    # ---------------------------------------------------------------------
-    # Drawing
-    # ---------------------------------------------------------------------
-    def _build_boxplot_data(self, context: dict) -> dict:
-        db = context["db"]
-        tickers = context["tickers"]
-
-        context["data_plot"] = [
-            db[ticker].dropna().values
-            for ticker in tickers
+    def _resolve_box_labels(
+        self,
+        series_config: list[BoxSeriesDict],
+        x_axis_config: dict[str, Any],
+    ) -> list[str]:
+        """
+        Resolve box labels using the shared X-axis configuration.
+        """
+        labels = [
+            str(item["label"])
+            for item in series_config
         ]
 
-        return context
-
-    def _draw_boxplot(self, context: dict) -> dict:
-        box_config = context["box_config"]
-
-        bp = self._ax.boxplot(
-            context["data_plot"],
-            labels=context["labels"],
-            patch_artist=True,
-            boxprops=context["box_style"],
-            medianprops=context["median_style"],
-            whiskerprops=context["whisker_style"],
-            capprops=context["cap_style"],
-            flierprops=context["flier_style"],
-            meanprops=context["mean_style"],
-            **box_config,
+        tick_labels = x_axis_config.get(
+            "tick_labels"
         )
 
-        context["boxplot_result"] = bp
-        context["vert"] = box_config.get("vert", True)
-
-        return context
-
-    def _apply_box_colors(self, context: dict) -> dict:
-        bp = context["boxplot_result"]
-        colors = context["colors"]
-        box_face_alpha = context["box_face_alpha"]
-
-        for i, patch in enumerate(bp["boxes"]):
-            patch.set_facecolor(colors[i])
-            patch.set_alpha(box_face_alpha)
-
-        return context
-
-    # ---------------------------------------------------------------------
-    # X-axis metadata and formatting
-    # ---------------------------------------------------------------------
-    def _resolve_box_x_labels(self, context: dict) -> list[str]:
-        labels = [str(label) for label in context["labels"]]
-        x_axis = context["x_axis"]
-
-        tick_labels = x_axis.get("tick_labels")
-        tick_label_map = x_axis.get("tick_label_map") or {}
+        tick_label_map = (
+            x_axis_config.get("tick_label_map")
+            or {}
+        )
 
         if tick_labels is not None:
-            tick_labels = list(tick_labels)
-            if len(tick_labels) < len(labels):
-                tick_labels = tick_labels + labels[len(tick_labels):]
-            return tick_labels[:len(labels)]
+            resolved_labels = list(tick_labels)
+
+            if len(resolved_labels) != len(labels):
+                raise ValueError(
+                    "'x_axis.tick_labels' must have the "
+                    "same length as the selected box series."
+                )
+
+            return [
+                str(label)
+                for label in resolved_labels
+            ]
 
         return [
-            tick_label_map.get(label, label)
+            str(
+                tick_label_map.get(
+                    label,
+                    label,
+                )
+            )
             for label in labels
         ]
 
-    def _apply_box_xaxis(self, context: dict) -> dict:
-        x_axis = context["x_axis"]
-        labels = self._resolve_box_x_labels(context)
-        tick_positions = np.arange(1, len(labels) + 1)
-
-        fontsize = x_axis.get("fontsize", 8)
-        rotation = x_axis.get("rotation", 0)
-        ha = x_axis.get("ha", "center")
-        va = x_axis.get("va", "center")
-        label_color = x_axis.get("label_color")
-
-        # Boxplot categories live on the x-axis for the supported/default mode.
-        self._ax.set_xticks(tick_positions)
-        self._ax.set_xticklabels(
-            labels,
-            fontsize=fontsize,
-            rotation=rotation,
-            ha=ha,
-            va=va,
+    def _apply_box_xaxis(
+        self,
+        *,
+        series_config: list[BoxSeriesDict],
+        x_axis_config: dict[str, Any],
+        vertical: bool,
+    ) -> None:
+        """
+        Apply categorical labels and store box-axis metadata.
+        """
+        labels = self._resolve_box_labels(
+            series_config=series_config,
+            x_axis_config=x_axis_config,
         )
 
-        if label_color is not None:
-            for label in self._ax.get_xticklabels():
-                label.set_color(label_color)
+        positions = np.arange(
+            1,
+            len(labels) + 1,
+            dtype=float,
+        )
+
+        fontsize = x_axis_config.get(
+            "fontsize",
+            8,
+        )
+
+        rotation = x_axis_config.get(
+            "rotation",
+            0,
+        )
+
+        horizontal_alignment = (
+            x_axis_config.get(
+                "ha",
+                "center",
+            )
+        )
+
+        vertical_alignment = (
+            x_axis_config.get(
+                "va",
+                "top",
+            )
+        )
+
+        label_color = x_axis_config.get(
+            "label_color"
+        )
+
+        if vertical:
+            self._ax.set_xticks(positions)
+
+            self._ax.set_xticklabels(
+                labels,
+                fontsize=fontsize,
+                rotation=rotation,
+                ha=horizontal_alignment,
+                va=vertical_alignment,
+            )
+
+            if label_color is not None:
+                for tick_label in (
+                    self._ax.get_xticklabels()
+                ):
+                    tick_label.set_color(
+                        label_color
+                    )
+
+        else:
+            self._ax.set_yticks(positions)
+
+            self._ax.set_yticklabels(
+                labels,
+                fontsize=fontsize,
+                rotation=rotation,
+                ha=horizontal_alignment,
+                va=vertical_alignment,
+            )
+
+            if label_color is not None:
+                for tick_label in (
+                    self._ax.get_yticklabels()
+                ):
+                    tick_label.set_color(
+                        label_color
+                    )
 
         self._x_axis_mode = "categorical"
         self._x_axis_fechas = None
-        self._x_vals = tick_positions.astype(float)
+        self._x_vals = positions
+
         self._x_axis_metadata = {
             "mode": "categorical",
             "chart_type": "box_whiskers",
-            "tickers": context["tickers"],
+            "orientation": (
+                "vertical"
+                if vertical
+                else "horizontal"
+            ),
+            "tickers": [
+                item["ticker"]
+                for item in series_config
+            ],
             "labels": labels,
-            "x_vals": self._x_vals,
-            "tick_labels": x_axis.get("tick_labels"),
-            "tick_label_map": x_axis.get("tick_label_map"),
+            "x_vals": positions,
+            "tick_labels": (
+                x_axis_config.get("tick_labels")
+            ),
+            "tick_label_map": (
+                x_axis_config.get(
+                    "tick_label_map"
+                )
+            ),
             "fontsize": fontsize,
             "rotation": rotation,
-            "ha": ha,
-            "va": va,
+            "ha": horizontal_alignment,
+            "va": vertical_alignment,
             "label_color": label_color,
         }
 
-        return context
-
-    # ---------------------------------------------------------------------
-    # Statistic tags
-    # ---------------------------------------------------------------------
-    def _default_box_stat_tag(self) -> dict:
-        return {
-            "label_h_align": "center",
-            "label_v_align": "center",
-            "ubic_etq": (0, 10),
-            "fontsize": 8,
-            "fontweight": "bold",
-            "font_color": "black",
-            "bg_color": "None",
-            "bg_alpha": 1.0,
-            "edge_color": "None",
-            "show_bbox": True,
-            "zorder": 20,
-            "fmt": ",.1f",
-            "show": True,
-        }
-
-    def _resolve_box_stat_tag(
-        self,
-        config: dict | None,
-        *,
-        default_offset: tuple[float, float],
-    ) -> tuple[dict, bool, str]:
-
-        tag_config = self._default_box_stat_tag()
-
-        if config is not None:
-            tag_config.update(config)
-
-        show = tag_config.pop("show", False)
-        fmt = tag_config.pop("fmt", ",.2f")
-
-        if tag_config.get("ubic_etq") == (0, 10):
-            tag_config["ubic_etq"] = default_offset
-
-        return tag_config, show, fmt
-
-    def _apply_box_stat_tags(
-        self,
-        context: dict,
-    ) -> dict:
-
-        range_tag_high, range_high_show, range_high_fmt = (
-            self._resolve_box_stat_tag(
-                context["range_tag_high"],
-                default_offset=(0, 10),
-            )
-        )
-
-        range_tag_low, range_low_show, range_low_fmt = (
-            self._resolve_box_stat_tag(
-                context["range_tag_low"],
-                default_offset=(0, -10),
-            )
-        )
-
-        mean_tag, mean_show, mean_fmt = (
-            self._resolve_box_stat_tag(
-                context["mean_tag"],
-                default_offset=(0, 0),
-            )
-        )
-
-        if not (
-            range_high_show
-            or range_low_show
-            or mean_show
-        ):
-            return context
-
-        bp = context["boxplot_result"]
-        db = context["db"]
-        tickers = context["tickers"]
-        vert = context["vert"]
-
-        for i, ticker in enumerate(tickers):
-
-            low_whisker = bp["whiskers"][2 * i]
-            high_whisker = bp["whiskers"][2 * i + 1]
-
-            series = db[ticker].dropna()
-
-            if series.empty:
-                continue
-
-            mean_value = float(series.mean())
-
-            if vert:
-
-                x_low = float(
-                    np.mean(
-                        low_whisker.get_xdata()
-                    )
-                )
-
-                y_low = float(
-                    np.min(
-                        low_whisker.get_ydata()
-                    )
-                )
-
-                x_high = float(
-                    np.mean(
-                        high_whisker.get_xdata()
-                    )
-                )
-
-                y_high = float(
-                    np.max(
-                        high_whisker.get_ydata()
-                    )
-                )
-
-                x_mean = i + 1
-                y_mean = mean_value
-
-                low_label_value = y_low
-                high_label_value = y_high
-
-            else:
-
-                y_low = float(
-                    np.mean(
-                        low_whisker.get_ydata()
-                    )
-                )
-
-                x_low = float(
-                    np.min(
-                        low_whisker.get_xdata()
-                    )
-                )
-
-                y_high = float(
-                    np.mean(
-                        high_whisker.get_ydata()
-                    )
-                )
-
-                x_high = float(
-                    np.max(
-                        high_whisker.get_xdata()
-                    )
-                )
-
-                x_mean = mean_value
-                y_mean = i + 1
-
-                low_label_value = x_low
-                high_label_value = x_high
-
-            if range_low_show:
-
-                self.tag(
-                    x_value=x_low,
-                    y_value=y_low,
-                    label=f"{low_label_value:{range_low_fmt}}",
-                    **range_tag_low,
-                )
-
-            if range_high_show:
-
-                self.tag(
-                    x_value=x_high,
-                    y_value=y_high,
-                    label=f"{high_label_value:{range_high_fmt}}",
-                    **range_tag_high,
-                )
-
-            if mean_show:
-
-                self.tag(
-                    x_value=x_mean,
-                    y_value=y_mean,
-                    label=f"{mean_value:{mean_fmt}}",
-                    **mean_tag,
-                )
-
-        return context
-
-    # ---------------------------------------------------------------------
-    # Metadata
-    # ---------------------------------------------------------------------
     def _store_box_metadata(
         self,
-        context: dict,
-    ) -> dict:
+        *,
+        dataframe: pd.DataFrame,
+        df_index: int,
+        series_config: list[BoxSeriesDict],
+    ) -> None:
+        """
+        Store reusable box-chart metadata in the active chart state.
+        """
+        state = self._ensure_active_state()
 
-        state = context["state"]
+        axis_map = {
+            item["ticker"]: "left"
+            for item in series_config
+        }
+
+        state.dataframe_idx = df_index
+        state.dataframe = dataframe
+        state.series_config = series_config
+        state.axis_map = axis_map
+
+        state.ticker_label_color = [
+            (
+                item["ticker"],
+                item["label"],
+                item["color"],
+            )
+            for item in series_config
+        ]
 
         state.x_axis_mode = self._x_axis_mode
         state.x_axis_fechas = self._x_axis_fechas
         state.x_vals = self._x_vals
         state.x_axis_metadata = self._x_axis_metadata
 
-        state.series_config = (
-            context["series_config"]
+        self._df = dataframe
+        self._ticker_label_color = (
+            state.ticker_label_color
         )
 
-        state.axis_map = {
-            ticker: "left"
-            for ticker in context["tickers"]
-        }
-
-        state.ticker_label_color = [
-            (
-                context["tickers"][i],
-                context["labels"][i],
-                context["colors"][i],
-            )
-            for i in range(
-                len(
-                    context["tickers"]
-                )
-            )
-        ]
-
-        return context
-
-    # ---------------------------------------------------------------------
-    # Finalization
-    # ---------------------------------------------------------------------
-    def _apply_box_tag_dot(
-        self,
-        context: dict,
-    ) -> dict:
-
-        tag_dot = context["tag_dot"]
-
-        if tag_dot:
-
-            self._box_whiskers_label_generate(
-                control_dict=tag_dot,
-            )
-
-        return context
-
-    def _finalize_box_axes(
-        self,
-        context: dict,
-        *,
-        show_hguide: bool,
-    ) -> dict:
-
-        y_axis = context["y_axis"]
-        hlines = context["hlines"]
-
-        if hlines:
-
-            self.horizontal_lines(
-                **hlines
-            )
-
-        if show_hguide:
-
-            self.horizontal_guides(
-                mostrar_cero=False,
-            )
-
-        self.config_yaxis(
-            **y_axis
-        )
-
-        return context
-
-    def _finalize_box_legend(
-        self,
-        context: dict,
-    ) -> dict:
-
-        legend = context["legend"]
-
-        self.add_legend(
-            **legend
-        )
-
-        return context
-
-    # ---------------------------------------------------------------------
-    # Public API
-    # ---------------------------------------------------------------------
     def graph_box_whiskers(
         self,
-        figsize: tuple[float, float] = (6.00, 5.00),
-
-        # -----------------------------------------------------------------
-        # Data selection
-        # -----------------------------------------------------------------
+        series: Sequence[BoxSeriesLike] | None = None,
         df_index: int = 0,
-        tickers: list[str] | str = "all",
-        labels: list[str] | tuple[str, ...] | dict[str, str] | None = None,
-        colors: list[str] | tuple[str, ...] | str | dict[str, str] | None = None,
-
-        # -----------------------------------------------------------------
-        # Layout
-        # -----------------------------------------------------------------
-        title=None,
-        subtitle=None,
-        source=None,
-        titles=None,
-
-        # -----------------------------------------------------------------
-        # Axis config
-        # -----------------------------------------------------------------
-        x_axis=None,
-        y_axis=None,
-
-        # -----------------------------------------------------------------
-        # Boxplot config
-        # -----------------------------------------------------------------
-        box_config: dict | None = None,
-        box_style: dict | None = None,
-        median_style: dict | None = None,
-        whisker_style: dict | None = None,
-        cap_style: dict | None = None,
-        flier_style: dict | None = None,
-        mean_style: dict | None = None,
-
+        box_config: dict[str, Any] | None = None,
+        box_style: dict[str, Any] | None = None,
+        median_style: dict[str, Any] | None = None,
+        whisker_style: dict[str, Any] | None = None,
+        cap_style: dict[str, Any] | None = None,
+        flier_style: dict[str, Any] | None = None,
+        mean_style: dict[str, Any] | None = None,
         box_face_alpha: float = 0.50,
-
-        # -----------------------------------------------------------------
-        # Statistic labels
-        # -----------------------------------------------------------------
-        range_tag_high: dict | None = None,
-        range_tag_low: dict | None = None,
-        mean_tag: dict | None = None,
-
-        # -----------------------------------------------------------------
-        # Additional annotations
-        # -----------------------------------------------------------------
-        tag_dot: dict | None = None,
-
-        # -----------------------------------------------------------------
-        # Reference lines / guides
-        # -----------------------------------------------------------------
-        hlines: dict | None = None,
-        show_hguide: bool = False,
-
-        # -----------------------------------------------------------------
-        # Legend
-        # -----------------------------------------------------------------
-        legend=None,
-
+        x_axis: XAxisLike | None = None,
     ) -> Self:
-
         """
-        Create a box-and-whisker chart.
+        Add a box-and-whisker chart to the active figure.
+
+        This method handles only box-specific behavior. Figure
+        creation, titles, subtitles, sources, legends, general axis
+        formatting, guides, and reference lines are handled through
+        their standalone methods.
+
+        If series is None, all numeric DataFrame columns are plotted
+        using automatic labels and palette colors.
 
         Parameters
         ----------
-        df_index
-            DataFrame index when multiple DataFrames were passed to the graph.
+        series:
+            Box-series configurations. Each item can be a dictionary
+            or BoxSeriesConfig instance.
 
-        tickers
-            Columns to plot.
+        df_index:
+            Position of the DataFrame stored in the graph object.
 
-        labels
-            Display labels for each box.
+        box_config:
+            General keyword arguments passed to Matplotlib boxplot.
 
-        colors
-            Box colors.
+        box_style:
+            Properties applied to box borders.
 
-        title, subtitle, source
-            Figure-level metadata.
+        median_style:
+            Properties applied to median lines.
 
-        x_axis, y_axis
-            Axis configuration.
+        whisker_style:
+            Properties applied to whiskers.
 
-        tag_dot
-            Controls passed to BoxWTags.
+        cap_style:
+            Properties applied to whisker caps.
+
+        flier_style:
+            Properties applied to outlier markers.
+
+        mean_style:
+            Properties applied to mean lines or markers.
+
+        box_face_alpha:
+            Opacity applied to box face colors.
+
+        x_axis:
+            Shared X-axis configuration used to format box labels.
 
         Returns
         -------
         Self
+            The current graph instance.
         """
+        if not isinstance(df_index, int):
+            raise TypeError(
+                "'df_index' must be an integer."
+            )
 
-        # -------------------------------------------------------------
-        # 1. Context
-        # -------------------------------------------------------------
-        context = self._prepare_box_context(
-            df_index=df_index,
-            tickers=tickers,
+        if not isinstance(
+            box_face_alpha,
+            (int, float),
+        ):
+            raise TypeError(
+                "'box_face_alpha' must be numeric."
+            )
+
+        if not 0 <= box_face_alpha <= 1:
+            raise ValueError(
+                "'box_face_alpha' must be between "
+                "zero and one."
+            )
+
+        dataframe = self._select_df(
+            df_idx=df_index,
+        )
+
+        if not isinstance(
+            dataframe,
+            pd.DataFrame,
+        ):
+            raise TypeError(
+                "The selected object must be a "
+                "pandas DataFrame."
+            )
+
+        if dataframe.empty:
+            raise ValueError(
+                "Cannot create a box plot from an "
+                "empty DataFrame."
+            )
+
+        series_config = (
+            self._normalize_box_series(
+                dataframe=dataframe,
+                series=series,
+            )
+        )
+
+        tickers = [
+            item["ticker"]
+            for item in series_config
+        ]
+
+        selected_dataframe = dataframe.loc[
+            :,
+            tickers,
+        ].copy()
+
+        configs = coerce_configs(
+            x_axis=(x_axis, XAxisConfig),
+        )
+
+        x_axis_config = config_to_dict(
+            configs["x_axis"]
+        )
+
+        resolved_box_config = (
+            self._merge_box_style(
+                self._default_box_config(),
+                box_config,
+            )
+        )
+
+        resolved_box_style = (
+            self._merge_box_style(
+                self._default_box_style(),
+                box_style,
+            )
+        )
+
+        resolved_median_style = (
+            self._merge_box_style(
+                self._default_median_style(),
+                median_style,
+            )
+        )
+
+        resolved_whisker_style = (
+            self._merge_box_style(
+                self._default_whisker_style(),
+                whisker_style,
+            )
+        )
+
+        resolved_cap_style = (
+            self._merge_box_style(
+                self._default_cap_style(),
+                cap_style,
+            )
+        )
+
+        resolved_flier_style = (
+            self._merge_box_style(
+                self._default_flier_style(),
+                flier_style,
+            )
+        )
+
+        resolved_mean_style = (
+            self._merge_box_style(
+                self._default_mean_style(),
+                mean_style,
+            )
+        )
+
+        vertical = resolved_box_config.get(
+            "vert",
+            True,
+        )
+
+        if not isinstance(vertical, bool):
+            raise TypeError(
+                "'box_config.vert' must be a boolean."
+            )
+
+        if not hasattr(self, "_ax") or self._ax is None:
+            self.plot()
+
+        box_data = self._build_box_data(
+            dataframe=selected_dataframe,
+            series_config=series_config,
+        )
+
+        labels = [
+            str(item["label"])
+            for item in series_config
+        ]
+
+        boxplot_result = self._ax.boxplot(
+            box_data,
             labels=labels,
-            colors=colors,
-            title=title,
-            subtitle=subtitle,
-            source=source,
-            titles=titles,
-            legend=legend,
-            x_axis=x_axis,
-            y_axis=y_axis,
-            box_config=box_config,
-            box_style=box_style,
-            median_style=median_style,
-            whisker_style=whisker_style,
-            cap_style=cap_style,
-            flier_style=flier_style,
-            mean_style=mean_style,
-            range_tag_high=range_tag_high,
-            range_tag_low=range_tag_low,
-            mean_tag=mean_tag,
-            tag_dot=tag_dot,
-            hlines=hlines,
-            box_face_alpha=box_face_alpha,
+            patch_artist=True,
+            boxprops=resolved_box_style,
+            medianprops=resolved_median_style,
+            whiskerprops=resolved_whisker_style,
+            capprops=resolved_cap_style,
+            flierprops=resolved_flier_style,
+            meanprops=resolved_mean_style,
+            **resolved_box_config,
         )
 
-        # -------------------------------------------------------------
-        # 2. Figure
-        # -------------------------------------------------------------
-        context = self._ensure_box_figure(
-            context=context,
-            figsize=figsize,
+        for position, patch in enumerate(
+            boxplot_result["boxes"]
+        ):
+            patch.set_facecolor(
+                series_config[position]["color"]
+            )
+
+            patch.set_alpha(
+                float(box_face_alpha)
+            )
+
+            patch.set_label(
+                str(
+                    series_config[position][
+                        "label"
+                    ]
+                )
+            )
+
+        self._apply_box_xaxis(
+            series_config=series_config,
+            x_axis_config=x_axis_config,
+            vertical=vertical,
         )
 
-        # -------------------------------------------------------------
-        # 3. Figure layout
-        # -------------------------------------------------------------
-        context = self._apply_box_layout(
-            context=context,
+        self._store_box_metadata(
+            dataframe=selected_dataframe,
+            df_index=df_index,
+            series_config=series_config,
         )
 
-        # -------------------------------------------------------------
-        # 4. Resolve styles
-        # -------------------------------------------------------------
-        context = self._resolve_box_styles(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 5. Build plotting arrays
-        # -------------------------------------------------------------
-        context = self._build_boxplot_data(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 6. Draw
-        # -------------------------------------------------------------
-        context = self._draw_boxplot(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 7. Colors
-        # -------------------------------------------------------------
-        context = self._apply_box_colors(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 8. X-axis metadata
-        # -------------------------------------------------------------
-        context = self._apply_box_xaxis(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 9. Metadata
-        # -------------------------------------------------------------
-        context = self._store_box_metadata(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 10. High / low / mean labels
-        # -------------------------------------------------------------
-        context = self._apply_box_stat_tags(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 11. User tags
-        # -------------------------------------------------------------
-        context = self._apply_box_tag_dot(
-            context=context,
-        )
-
-        # -------------------------------------------------------------
-        # 12. Guides & axis formatting
-        # -------------------------------------------------------------
-        context = self._finalize_box_axes(
-            context=context,
-            show_hguide=show_hguide,
-        )
-
-        # -------------------------------------------------------------
-        # 13. Legend
-        # -------------------------------------------------------------
-        context = self._finalize_box_legend(
-            context=context,
+        self._apply_box_tags(
+            dataframe=selected_dataframe,
+            series_config=series_config,
+            vertical=vertical,
+            whis=resolved_box_config.get(
+                "whis",
+                1.5,
+            ),
+            ax=self._ax,
         )
 
         return self

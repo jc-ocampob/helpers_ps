@@ -1,36 +1,101 @@
 from __future__ import annotations
 
 from ._coerce import coerce_config, config_to_dict, clean_none, coerce_configs
-from .axes import XAxisConfig, YAxisConfig
-from .series import (
-    AxisSide,
-    SeriesSpec,
-    series_to_axis_map,
-    series_to_dicts,
-    series_to_legacy_ticker_label_color,
+from .axes import (
+    XAxisConfig,
+    XAxisDict,
+    XAxisLike,
+    XAxisLimit,
+    XAxisTickValues,
+    XAxisTickLabels,
+    XAxisHorizontalAlignment,
+    XAxisVerticalAlignment,
 )
-from .legend import LegendConfig
-from .layout import FigureTitle, FigureSubtitle, FigureSource, FigureConfig
-from .tags import TagStyle, DotStyle, LineTagConfig
+
+from .linesseries import LineSeriesLike, LineSeriesConfig, LineSeriesDict
+
+from .layout import (
+    FigureTitle,
+    FigureConfig,
+    FigureSource,
+    FigureSubtitle
+)
+
+from .boxseries import (
+    BoxTagMode,
+    BoxTagStatistic,
+    BoxTagXValue,
+    BoxTagXValues,
+    BoxHorizontalAlignment,
+    BoxVerticalAlignment,
+    BoxTagLabelDict,
+    BoxTagDotDict,
+    BoxTagDict,
+    BoxSeriesConfig,
+    BoxSeriesDict,
+    BoxSeriesLike,
+)
+
+from .barseries import (
+    BarAxisSide,
+    BarTagMode,
+    BarTagXValue,
+    BarTagXValues,
+    BarTagDict,
+    BarSeriesConfig,
+    BarSeriesDict,
+    BarSeriesLike,
+)
 
 __all__ = [
     "coerce_configs",
     "coerce_config",
     "config_to_dict",
     "clean_none",
+
+    # X Axis configs
     "XAxisConfig",
-    "YAxisConfig",
-    "AxisSide",
-    "SeriesSpec",
-    "series_to_axis_map",
-    "series_to_dicts",
-    "series_to_legacy_ticker_label_color",
-    "LegendConfig",
+    "XAxisDict",
+    "XAxisLike",
+    "XAxisLimit",
+    "XAxisTickValues",
+    "XAxisTickLabels",
+    "XAxisHorizontalAlignment",
+    "XAxisVerticalAlignment",
+
+    # Figure level configs
     "FigureTitle",
-    "FigureSubtitle",
-    "FigureSource",
     "FigureConfig",
-    "TagStyle",
-    "DotStyle",
-    "LineTagConfig",
+    "FigureSource",
+    "FigureSubtitle",
+
+    # Line Series configs
+    "LineSeriesLike",
+    "LineSeriesConfig",
+    "LineSeriesDict",
+
+    # Bar series configs
+    "BarAxisSide",
+    "BarTagMode",
+    "BarTagXValue",
+    "BarTagXValues",
+    "BarTagDict",
+    "BarSeriesConfig",
+    "BarSeriesDict",
+    "BarSeriesLike",
+
+    # BoxW series configs
+    "BoxTagMode",
+    "BoxTagStatistic",
+    "BoxTagXValue",
+    "BoxTagXValues",
+    "BoxHorizontalAlignment",
+    "BoxVerticalAlignment",
+    "BoxTagLabelDict",
+    "BoxTagDotDict",
+    "BoxTagDict",
+    "BoxSeriesConfig",
+    "BoxSeriesDict",
+    "BoxSeriesLike",
+
 ]

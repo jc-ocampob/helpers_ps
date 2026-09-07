@@ -1,804 +1,609 @@
 from __future__ import annotations
 
-from typing import Self, Literal
+from collections.abc import Sequence
+from dataclasses import asdict
+from typing import Any, Self
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from ..models import (
+    BarSeriesConfig,
+    BarSeriesDict,
+    BarSeriesLike,
     XAxisConfig,
-    YAxisConfig,
-    LegendConfig,
-    FigureTitle,
-    FigureSubtitle,
-    FigureSource,
+    XAxisLike,
     coerce_configs,
-    config_to_dict
+    config_to_dict,
 )
-from ..tags._colors import PALETA_COLORES
 
-import matplotlib.dates as mdates
+from ..tags._colors import PALETA_COLORES
 
 
 class BarChartMixin:
+    """
+    Provides bar-chart construction logic for GraphMtplt.
+    """
 
-    def _prepare_bar_context(
+    def _normalize_bar_series(
         self,
-        *,
-        df_index: int,
-        tickers,
-        labels,
-        colors,
-        axis_side,
-        stacked: bool,
-        grouped: bool,
-        bar_mode: str,
-        x_axis,
-        y_axis,
-        y_axis_right,
-        right_axis,
-        title,
-        subtitle,
-        source,
-        legend,
-        hlines,
-        bar_labels,
-    ):
-        db = self._select_df(df_idx=df_index)
+        dataframe: pd.DataFrame,
+        series: Sequence[BarSeriesLike] | None = None,
+    ) -> list[BarSeriesDict]:
+        """
+        Normalize and validate bar-series configurations.
 
-        series_config = self._normalize_series_config(
-            dataframe=db,
-            tickers=tickers,
-            labels=labels,
-            colors=colors,
-            axis_side=axis_side,
+        If series is None, all DataFrame columns are included using
+        their default configuration.
+        """
+        if series is None:
+            series = [
+                BarSeriesConfig(
+                    ticker=str(column),
+                )
+                for column in dataframe.columns
+            ]
+
+        if not series:
+            raise ValueError(
+                "'series' cannot be empty. "
+                "Use None to plot all DataFrame columns."
+            )
+
+        normalized: list[BarSeriesConfig] = []
+
+        for position, item in enumerate(series):
+            if isinstance(item, BarSeriesConfig):
+                config = item
+
+            elif isinstance(item, dict):
+                try:
+                    config = BarSeriesConfig(**item)
+
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        "Invalid bar series configuration at "
+                        f"position {position}: {item}."
+                    ) from exc
+
+            else:
+                raise TypeError(
+                    "Each item in 'series' must be a dictionary "
+                    "or a BarSeriesConfig instance."
+                )
+
+            if config.ticker not in dataframe.columns:
+                raise KeyError(
+                    f"Ticker '{config.ticker}' was not found "
+                    "in the selected DataFrame."
+                )
+
+            normalized.append(config)
+
+        tickers = [
+            config.ticker
+            for config in normalized
+        ]
+
+        if len(tickers) != len(set(tickers)):
+            raise ValueError(
+                "Duplicated tickers are not allowed in 'series'."
+            )
+
+        if not PALETA_COLORES:
+            raise ValueError(
+                "PALETA_COLORES cannot be empty."
+            )
+
+        for position, config in enumerate(normalized):
+            if config.label is None:
+                config.label = config.ticker
+
+            if config.color is None:
+                config.color = PALETA_COLORES[
+                    position % len(PALETA_COLORES)
+                ]
+
+        return [
+            BarSeriesDict(**asdict(config))
+            for config in normalized
+        ]
+
+    def _prepare_bar_x_values(
+        self,
+        dataframe: pd.DataFrame,
+    ) -> tuple[np.ndarray, float]:
+        """
+        Return numeric bar positions and the base distance between
+        consecutive observations.
+        """
+        if self._x_axis_mode in {"bbg", "categorical"}:
+            x_values = np.asarray(
+                self._x_vals,
+                dtype=float,
+            )
+
+        elif pd.api.types.is_datetime64_any_dtype(
+            dataframe.index
+        ):
+            x_values = np.asarray(
+                self._ax.convert_xunits(
+                    pd.to_datetime(dataframe.index)
+                ),
+                dtype=float,
+            )
+
+        elif pd.api.types.is_numeric_dtype(
+            dataframe.index
+        ):
+            x_values = np.asarray(
+                dataframe.index,
+                dtype=float,
+            )
+
+        else:
+            x_values = np.arange(
+                len(dataframe.index),
+                dtype=float,
+            )
+
+        finite_values = x_values[
+            np.isfinite(x_values)
+        ]
+
+        unique_values = np.sort(
+            np.unique(finite_values)
         )
 
-        tickers = [item["ticker"] for item in series_config]
-        labels = [item["label"] for item in series_config]
-        colors = [item["color"] for item in series_config]
+        differences = np.diff(unique_values)
+
+        positive_differences = differences[
+            differences > 0
+        ]
+
+        base_step = (
+            float(np.median(positive_differences))
+            if len(positive_differences)
+            else 1.0
+        )
+
+        return x_values, base_step
+
+    def _get_bar_values(
+        self,
+        dataframe: pd.DataFrame,
+        ticker: str,
+    ) -> np.ndarray:
+        """
+        Return a bar series aligned with the active X-axis.
+        """
+        if self._x_axis_mode == "bbg":
+            return (
+                dataframe[ticker]
+                .reindex(self._x_axis_fechas)
+                .to_numpy(dtype=float)
+            )
+
+        return dataframe[ticker].to_numpy(
+            dtype=float
+        )
+
+    def _split_bar_values(
+        self,
+        values: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Split values into positive and negative arrays.
+
+        Missing values are converted to zero so they do not affect
+        accumulated stack positions.
+        """
+        values = np.asarray(
+            values,
+            dtype=float,
+        )
+
+        positive = np.where(
+            np.isnan(values),
+            0.0,
+            np.maximum(values, 0.0),
+        )
+
+        negative = np.where(
+            np.isnan(values),
+            0.0,
+            np.minimum(values, 0.0),
+        )
+
+        return positive, negative
+
+    def _plot_bar_series(
+        self,
+        dataframe: pd.DataFrame,
+        series_config: list[BarSeriesDict],
+        left_ax,
+        right_ax,
+        grouped: bool,
+        stacked: bool,
+        bar_width: float,
+        alpha: float,
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Plot bar series on their configured axes.
+        """
+        x_values, base_step = (
+            self._prepare_bar_x_values(
+                dataframe=dataframe,
+            )
+        )
+
+        series_count = len(series_config)
+
+        bars_data: dict[
+            str,
+            dict[str, Any],
+        ] = {}
+
+        def get_axis(item: BarSeriesDict):
+            selected_side = item["axis_side"]
+
+            plot_ax = (
+                right_ax
+                if selected_side == "right"
+                else left_ax
+            )
+
+            if plot_ax is None:
+                raise RuntimeError(
+                    f"Axis '{selected_side}' was not "
+                    "initialized correctly."
+                )
+
+            return plot_ax
+
+        if stacked:
+            stack_axis = get_axis(
+                series_config[0]
+            )
+
+            bottom_positive = np.zeros(
+                len(x_values),
+                dtype=float,
+            )
+
+            bottom_negative = np.zeros(
+                len(x_values),
+                dtype=float,
+            )
+
+            width = min(
+                bar_width * base_step,
+                0.85 * base_step,
+            )
+
+            for item in series_config:
+                ticker = item["ticker"]
+
+                values = self._get_bar_values(
+                    dataframe=dataframe,
+                    ticker=ticker,
+                )
+
+                positive, negative = (
+                    self._split_bar_values(values)
+                )
+
+                positive_bars = stack_axis.bar(
+                    x_values,
+                    positive,
+                    width=width,
+                    bottom=bottom_positive,
+                    color=item["color"],
+                    alpha=alpha,
+                    label=item["label"],
+                    zorder=3,
+                )
+
+                negative_bars = stack_axis.bar(
+                    x_values,
+                    negative,
+                    width=width,
+                    bottom=bottom_negative,
+                    color=item["color"],
+                    alpha=alpha,
+                    label="_nolegend_",
+                    zorder=3,
+                )
+
+                bottom_positive += positive
+                bottom_negative += negative
+
+                bars_data[ticker] = {
+                    "bars": {
+                        "pos": positive_bars,
+                        "neg": negative_bars,
+                    },
+                    "ticker": ticker,
+                    "label": item["label"],
+                    "color": item["color"],
+                    "axis_side": item["axis_side"],
+                    "x_values": x_values.copy(),
+                    "values": values.copy(),
+                }
+
+            return bars_data
+
+        if grouped and series_count > 1:
+            group_width = min(
+                bar_width * base_step,
+                0.80 * base_step,
+            )
+
+            individual_width = (
+                group_width / series_count
+            )
+
+            for position, item in enumerate(
+                series_config
+            ):
+                ticker = item["ticker"]
+                plot_ax = get_axis(item)
+
+                values = self._get_bar_values(
+                    dataframe=dataframe,
+                    ticker=ticker,
+                )
+
+                offset = (
+                    position
+                    - (series_count - 1) / 2
+                ) * individual_width
+
+                plotted_x = x_values + offset
+
+                bars = plot_ax.bar(
+                    plotted_x,
+                    values,
+                    width=individual_width,
+                    color=item["color"],
+                    alpha=alpha,
+                    label=item["label"],
+                    zorder=3,
+                )
+
+                bars_data[ticker] = {
+                    "bars": bars,
+                    "ticker": ticker,
+                    "label": item["label"],
+                    "color": item["color"],
+                    "axis_side": item["axis_side"],
+                    "x_values": plotted_x.copy(),
+                    "base_x_values": x_values.copy(),
+                    "values": values.copy(),
+                }
+
+            return bars_data
+
+        item = series_config[0]
+        ticker = item["ticker"]
+        plot_ax = get_axis(item)
+
+        values = self._get_bar_values(
+            dataframe=dataframe,
+            ticker=ticker,
+        )
+
+        width = min(
+            bar_width * base_step,
+            0.85 * base_step,
+        )
+
+        bars = plot_ax.bar(
+            x_values,
+            values,
+            width=width,
+            color=item["color"],
+            alpha=alpha,
+            label=item["label"],
+            zorder=3,
+        )
+
+        bars_data[ticker] = {
+            "bars": bars,
+            "ticker": ticker,
+            "label": item["label"],
+            "color": item["color"],
+            "axis_side": item["axis_side"],
+            "x_values": x_values.copy(),
+            "values": values.copy(),
+        }
+
+        return bars_data
+
+    def graph_bar(
+        self,
+        series: Sequence[BarSeriesLike] | None = None,
+        df_index: int = 0,
+        grouped: bool | None = None,
+        stacked: bool = False,
+        bar_width: float = 0.8,
+        alpha: float = 0.95,
+        x_axis: XAxisLike | None = None,
+    ) -> Self:
+        """
+        Add bar series to the active figure.
+
+        If series is None, all DataFrame columns are plotted using:
+
+        - Column name as label.
+        - Automatic palette colors.
+        - Left axis.
+        - Grouped bars when multiple columns exist.
+        - No tags.
+        """
+        if not isinstance(bar_width, (int, float)):
+            raise TypeError(
+                "'bar_width' must be numeric."
+            )
+
+        if not 0 < bar_width <= 1:
+            raise ValueError(
+                "'bar_width' must be greater than zero "
+                "and less than or equal to one."
+            )
+
+        if not isinstance(alpha, (int, float)):
+            raise TypeError(
+                "'alpha' must be numeric."
+            )
+
+        if not 0 <= alpha <= 1:
+            raise ValueError(
+                "'alpha' must be between zero and one."
+            )
+
+        if not isinstance(stacked, bool):
+            raise TypeError(
+                "'stacked' must be a boolean."
+            )
+
+        if (
+            grouped is not None
+            and not isinstance(grouped, bool)
+        ):
+            raise TypeError(
+                "'grouped' must be a boolean or None."
+            )
+
+        dataframe = self._select_df(
+            df_idx=df_index,
+        )
+
+        configs = coerce_configs(
+            x_axis=(x_axis, XAxisConfig),
+        )
+
+        x_axis_config = config_to_dict(
+            configs["x_axis"]
+        )
+
+        series_config = self._normalize_bar_series(
+            dataframe=dataframe,
+            series=series,
+        )
+
+        series_count = len(series_config)
+
+        if grouped is None:
+            grouped = (
+                series_count > 1
+                and not stacked
+            )
+
+        if stacked and grouped:
+            raise ValueError(
+                "'stacked' and 'grouped' cannot both be True."
+            )
+
+        if (
+            not stacked
+            and not grouped
+            and series_count > 1
+        ):
+            raise ValueError(
+                "Multiple bar series require grouped=True "
+                "or stacked=True."
+            )
 
         axis_map = {
             item["ticker"]: item["axis_side"]
             for item in series_config
         }
 
-        if stacked and len(set(axis_map.values())) > 1:
+        if (
+            stacked
+            and len(set(axis_map.values())) > 1
+        ):
             raise ValueError(
-                "Mixed left/right axis sides are not supported for stacked bars. "
-                "Use one axis side for the full stack, or use grouped=True."
+                "Stacked bars cannot use mixed left and "
+                "right axes."
             )
 
-        db = db[tickers].copy()
-
         state = self._ensure_active_state()
+
         state.series_config = series_config
         state.axis_map = axis_map
+
         state.ticker_label_color = [
-            (item["ticker"], item["label"], item["color"])
+            (
+                item["ticker"],
+                item["label"],
+                item["color"],
+            )
             for item in series_config
         ]
 
-        configs = coerce_configs(
-            x_axis=(x_axis, XAxisConfig),
-            y_axis=(y_axis, YAxisConfig),
-            y_axis_right=(y_axis_right, YAxisConfig),
-            title=(title, FigureTitle),
-            subtitle=(subtitle, FigureSubtitle),
-            legend=(legend, LegendConfig),
-            source=(source, FigureSource),
-        )
+        state.bar_grouped = grouped
+        state.bar_stacked = stacked
 
-        x_axis = config_to_dict(configs["x_axis"])
-        y_axis = config_to_dict(configs["y_axis"])
-        y_axis_right = config_to_dict(configs["y_axis_right"])
-        title = config_to_dict(configs["title"])
-        subtitle = config_to_dict(configs["subtitle"])
-        legend = config_to_dict(configs["legend"])
-        source = config_to_dict(configs["source"])
-
-        right_axis = right_axis if right_axis is not None else {}
-        hlines = hlines if hlines is not None else {}
-        bar_labels = bar_labels if bar_labels is not None else {}
-
-        if bar_mode == "auto":
-            if len(tickers) == 1:
-                bar_mode = "time"
-            else:
-                bar_mode = "time" if (grouped or stacked) else "last"
-
-        state.bar_mode = bar_mode
-        state.right_axis_config = right_axis.copy()
-        state.y_axis_right = y_axis_right.copy()
-
-        return {
-            "db": db,
-            "state": state,
-            "series_config": series_config,
-            "tickers": tickers,
-            "labels": labels,
-            "colors": colors,
-            "axis_map": axis_map,
-            "stacked": stacked,
-            "grouped": grouped,
-            "bar_mode": bar_mode,
-            "x_axis": x_axis,
-            "y_axis": y_axis,
-            "y_axis_right": y_axis_right,
-            "right_axis": right_axis,
-            "title": title,
-            "subtitle": subtitle,
-            "source": source,
-            "legend": legend,
-            "hlines": hlines,
-            "bar_labels": bar_labels,
-        }
-
-
-    def _resolve_bar_axes(self, context: dict):
-        state = context["state"]
-        axis_map = context["axis_map"]
-
-        left_ax = self._ax
-        right_ax = getattr(self, "_right_ax", None)
-
-        needs_right_axis = any(
-            side == "right"
-            for side in axis_map.values()
-        )
-
-        if needs_right_axis:
-            if right_ax is None:
-                right_ax = left_ax.twinx()
-
-            state.right_ax = right_ax
-            state.right_axis_enabled = True
-        else:
-            state.right_axis_enabled = right_ax is not None
-
-        def get_plot_axis(ticker: str):
-            selected_side = axis_map.get(ticker, "left")
-
-            if selected_side == "right":
-                if right_ax is None:
-                    raise RuntimeError("Right axis was not initialized correctly.")
-                return right_ax
-
-            return left_ax
-
-        context["left_ax"] = left_ax
-        context["right_ax"] = right_ax
-        context["get_plot_axis"] = get_plot_axis
-
-        return context
-
-
-    def _ensure_bar_figure(self, context: dict, figsize: tuple[float, float]):
         if not hasattr(self, "_ax") or self._ax is None:
-            self.plot(figsize=figsize)
+            self.plot()
 
-        return self._resolve_bar_axes(context)
+        left_ax, right_ax = self._resolve_line_axes(
+            axis_map=axis_map,
+        )
 
+        dataframe = self.prep_x_axis(
+            dataframe=dataframe,
+            **x_axis_config,
+        )
 
-    def _apply_bar_layout(self, context: dict):
-        title = context["title"]
-        subtitle = context["subtitle"]
-        source = context["source"]
-
-        self.add_title(**title)
-        self.add_subtitle(**subtitle)
-        self.add_source(**source)
-
-        return context
-
-
-    def _plot_time_bars(self, context: dict) -> dict:
-        db = context["db"]
-        state = context["state"]
-        tickers = context["tickers"]
-        labels = context["labels"]
-        colors = context["colors"]
-        grouped = context["grouped"]
-        stacked = context["stacked"]
-        bar_width = context["bar_width"]
-        alpha = context["alpha"]
-        x_axis = context["x_axis"]
-        left_ax = context["left_ax"]
-        get_plot_axis = context["get_plot_axis"]
-
-        bars_data = {}
-
-        db = self.prep_x_axis(dataframe=db, **x_axis)
-        context["db"] = db
-
-        if self._x_axis_mode == "bbg":
-            state.bars_x_reference = list(self._x_axis_fechas)
-        else:
-            state.bars_x_reference = list(db.index)
-
-        m = len(tickers)
-
-        if m == 1:
-            t = tickers[0]
-            plot_ax = get_plot_axis(t)
-            s = db[[t]].copy()
-
-            if self._x_axis_mode == "bbg":
-                serie = s.reindex(self._x_axis_fechas)[t]
-                bars = plot_ax.bar(
-                    self._x_vals,
-                    serie.to_numpy(),
-                    width=min(bar_width, 0.85),
-                    color=colors[0],
-                    alpha=alpha,
-                    label=labels[0],
-                    zorder=3,
-                )
-            else:
-                bars = plot_ax.bar(
-                    s.index,
-                    s[t],
-                    width=min(bar_width, 0.85),
-                    color=colors[0],
-                    alpha=alpha,
-                    label=labels[0],
-                    zorder=3,
-                )
-
-            bars_data[t] = {"bars": bars}
-            return bars_data
-
-        if grouped and not stacked:
-            return self._plot_time_grouped_bars(context)
-
-        return self._plot_time_stacked_bars(context)
-    
-
-    def _plot_time_grouped_bars(self, context: dict) -> dict:
-        db = context["db"]
-        tickers = context["tickers"]
-        labels = context["labels"]
-        colors = context["colors"]
-        bar_width = context["bar_width"]
-        alpha = context["alpha"]
-        left_ax = context["left_ax"]
-        x_axis = context["x_axis"]
-        get_plot_axis = context["get_plot_axis"]
-
-        bars_data = {}
-        m = len(tickers)
-
-        if self._x_axis_mode == "bbg":
-            base_x = self._x_vals.astype(float)
-            width = min(bar_width / m, 0.8 / m)
-
-            for i, t in enumerate(tickers):
-                plot_ax = get_plot_axis(t)
-                serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
-                offset = (i - (m - 1) / 2) * width
-
-                bars = plot_ax.bar(
-                    base_x + offset,
-                    serie.to_numpy(),
-                    width=width,
-                    color=colors[i],
-                    alpha=alpha,
-                    label=labels[i],
-                    zorder=3,
-                )
-
-                bars_data[t] = {"bars": bars}
-
-            return bars_data
-
-        x_index = db.index
-        is_datetime = pd.api.types.is_datetime64_any_dtype(x_index)
-        is_numeric = pd.api.types.is_numeric_dtype(x_index)
-
-        if is_datetime:
-            x_num = mdates.date2num(pd.to_datetime(x_index).to_pydatetime())
-            diffs = np.diff(np.sort(np.unique(x_num)))
-            base_step = np.median(diffs) if len(diffs) else 30.0
-            group_total = base_step * 0.8
-            width = group_total / m
-
-            for i, t in enumerate(tickers):
-                plot_ax = get_plot_axis(t)
-                offset = (i - (m - 1) / 2) * width
-
-                bars = plot_ax.bar(
-                    x_num + offset,
-                    np.asarray(db[t].values, dtype=float),
-                    width=width,
-                    color=colors[i],
-                    alpha=alpha,
-                    label=labels[i],
-                    zorder=3,
-                )
-
-                bars_data[t] = {"bars": bars}
-
-            self._ax.xaxis_date()
-            return bars_data
-
-        if is_numeric:
-            x_num = np.asarray(x_index.values, dtype=float)
-            diffs = np.diff(np.sort(np.unique(x_num)))
-            base_step = np.median(diffs) if len(diffs) else 1.0
-            group_total = base_step * 0.8
-            width = group_total / m
-
-            for i, t in enumerate(tickers):
-                plot_ax = get_plot_axis(t)
-                offset = (i - (m - 1) / 2) * width
-
-                bars = plot_ax.bar(
-                    x_num + offset,
-                    np.asarray(db[t].values, dtype=float),
-                    width=width,
-                    color=colors[i],
-                    alpha=alpha,
-                    label=labels[i],
-                    zorder=3,
-                )
-
-                bars_data[t] = {"bars": bars}
-
-            return bars_data
-
-        x = np.arange(len(db.index), dtype=float)
-        width = min(bar_width / m, 0.8 / m)
-
-        for i, t in enumerate(tickers):
-            plot_ax = get_plot_axis(t)
-            offset = (i - (m - 1) / 2) * width
-
-            bars = plot_ax.bar(
-                x + offset,
-                np.asarray(db[t].values, dtype=float),
-                width=width,
-                color=colors[i],
-                alpha=alpha,
-                label=labels[i],
-                zorder=3,
+        if self._x_axis_mode == "categorical":
+            categorical_x = np.arange(
+                len(dataframe.index),
+                dtype=float,
             )
 
-            bars_data[t] = {"bars": bars}
+            self._x_vals = categorical_x
 
-        left_ax.set_xticks(x)
-        x_font = x_axis.get("fontsize", 8)
-        left_ax.set_xticklabels(
-            [str(v) for v in db.index],
-            fontsize=x_font,
+            left_ax.set_xticks(
+                categorical_x
+            )
+
+            left_ax.set_xticklabels(
+                [
+                    str(value)
+                    for value in dataframe.index
+                ]
+            )
+
+        bars_data = self._plot_bar_series(
+            dataframe=dataframe,
+            series_config=series_config,
+            left_ax=left_ax,
+            right_ax=right_ax,
+            grouped=grouped,
+            stacked=stacked,
+            bar_width=float(bar_width),
+            alpha=float(alpha),
         )
-
-        return bars_data
-
-
-    def _split_positive_negative(self, values):
-        y = np.asarray(values, dtype=float)
-
-        y_pos = np.where(
-            np.isnan(y),
-            0.0,
-            np.where(y > 0, y, 0.0),
-        )
-
-        y_neg = np.where(
-            np.isnan(y),
-            0.0,
-            np.where(y < 0, y, 0.0),
-        )
-
-        return y_pos, y_neg
-
-
-    def _plot_time_stacked_bars(self, context: dict) -> dict:
-        db = context["db"]
-        tickers = context["tickers"]
-        labels = context["labels"]
-        colors = context["colors"]
-        bar_width = context["bar_width"]
-        alpha = context["alpha"]
-        get_plot_axis = context["get_plot_axis"]
-
-        bars_data = {}
-        stack_axis = get_plot_axis(tickers[0])
-
-        if self._x_axis_mode == "bbg":
-            x_plot = self._x_vals
-            bottom_pos = np.zeros(len(self._x_vals), dtype=float)
-            bottom_neg = np.zeros(len(self._x_vals), dtype=float)
-
-            for i, t in enumerate(tickers):
-                serie = db[[t]].copy().reindex(self._x_axis_fechas)[t]
-                y_pos, y_neg = self._split_positive_negative(serie.values)
-
-                bars_pos = None
-                bars_neg = None
-
-                if np.any(y_pos != 0):
-                    bars_pos = stack_axis.bar(
-                        x_plot,
-                        y_pos,
-                        width=min(bar_width, 0.85),
-                        bottom=bottom_pos,
-                        color=colors[i],
-                        alpha=alpha,
-                        label=labels[i],
-                        zorder=3,
-                    )
-                    bottom_pos = bottom_pos + y_pos
-
-                if np.any(y_neg != 0):
-                    bars_neg = stack_axis.bar(
-                        x_plot,
-                        y_neg,
-                        width=min(bar_width, 0.85),
-                        bottom=bottom_neg,
-                        color=colors[i],
-                        alpha=alpha,
-                        zorder=3,
-                    )
-                    bottom_neg = bottom_neg + y_neg
-
-                bars_data[t] = {
-                    "bars": {
-                        "pos": bars_pos,
-                        "neg": bars_neg,
-                    }
-                }
-
-            return bars_data
-
-        x_plot = db.index
-        bottom_pos = np.zeros(len(db.index), dtype=float)
-        bottom_neg = np.zeros(len(db.index), dtype=float)
-
-        for i, t in enumerate(tickers):
-            y_pos, y_neg = self._split_positive_negative(db[t].values)
-
-            bars_pos = None
-            bars_neg = None
-
-            if np.any(y_pos != 0):
-                bars_pos = stack_axis.bar(
-                    x_plot,
-                    y_pos,
-                    width=min(bar_width, 0.85),
-                    bottom=bottom_pos,
-                    color=colors[i],
-                    alpha=alpha,
-                    label=labels[i],
-                    zorder=3,
-                )
-                bottom_pos = bottom_pos + y_pos
-
-            if np.any(y_neg != 0):
-                bars_neg = stack_axis.bar(
-                    x_plot,
-                    y_neg,
-                    width=min(bar_width, 0.85),
-                    bottom=bottom_neg,
-                    color=colors[i],
-                    alpha=alpha,
-                    zorder=3,
-                )
-                bottom_neg = bottom_neg + y_neg
-
-            bars_data[t] = {
-                "bars": {
-                    "pos": bars_pos,
-                    "neg": bars_neg,
-                }
-            }
-
-        return bars_data
-
-
-    def _plot_last_bars(self, context: dict) -> dict:
-        db = context["db"]
-        state = context["state"]
-        tickers = context["tickers"]
-        labels = context["labels"]
-        colors = context["colors"]
-        grouped = context["grouped"]
-        stacked = context["stacked"]
-        bar_width = context["bar_width"]
-        alpha = context["alpha"]
-        left_ax = context["left_ax"]
-        x_axis = context["x_axis"]
-        get_plot_axis = context["get_plot_axis"]
-
-        db = db[tickers].copy()
-        context["db"] = db
-
-        state.bars_x_reference = list(db.index)
-
-        x = np.arange(len(db.index), dtype=float)
-        cats = [str(v) for v in db.index]
-        m = len(tickers)
-
-        vals_matrix = np.column_stack([
-            np.asarray(db[t].values, dtype=float)
-            for t in tickers
-        ])
-
-        self._x_axis_mode = "categorical"
-        self._x_axis_fechas = None
-        self._x_vals = x
-
-        bars_data = {}
-
-        if grouped and not stacked:
-            width = min(bar_width / max(m, 1), 0.8 / max(m, 1))
-
-            for i, t in enumerate(tickers):
-                plot_ax = get_plot_axis(t)
-                offset = (i - (m - 1) / 2) * width
-                y = vals_matrix[:, i]
-
-                bars = plot_ax.bar(
-                    x + offset,
-                    y,
-                    width=width,
-                    color=colors[i],
-                    alpha=alpha,
-                    label=labels[i],
-                    zorder=3,
-                )
-
-                bars_data[t] = {"bars": bars}
-
-            return bars_data
-
-        if stacked:
-            stack_axis = get_plot_axis(tickers[0])
-            bottom_pos = np.zeros(len(x), dtype=float)
-            bottom_neg = np.zeros(len(x), dtype=float)
-
-            for i, t in enumerate(tickers):
-                y_pos, y_neg = self._split_positive_negative(vals_matrix[:, i])
-
-                bars_pos = None
-                bars_neg = None
-
-                if np.any(y_pos != 0):
-                    bars_pos = stack_axis.bar(
-                        x,
-                        y_pos,
-                        width=min(bar_width, 0.85),
-                        bottom=bottom_pos,
-                        color=colors[i],
-                        alpha=alpha,
-                        label=labels[i],
-                        zorder=3,
-                    )
-                    bottom_pos = bottom_pos + y_pos
-
-                if np.any(y_neg != 0):
-                    bars_neg = stack_axis.bar(
-                        x,
-                        y_neg,
-                        width=min(bar_width, 0.85),
-                        bottom=bottom_neg,
-                        color=colors[i],
-                        alpha=alpha,
-                        zorder=3,
-                    )
-                    bottom_neg = bottom_neg + y_neg
-
-                bars_data[t] = {
-                    "bars": {
-                        "pos": bars_pos,
-                        "neg": bars_neg,
-                    }
-                }
-
-            return bars_data
-
-        t = tickers[0]
-        plot_ax = get_plot_axis(t)
-        y = vals_matrix[:, 0]
-
-        bars = plot_ax.bar(
-            x,
-            y,
-            width=min(bar_width, 0.85),
-            color=colors[0],
-            alpha=alpha,
-            label=labels[0],
-            zorder=3,
-        )
-
-        bars_data[t] = {"bars": bars}
-
-        left_ax.set_xticks(x)
-        x_font = x_axis.get("fontsize", 8)
-        left_ax.set_xticklabels(cats, fontsize=x_font)
-
-        return bars_data
-
-
-    def _finalize_bar_metadata(self, context: dict, bars_data: dict):
-        state = context["state"]
 
         state.bars_data = bars_data
-        state.bar_stacked = context["stacked"]
-        state.bar_grouped = context["grouped"]
 
-        return context
-
-
-    def _finalize_bar_axes(self, context: dict):
-        left_ax = context["left_ax"]
-        right_ax = context["right_ax"]
-        y_axis = context["y_axis"]
-        y_axis["side"] = "left"
-        y_axis_right = context["y_axis_right"]
-        y_axis_right["side"] = "right"
-        right_axis = context["right_axis"]
-        hlines = context["hlines"]
-        show_hguide = context["show_hguide"]
-
-        self.config_yaxis(
-            **y_axis,
+        state.bars_x_reference = (
+            list(self._x_axis_fechas)
+            if self._x_axis_mode == "bbg"
+            else list(dataframe.index)
         )
 
-        if right_ax is not None:
-            right_y_axis = right_axis.copy()
-            right_y_axis.update(y_axis_right)
-
-            self.config_yaxis(
-                **right_y_axis,
-            )
-
-        self._ax = left_ax
-
-        if hlines:
-            self.horizontal_lines(
-                side="left",
-                **hlines,
-            )
-
-        if show_hguide:
-            self.horizontal_guides(
-                side="both" if right_ax is not None else "left",
-                mostrar_cero=False,
-            )
-
-        return context
-
-
-    def _finalize_bar_legend(self, context: dict):
-        left_ax = context["left_ax"]
-        right_ax = context["right_ax"]
-        legend = context["legend"]
-
-        self.add_combined_legend(
-            ax=left_ax,
-            include_right_axis=right_ax is not None,
-            **legend,
+        self._apply_bar_tags(
+            series_config=series_config,
+            bars_data=bars_data,
+            x_reference=state.bars_x_reference,
+            left_ax=left_ax,
+            right_ax=right_ax,
         )
 
         self._ax = left_ax
-
-        return context
-
-
-    def _apply_bar_labels(self, context: dict):
-        bar_labels = context["bar_labels"]
-        axis_map = context["axis_map"]
-        left_ax = context["left_ax"]
-        right_ax = context["right_ax"]
-
-        if not bar_labels:
-            return context
-
-        bar_labels_left = {}
-        bar_labels_right = {}
-
-        for control_name, control in bar_labels.items():
-            ticker = control.get("ticker")
-
-            if ticker is None:
-                bar_labels_left[control_name] = control
-                continue
-
-            if axis_map.get(ticker, "left") == "right":
-                bar_labels_right[control_name] = control
-            else:
-                bar_labels_left[control_name] = control
-
-        if bar_labels_left:
-            self._ax = left_ax
-            self._bar_value_label_generate_dict(
-                label_dict=bar_labels_left,
-            )
-
-        if bar_labels_right:
-            if right_ax is None:
-                raise RuntimeError(
-                    "Right axis was not initialized for right-side bar labels."
-                )
-
-            self._ax = right_ax
-            self._bar_value_label_generate_dict(
-                label_dict=bar_labels_right,
-            )
-
-        self._ax = left_ax
-
-        return context
-
-
-    def graph_bar(
-        self,
-        figsize: tuple[float, float] = (6.00, 5.00),
-        title: dict | FigureTitle | None = None,
-        subtitle: dict | FigureSubtitle | None = None,
-        source: dict | FigureSource | None = None,
-        df_index: int = 0,
-        tickers: list[str] | str = "all",
-        labels: list[str] | str | dict[str, str] | None = None,
-        colors: list[str] | str | dict[str, str] = PALETA_COLORES,
-        x_axis: dict | XAxisConfig | None = None,
-        y_axis: dict | YAxisConfig | None = None,
-        axis_side: str | list[str] | dict[str, str] | None = None,
-        y_axis_right: dict | YAxisConfig | None = None,
-        right_axis: dict | None = None,
-        bar_mode: Literal["auto", "time", "last"] = "auto",
-        stacked: bool = False,
-        grouped: bool = False,
-        bar_width: float = 0.8,
-        alpha: float = 0.95,
-        bar_labels: dict | None = None,
-        legend: dict | LegendConfig | None = None,
-        hlines: dict | None = None,
-        show_hguide: bool = False,
-    ) -> Self:
-        context = self._prepare_bar_context(
-            df_index=df_index,
-            tickers=tickers,
-            labels=labels,
-            colors=colors,
-            axis_side=axis_side,
-            stacked=stacked,
-            grouped=grouped,
-            bar_mode=bar_mode,
-            x_axis=x_axis,
-            y_axis=y_axis,
-            y_axis_right=y_axis_right,
-            right_axis=right_axis,
-            title=title,
-            subtitle=subtitle,
-            source=source,
-            legend=legend,
-            hlines=hlines,
-            bar_labels=bar_labels,
-        )
-
-        context["bar_width"] = bar_width
-        context["alpha"] = alpha
-        context["show_hguide"] = show_hguide
-
-        context = self._ensure_bar_figure(
-            context=context,
-            figsize=figsize,
-        )
-
-        self._apply_bar_layout(context)
-
-        if context["bar_mode"] == "time":
-            bars_data = self._plot_time_bars(context)
-        elif context["bar_mode"] == "last":
-            bars_data = self._plot_last_bars(context)
-        else:
-            raise ValueError("bar_mode must be one of: 'auto', 'time', 'last'")
-
-        self._finalize_bar_metadata(context, bars_data)
-        self._finalize_bar_axes(context)
-        self._finalize_bar_legend(context)
-        self._apply_bar_labels(context)
 
         return self

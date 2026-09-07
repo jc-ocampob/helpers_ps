@@ -1,54 +1,63 @@
 from __future__ import annotations
+from typing import Self
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 import matplotlib.dates as mdates
-from ..models import XAxisConfig, YAxisConfig, coerce_config, config_to_dict
+from ..models import XAxisConfig, coerce_config, config_to_dict
 
 
 class AxesMixin:
     """
-    Provides x-axis and y-axis preparation utilities.
+    Axis preparation and formatting utilities.
+
+    This mixin provides helpers for configuring x-axis and y-axis
+    behavior across all chart types. It supports datetime, numeric,
+    categorical, and Bloomberg-style axes while maintaining internal
+    metadata required by annotations, reference lines, and other
+    chart components.
+
+    Features
+    --------
+    - Datetime axis formatting.
+    - Bloomberg-style month/year axes.
+    - Numeric and categorical axis handling.
+    - Custom ticks and labels.
+    - Left and right y-axis configuration.
+    - Axis selection and retrieval helpers.
+
+    Notes
+    -----
+    Most chart types delegate axis preparation and formatting to
+    this mixin in order to keep axis behavior consistent across
+    the entire plotting framework.
     """
-    def prep_x_axis_config(
-        self,
-        dataframe: pd.DataFrame | None = None,
-        config: XAxisConfig | dict | None = None,
-    ) -> pd.DataFrame:
-        cfg = coerce_config(config, XAxisConfig)
-        kwargs = config_to_dict(cfg)
-        return self.prep_x_axis(
-            dataframe=dataframe,
-            **kwargs,
-        )
-
-
-    def prep_y_axis_config(
-        self,
-        config: YAxisConfig | dict | None = None,
-    ):
-        cfg = coerce_config(config, YAxisConfig)
-        kwargs = config_to_dict(cfg)
-        return self.config_yaxis(**kwargs)
-
 
     def _months_years(self, fechas):
         """
-        Extract Spanish month abbreviations and years from a date-like index.
+        Extract month abbreviations and year values from a date sequence.
 
-        This helper stores month labels and year values in the instance so they can
-        be reused when creating Bloomberg-style x-axis labels.
+        This helper prepares the internal month and year arrays used by
+        Bloomberg-style x-axis formatting. Month labels are stored using
+        Spanish abbreviations while year values are stored separately
+        for year annotations.
 
         Parameters
         ----------
         fechas : sequence of datetime-like values
-            Date-like sequence used to extract month abbreviations and years.
+            Date sequence used to derive month and year information.
 
         Returns
         -------
         None
-            The extracted values are stored internally in `_months` and `_years`.
+            Month and year values are stored internally in `_months`
+            and `_years`.
+
+        Notes
+        -----
+        This helper is primarily used by Bloomberg-style x-axis layouts.
         """
+        
         mes_es = {
             1: 'Ene', 2: 'Feb', 3: 'Mar', 4: 'Abr',
             5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Ago',
@@ -61,25 +70,34 @@ class AxesMixin:
 
     def _years_xaxis(self, y_offset=-0.08, fontsize=None, color='black'):
         """
-        Add year labels below the x-axis for Bloomberg-style date charts.
+        Draw year labels below a Bloomberg-style x-axis.
 
-        This method uses the internally stored `_years` array to place one centered
-        year label below each group of monthly x-axis labels.
+        This helper places one centered year label below each group of
+        monthly labels. It is used to replicate Bloomberg-style date
+        axes where months appear on the axis and years appear below
+        the month groups.
 
         Parameters
         ----------
         y_offset : float, default -0.08
-            Vertical offset of the year labels relative to the x-axis transform.
+            Vertical offset of the year labels relative to the
+            x-axis transform.
+
         fontsize : float or None, optional
-            Font size of the year labels. If None, the method uses the internal
-            tick font size when available.
+            Font size of the year labels. When omitted, the
+            configured tick font size is used.
+
         color : str, default "black"
-            Text color of the year labels.
+            Color of the year labels.
 
         Returns
         -------
         None
             Year labels are added directly to the active axis.
+
+        Notes
+        -----
+        If no year information
         """
 
         years = getattr(self, "_years", None)
@@ -103,26 +121,28 @@ class AxesMixin:
 
     def _coerce_to_bbg_x(self, x):
         """
-        Convert an x-axis input value into the internal Bloomberg-style position.
+        Convert a value to its Bloomberg-style x-axis position.
 
-        Bloomberg-style charts use integer positions instead of the original
-        datetime values. This helper converts dates, timestamps, or numeric values
-        into the corresponding numeric x-coordinate used by the active axis.
+        Bloomberg-style axes are represented internally using integer
+        positions rather than actual datetime values. This helper
+        converts date-like inputs into the corresponding x-axis
+        coordinate.
 
         Parameters
         ----------
         x : int, float, str, pandas.Timestamp, or datetime-like
-            Input x-axis value to convert.
+            Value to convert.
 
         Returns
         -------
         float
-            Numeric x-axis position compatible with the Bloomberg-style axis.
+            Numeric x-axis coordinate compatible with the active
+            Bloomberg-style axis.
 
         Notes
         -----
-        If the internal Bloomberg date index is not available, the function attempts
-        to return the input value as a float.
+        When no Bloomberg-style date index exists, numeric values are
+        returned directly whenever possible.
         """
 
         fechas = self._x_axis_fechas
@@ -144,6 +164,34 @@ class AxesMixin:
 
 
     def _resolve_line_axes(self, axis_map: dict[str, str]):
+        """
+        Resolve the axes required for multi-axis line charts.
+
+        This helper determines whether a secondary y-axis is required
+        based on the requested axis mapping. If at least one series is
+        assigned to the right axis and a right axis does not already
+        exist, a new twin axis is created.
+
+        Parameters
+        ----------
+        axis_map : dict[str, str]
+            Mapping of series names to axis assignments such as
+            `"left"` or `"right"`.
+
+        Returns
+        -------
+        tuple
+            Tuple containing:
+
+            - Left axis.
+            - Right axis (or None when not required).
+
+        Notes
+        -----
+        The method also updates the internal axis state used by other
+        chart components.
+        """
+
         left_ax = self._ax
         right_ax = getattr(self, "_right_ax", None)
 
@@ -175,65 +223,112 @@ class AxesMixin:
         tick_label_map: dict | None = None,
         rotation: float = 0,
         ha: str = "center",
-        va: str = "center",
+        va: str = "top",
         label_color: str | None = None,
         show_years: bool = True,
     ) -> pd.DataFrame:
         """
-        Prepare the x-axis format, ticks, labels, limits, and internal metadata.
+        Prepare and configure the x-axis.
 
-        This method detects whether the DataFrame index is datetime-like, numeric,
-        or categorical, and applies the appropriate x-axis formatting. It supports
-        automatic tick selection through `tick_step`, explicit tick selection through
-        `tick_values`, and custom label replacement through `tick_labels` or
-        `tick_label_map`.
+        This method analyzes the DataFrame index and automatically
+        configures the x-axis as datetime, Bloomberg-style datetime,
+        numeric, or categorical. It also applies tick formatting,
+        custom labels, axis limits, rotations, and internal metadata.
 
         Parameters
         ----------
         dataframe : pandas.DataFrame or None, optional
-            DataFrame used to configure the x-axis. If None, the active internal
-            DataFrame `_df` is used.
+            DataFrame used to configure the x-axis. When omitted,
+            the active internal DataFrame is used.
+
         bbg_format : bool, default False
-            Whether to use the Bloomberg-style x-axis format for datetime indexes.
+            Whether to use Bloomberg-style datetime formatting.
+
         tick_step : int, default 6
-            Step used to determine the frequency of visible x-axis tick labels when
-            `tick_values` is not provided.
+            Tick frequency used when explicit tick values are not
+            provided.
+
         fmt : str or None, optional
-            Format string used for datetime or numeric tick labels.
+            Format string used for datetime or numeric labels.
+
         year_y_offset : float, default -0.08
-            Vertical offset used for year labels when `bbg_format=True`.
+            Vertical offset used for Bloomberg-style year labels.
+
         lim : tuple[float, float] or None, optional
-            Optional lower and upper x-axis filter applied to the DataFrame index.
+            Optional x-axis limits.
+
         fontsize : float, default 8
-            Font size used for x-axis tick labels.
-        tick_values : list, tuple, pandas.Index, numpy.ndarray, or None, optional
-            Explicit x-axis values to display as ticks. Values should match the
-            DataFrame index for datetime, numeric, or categorical axes. In
-            Bloomberg-style mode, datetime values are mapped to internal positions.
-        tick_labels : list[str], tuple[str, ...], or None, optional
-            Explicit labels to use for `tick_values`. Must have the same length as
-            the resolved tick positions.
+            Tick label font size.
+
+        tick_values : list-like or None, optional
+            Explicit values used as visible ticks.
+
+        tick_labels : list-like or None, optional
+            Explicit labels assigned to visible ticks.
+
         tick_label_map : dict or None, optional
-            Mapping used to rename selected tick labels. Keys are matched against
-            original index values and stringified labels.
+            Mapping used to replace selected tick labels.
+
         rotation : float, default 0
-            Rotation applied to x-axis tick labels.
+            Rotation applied to x-axis labels.
+
         ha : str, default "center"
-            Horizontal alignment of x-axis tick labels.
+            Horizontal alignment of x-axis labels.
+
+        va : str, default "center"
+            Vertical alignment of x-axis labels.
+
         label_color : str or None, optional
-            Optional color applied to x-axis tick labels.
+            Tick label color.
+
         show_years : bool, default True
-            Whether to draw year labels in Bloomberg-style mode.
+            Whether Bloomberg-style year labels should be displayed.
 
         Returns
         -------
         pandas.DataFrame
-            DataFrame after applying the optional x-axis limits.
+            Filtered DataFrame after applying any x-axis limits.
 
         Notes
         -----
-        The method updates internal x-axis metadata such as `_x_axis_mode`,
-        `_x_axis_fechas`, `_x_vals`, `_months`, `_years`, and `_x_axis_metadata`.
+        This method updates internal metadata including axis mode,
+        tick configuration, Bloomberg date mappings, and plotting
+        positions required by annotations and reference lines.
+
+        Examples
+        --------
+        Standard datetime axis:
+
+        >>> graph.prep_x_axis(df)
+
+        Bloomberg-style axis:
+
+        >>> graph.prep_x_axis(
+        ...     df,
+        ...     bbg_format=True
+        ... )
+
+        Custom tick positions:
+
+        >>> graph.prep_x_axis(
+        ...     df,
+        ...     tick_values=[
+        ...         "2022-01-01",
+        ...         "2023-01-01",
+        ...     ]
+        ... )
+
+        Custom labels:
+
+        >>> graph.prep_x_axis(
+        ...     df,
+        ...     tick_values=[0, 5, 10],
+        ...     tick_labels=[
+        ...         "Start",
+        ...         "Middle",
+        ...         "End",
+        ...     ]
+        ... )
         """
 
         # -------------------------------------------------
@@ -640,48 +735,89 @@ class AxesMixin:
         ax=None,
     ):
         """
-        Prepare and format a y-axis.
+        Configure and format a y-axis.
 
-        This method formats a target y-axis with limits, tick label formatting,
-        tick styling, axis label styling, spine color, and optional tick spacing.
-
-        It can be used for the active axis, the left axis, the right axis, or an
-        explicitly provided Matplotlib axis. Grid lines are intentionally handled
-        by horizontal_guides() to keep responsibilities separated.
+        This method applies limits, label formatting, tick styling,
+        axis labels, spine colors, and tick spacing to a target
+        axis. It can be used on the left axis, right axis, or an
+        explicitly supplied Matplotlib axis.
 
         Parameters
         ----------
-        lim:
+        lim : tuple[float, float] or None, optional
             Lower and upper y-axis limits.
-        fmt:
-            Numeric format string used for y-axis labels. If None, ',.0f' is used.
-        fontsize:
-            Font size used for y-axis tick labels.
-        tick_step:
-            Fixed interval between y-axis ticks.
-        label:
-            Optional y-axis label.
-        label_fontsize:
-            Font size used for the y-axis label. If None, uses fontsize.
-        label_color:
-            Color used for the y-axis label.
-        tick_color:
-            Color used for y-axis tick labels and tick marks.
-        spine_color:
-            Color used for the y-axis spine.
-        margins_x:
-            X-axis margin passed to the target axis. If None, margins are not changed.
-        side:
-            Optional side reference. Use 'left' or 'right'. If None, the method
-            formats the active axis unless ax is provided.
-        ax:
-            Explicit Matplotlib axis to format. This takes priority over side.
+
+        fmt : str or None, optional
+            Numeric format string used for tick labels.
+
+        fontsize : float, default 7
+            Tick label font size.
+
+        tick_step : int or None, optional
+            Fixed spacing between y-axis ticks.
+
+        label : str or None, optional
+            Axis label.
+
+        label_fontsize : float or None, optional
+            Font size of the axis label.
+
+        label_color : str or None, optional
+            Axis label color.
+
+        tick_color : str or None, optional
+            Tick color.
+
+        spine_color : str or None, optional
+            Spine color.
+
+        margins_x : float or None, default 0.01
+            Horizontal margins applied to the axis.
+
+        side : {"left", "right"} or None, optional
+            Axis side to configure.
+
+        ax : matplotlib.axes.Axes or None, optional
+            Explicit axis to configure.
 
         Returns
         -------
-        Graph_base
-            Current graph object.
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        Basic formatting:
+
+        >>> (
+        ...     graph
+        ...     .config_yaxis(
+        ...         fmt=",.0f"
+        ...     )
+        ... )
+
+        Right axis formatting:
+
+        >>> (
+        ...     graph
+        ...     .config_yaxis(
+        ...         side="right",
+        ...         label="Spread"
+        ...     )
+        ... )
+
+        Custom colors:
+
+        >>> (
+        ...     graph
+        ...     .config_yaxis(
+        ...         label_color="red",
+        ...         tick_color="red",
+        ...         spine_color="red"
+        ...     )
+        ... )
         """
+        
         # -------------------------------------------------
         # 1. Resolve target axis
         # -------------------------------------------------
@@ -790,3 +926,84 @@ class AxesMixin:
 
         return self
 
+
+    def axis(self: Self, ax_index: int = 0) -> Self:
+        """
+        Activate a subplot axis.
+
+        This method selects one of the available subplot axes and
+        makes it the active target for all subsequent plotting
+        operations.
+
+        Parameters
+        ----------
+        ax_index : int, default 0
+            Zero-based subplot index.
+
+        Returns
+        -------
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        Select the second subplot:
+
+        >>> (
+        ...     graph
+        ...     .axis(1)
+        ...     .graph_line(data)
+        ... )
+        """
+        
+        self._set_axis(ax_index=ax_index)
+        return self
+
+
+    def get_axis(self, side: str = "left"):
+        """
+        Return a Matplotlib axis object.
+
+        This helper exposes the underlying Matplotlib axis so that
+        advanced users can perform custom operations that are not
+        directly supported by the chart API.
+
+        Parameters
+        ----------
+        side : {"left", "right"}, default "left"
+            Axis side to retrieve.
+
+        Returns
+        -------
+        matplotlib.axes.Axes
+            Requested Matplotlib axis.
+
+        Raises
+        ------
+        ValueError
+            If an invalid axis side is provided.
+
+        RuntimeError
+            If the requested right axis does not exist.
+
+        Examples
+        --------
+        Retrieve the left axis:
+
+        >>> ax = graph.get_axis()
+
+        Retrieve the right axis:
+
+        >>> right_ax = graph.get_axis("right")
+        """
+        
+        if side not in {"left", "right"}:
+            raise ValueError("side must be 'left' or 'right'.")
+
+        if side == "left":
+            return self._ax
+
+        if self._right_ax is None:
+            raise RuntimeError("No right axis exists for the active chart.")
+
+        return self._right_ax

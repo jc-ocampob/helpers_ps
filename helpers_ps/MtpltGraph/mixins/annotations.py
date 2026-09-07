@@ -6,7 +6,24 @@ from typing import Self
 
 class AnnotationMixin:
     """
-    Low-level annotation and marker primitives
+    Annotation and highlighting primitives.
+
+    This mixin contains methods used to add visual emphasis and explanatory
+    elements to charts, including labels, markers, and shaded regions.
+
+    Methods
+    -------
+    tag
+        Add text annotations at specific coordinates.
+
+    dot
+        Add highlighted point markers.
+
+    shade_x
+        Add shaded vertical regions along the x-axis.
+
+    shade_y
+        Add shaded horizontal regions along the y-axis.
     """
 
     def tag(
@@ -72,8 +89,8 @@ class AnnotationMixin:
 
         Returns
         -------
-        None
-            The annotation is added directly to the active axis.
+        Self
+            Returns the chart instance for method chaining.
 
         Raises
         ------
@@ -136,77 +153,343 @@ class AnnotationMixin:
             ])
 
         return self
-    
+
+
     def dot(
         self,
         x_value,
         y_value,
-        color="red",
-        size=30,
-        zorder=5
+        color: str = "red",
+        size: float = 30,
+        zorder: float = 5,
+        *,
+        marker: str = "o",
+        markersize: float | None = None,
+        marker_color: str | None = None,
+        marker_edgecolor: str | None = None,
+        marker_edgewidth: float = 0.0,
+        alpha: float = 1.0,
+        clip_on: bool = True,
+        label: str | None = None,
+        **scatter_kwargs,
     ) -> Self:
         """
         Add a highlighted point marker to the active chart.
 
-        This method supports standard datetime, numeric, categorical, and
-        Bloomberg-style x-axis modes.
+        The method supports datetime, numeric, categorical, and
+        Bloomberg-style X-axis modes. It can be called directly or
+        receive controls from a nested ``dot`` dictionary inside a
+        chart-series configuration.
+
+        The original ``color``, ``size``, and ``zorder`` parameters are
+        preserved for backward compatibility. The ``marker_color`` and
+        ``markersize`` parameters provide descriptive aliases for use
+        inside typed series configurations.
 
         Parameters
         ----------
-        x_value : any
-            X-axis value where the marker should be placed.
-        y_value : float
-            Y-axis value where the marker should be placed.
-        color : str, default "red"
-            Marker color.
-        size : float, default 30
-            Marker size.
-        zorder : int, default 5
-            Drawing order of the marker.
+        x_value:
+            X-axis value where the marker is placed.
+
+            For a standard datetime axis, the value is converted to a
+            pandas Timestamp when possible. For a Bloomberg-style axis,
+            the value is mapped to its corresponding internal numeric
+            position. For numeric or categorical axes, Matplotlib axis
+            conversion is applied.
+
+        y_value:
+            Y-axis value where the marker is placed.
+
+        color:
+            Default marker face color. This parameter is preserved from
+            the original API. It is used when ``marker_color`` is None.
+
+        size:
+            Marker area in points squared, passed to the ``s`` parameter
+            of ``Axes.scatter``. This parameter is preserved from the
+            original API and defaults to 30.
+
+        zorder:
+            Drawing order of the marker. Higher values are drawn over
+            elements with lower values.
+
+        marker:
+            Matplotlib marker style, such as ``"o"``, ``"D"``, ``"s"``,
+            ``"^"``, or ``"X"``.
+
+        markersize:
+            Marker diameter in points.
+
+            When provided, the value is converted to a scatter area using
+            ``markersize ** 2``. When omitted, ``size`` is used directly
+            as the scatter area.
+
+        marker_color:
+            Marker face color. When omitted, the value from ``color`` is
+            used.
+
+        marker_edgecolor:
+            Marker edge color. When omitted, Matplotlib selects the edge
+            color automatically.
+
+        marker_edgewidth:
+            Width of the marker edge.
+
+        alpha:
+            Marker opacity. Must be between 0 and 1.
+
+        clip_on:
+            Whether the marker is clipped to the active axes.
+
+        label:
+            Optional label assigned to the marker. This can be used by
+            legends or other artist-processing methods.
+
+        **scatter_kwargs:
+            Additional keyword arguments passed directly to
+            ``Axes.scatter``. Explicit arguments defined by this method
+            cannot be overridden through ``scatter_kwargs``.
 
         Returns
         -------
-        None
-            The marker is added directly to the active axis.
+        Self
+            The current chart instance for method chaining.
 
         Raises
         ------
         RuntimeError
             If the active axis has not been initialized.
+
+        TypeError
+            If numeric, boolean, or string parameters receive an invalid
+            type.
+
+        ValueError
+            If ``size``, ``markersize``, or ``marker_edgewidth`` is
+            negative, or if ``alpha`` is outside the interval from 0 to 1.
+
+        Examples
+        --------
+        Add a marker using the original API:
+
+        >>> graph.dot(
+        ...     x_value="2026-08-31",
+        ...     y_value=25.4,
+        ...     color="red",
+        ...     size=30,
+        ...     zorder=5,
+        ... )
+
+        Add a customized diamond marker:
+
+        >>> graph.dot(
+        ...     x_value="2026-08-31",
+        ...     y_value=25.4,
+        ...     marker="D",
+        ...     markersize=5,
+        ...     marker_color="#E0A228",
+        ...     marker_edgecolor="white",
+        ...     marker_edgewidth=0.7,
+        ...     alpha=1.0,
+        ...     zorder=24,
+        ... )
+
+        Use the method through a box-series reference:
+
+        >>> {
+        ...     "x_values": "last",
+        ...     "dot": {
+        ...         "marker": "o",
+        ...         "markersize": 5,
+        ...         "marker_color": "#C53B3B",
+        ...         "marker_edgecolor": "white",
+        ...         "marker_edgewidth": 0.7,
+        ...         "alpha": 1.0,
+        ...         "zorder": 24,
+        ...         "clip_on": False,
+        ...     },
+        ... }
         """
-
         if not hasattr(self, "_ax") or self._ax is None:
-            raise RuntimeError("Axis not initialized.")
+            raise RuntimeError(
+                "Axis not initialized. Call plot() before dot()."
+            )
 
-        mode = self._x_axis_mode
+        if not isinstance(size, (int, float)):
+            raise TypeError(
+                "'size' must be numeric."
+            )
 
-        # --- Convert x_value ---
+        if size < 0:
+            raise ValueError(
+                "'size' cannot be negative."
+            )
+
+        if (
+            markersize is not None
+            and not isinstance(markersize, (int, float))
+        ):
+            raise TypeError(
+                "'markersize' must be numeric or None."
+            )
+
+        if (
+            markersize is not None
+            and markersize < 0
+        ):
+            raise ValueError(
+                "'markersize' cannot be negative."
+            )
+
+        if not isinstance(
+            marker_edgewidth,
+            (int, float),
+        ):
+            raise TypeError(
+                "'marker_edgewidth' must be numeric."
+            )
+
+        if marker_edgewidth < 0:
+            raise ValueError(
+                "'marker_edgewidth' cannot be negative."
+            )
+
+        if not isinstance(alpha, (int, float)):
+            raise TypeError(
+                "'alpha' must be numeric."
+            )
+
+        if not 0 <= alpha <= 1:
+            raise ValueError(
+                "'alpha' must be between 0 and 1."
+            )
+
+        if not isinstance(zorder, (int, float)):
+            raise TypeError(
+                "'zorder' must be numeric."
+            )
+
+        if not isinstance(clip_on, bool):
+            raise TypeError(
+                "'clip_on' must be a boolean."
+            )
+
+        if not isinstance(marker, str):
+            raise TypeError(
+                "'marker' must be a string."
+            )
+
+        if not isinstance(color, str):
+            raise TypeError(
+                "'color' must be a string."
+            )
+
+        if (
+            marker_color is not None
+            and not isinstance(marker_color, str)
+        ):
+            raise TypeError(
+                "'marker_color' must be a string or None."
+            )
+
+        if (
+            marker_edgecolor is not None
+            and not isinstance(marker_edgecolor, str)
+        ):
+            raise TypeError(
+                "'marker_edgecolor' must be a string or None."
+            )
+
+        if (
+            label is not None
+            and not isinstance(label, str)
+        ):
+            raise TypeError(
+                "'label' must be a string or None."
+            )
+
+        mode = getattr(
+            self,
+            "_x_axis_mode",
+            None,
+        )
+
         if mode == "bbg":
-            x_plot = self._coerce_to_bbg_x(x_value)
+            x_plot = self._coerce_to_bbg_x(
+                x_value
+            )
+
         else:
-            x_conv = x_value
+            x_converted = x_value
 
             if mode == "datetime":
                 try:
-                    x_conv = pd.to_datetime(x_value)
-                except Exception:
-                    pass
+                    x_converted = pd.to_datetime(
+                        x_value
+                    )
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+                    x_converted = x_value
 
-            x_plot = self._ax.convert_xunits(x_conv)
+            x_plot = self._ax.convert_xunits(
+                x_converted
+            )
 
             if np.ndim(x_plot) > 0:
-                x_plot = np.asarray(x_plot).item()
+                x_array = np.asarray(x_plot)
 
-        # --- Plot point ---
+                if x_array.size != 1:
+                    raise ValueError(
+                        "'x_value' must resolve to a single "
+                        "X-axis position."
+                    )
+
+                x_plot = x_array.item()
+
+        resolved_color = (
+            marker_color
+            if marker_color is not None
+            else color
+        )
+
+        resolved_size = (
+            float(markersize) ** 2
+            if markersize is not None
+            else float(size)
+        )
+
+        plot_kwargs = {
+            "marker": marker,
+            "s": resolved_size,
+            "color": resolved_color,
+            "linewidths": float(
+                marker_edgewidth
+            ),
+            "alpha": float(alpha),
+            "zorder": float(zorder),
+            "clip_on": clip_on,
+        }
+
+        if marker_edgecolor is not None:
+            plot_kwargs["edgecolors"] = (
+                marker_edgecolor
+            )
+
+        if label is not None:
+            plot_kwargs["label"] = label
+
+        plot_kwargs.update(scatter_kwargs)
+
         self._ax.scatter(
             x_plot,
             y_value,
-            color=color,
-            s=size,
-            zorder=zorder
+            **plot_kwargs,
         )
 
         return self
+
 
     def shade_x(
         self,
@@ -254,8 +537,8 @@ class AnnotationMixin:
 
         Returns
         -------
-        None
-            Shaded regions are added directly to the active axis.
+        Self
+            Returns the chart instance for method chaining.
 
         Raises
         ------
@@ -266,6 +549,26 @@ class AnnotationMixin:
         -----
         When multiple periods are provided and `label` is used, the default label is
         applied only once to avoid duplicate legend entries.
+
+        Examples
+        --------
+        Shade a recession period:
+
+        >>> (
+        ...     graph
+        ...     .shade_x(("2020-03-01", "2020-06-30"))
+        ... )
+
+        Shade multiple periods:
+
+        >>> (
+        ...     graph
+        ...     .shade_x([
+        ...         ("2020-03-01", "2020-06-30"),
+        ...         ("2022-01-01", "2022-03-01")
+        ...     ])
+        ... )
+
         """
 
         if not hasattr(self, "_ax") or self._ax is None:
@@ -492,5 +795,96 @@ class AnnotationMixin:
                 label=final_label,
                 hatch=hat
             )
+
+        return self
+
+
+    def shade_y(
+        self,
+        period: tuple[float, float],
+        color="#B0B0B0",
+        alpha=0.25,
+        zorder=0,
+        label=None,
+        hatch=None,
+        xmin=0.0,
+        xmax=1.0,
+        clip_to_ylim=True,
+    ) -> Self:
+        """
+        Add a shaded horizontal region to the active chart.
+
+        This method highlights a y-axis range using a horizontal shaded
+        band. It is useful for emphasizing target ranges, confidence bands,
+        risk zones, valuation ranges, or threshold levels.
+
+        Parameters
+        ----------
+        period : tuple[float, float]
+            Y-axis range to shade as `(start, end)`.
+
+        color : str, default "#B0B0B0"
+            Fill color of the shaded region.
+
+        alpha : float, default 0.25
+            Transparency of the shaded region.
+
+        zorder : int, default 0
+            Drawing order of the shaded region.
+
+        label : str or None, optional
+            Optional legend label.
+
+        hatch : str or None, optional
+            Optional hatch pattern.
+
+        xmin : float, default 0.0
+            Left horizontal bound in axis-relative coordinates.
+
+        xmax : float, default 1.0
+            Right horizontal bound in axis-relative coordinates.
+
+        clip_to_ylim : bool, default True
+            Whether to clip the shaded range to the current y-axis limits.
+
+        Returns
+        -------
+        Self
+            Returns the chart instance for method chaining.
+
+        Raises
+        ------
+        RuntimeError
+            If the active axis has not been initialized.
+        """
+
+        if not hasattr(self, "_ax") or self._ax is None:
+            raise RuntimeError("No axis found. Call graph_line/graph_bar first.")
+
+        y0, y1 = period
+
+        if y1 < y0:
+            y0, y1 = y1, y0
+
+        if clip_to_ylim:
+            ylim = self._ax.get_ylim()
+
+            y0 = max(y0, ylim[0])
+            y1 = min(y1, ylim[1])
+
+            if y1 <= y0:
+                return self
+
+        self._ax.axhspan(
+            y0,
+            y1,
+            xmin=xmin,
+            xmax=xmax,
+            facecolor=color,
+            alpha=alpha,
+            zorder=zorder,
+            label=label,
+            hatch=hatch,
+        )
 
         return self

@@ -1,56 +1,57 @@
 from __future__ import annotations
 
-from typing import Self
+from collections.abc import Sequence
+from typing import Any, Self
 
+import matplotlib.patheffects as path_effects
 import numpy as np
 import pandas as pd
-import matplotlib.patheffects as path_effects
 
-from ..models import (
-    LegendConfig,
-    FigureTitle,
-    FigureSubtitle,
-    FigureSource,
-    coerce_configs,
-    config_to_dict
-)
 from ..tags._colors import PALETA_COLORES
 
 
 class PieChartMixin:
-
+    """
+    Provides pie-chart construction logic for GraphMtplt.
+    """
 
     def _resolve_pie_value_column(
         self,
         dataframe: pd.DataFrame,
-        tickers: list[str] | tuple[str, ...] | set[str] | str,
+        ticker: str | None,
     ) -> str:
-        if isinstance(tickers, str):
-            if tickers == "all":
-                if len(dataframe.columns) != 1:
-                    raise ValueError(
-                        "`graph_pie()` requires exactly one value column. "
-                        "Pass `tickers='column_name'` or provide a one-column DataFrame."
-                    )
-                return dataframe.columns[0]
+        """
+        Resolve and validate the DataFrame column used by the pie chart.
 
-            return tickers
-
-        if isinstance(tickers, (list, tuple, set)):
-            tickers_list = list(tickers)
-
-            if len(tickers_list) != 1:
+        If ticker is None, the DataFrame must contain exactly one
+        column.
+        """
+        if ticker is None:
+            if len(dataframe.columns) != 1:
                 raise ValueError(
-                    "`graph_pie()` only supports one value column. "
-                    "Pass a single column name in `tickers`."
+                    "When 'ticker' is None, graph_pie() requires "
+                    "a DataFrame containing exactly one column."
                 )
 
-            return tickers_list[0]
+            return str(dataframe.columns[0])
 
-        raise TypeError(
-            "`tickers` must be 'all', a string column name, or a one-item list."
-        )
+        if not isinstance(ticker, str):
+            raise TypeError(
+                "'ticker' must be a string or None."
+            )
 
+        if not ticker.strip():
+            raise ValueError(
+                "'ticker' cannot be empty."
+            )
+
+        if ticker not in dataframe.columns:
+            raise KeyError(
+                f"Ticker '{ticker}' was not found in the "
+                "selected DataFrame."
+            )
+
+        return ticker
 
     def _build_pie_series(
         self,
@@ -58,71 +59,140 @@ class PieChartMixin:
         value_column: str,
         sort_values: bool,
     ) -> pd.Series:
-        if value_column not in dataframe.columns:
-            raise ValueError(f"Column not found in dataframe: {value_column}")
-
-        serie = pd.to_numeric(
+        """
+        Build and validate the numeric series plotted by the pie chart.
+        """
+        series = pd.to_numeric(
             dataframe[value_column],
             errors="coerce",
         )
 
-        serie = serie.replace([np.inf, -np.inf], np.nan).dropna()
+        series = (
+            series
+            .replace(
+                [np.inf, -np.inf],
+                np.nan,
+            )
+            .dropna()
+        )
 
-        if serie.empty:
+        if series.empty:
             raise ValueError(
-                f"The selected column `{value_column}` has no numeric values to plot."
+                f"Ticker '{value_column}' contains no "
+                "numeric values to plot."
             )
 
-        if serie.index.has_duplicates:
+        if series.index.has_duplicates:
             raise ValueError(
-                "`graph_pie()` requires a unique DataFrame index because the index "
-                "is used as pie categories and metadata keys."
+                "graph_pie() requires a unique DataFrame index "
+                "because index values identify pie categories."
+            )
+
+        if (series < 0).any():
+            negative_categories = [
+                str(category)
+                for category in series.index[
+                    series < 0
+                ]
+            ]
+
+            raise ValueError(
+                "Pie-chart values cannot be negative. "
+                "Negative values were found for: "
+                f"{negative_categories}."
+            )
+
+        if not np.any(series.to_numpy(dtype=float) > 0):
+            raise ValueError(
+                "graph_pie() requires at least one value "
+                "greater than zero."
             )
 
         if sort_values:
-            serie = serie.sort_values(ascending=False)
+            series = series.sort_values(
+                ascending=False
+            )
 
-        return serie
-
+        return series
 
     def _resolve_pie_labels(
         self,
-        categories: list,
-        labels: list[str] | tuple[str, ...] | dict | None,
+        categories: Sequence,
+        labels: Sequence[str] | dict[Any, str] | None,
     ) -> list[str]:
+        """
+        Resolve display labels for pie categories.
+        """
         if labels is None:
-            return [str(category) for category in categories]
+            return [
+                str(category)
+                for category in categories
+            ]
 
         if isinstance(labels, dict):
             return [
-                labels.get(
-                    category,
-                    labels.get(str(category), str(category)),
+                str(
+                    labels.get(
+                        category,
+                        labels.get(
+                            str(category),
+                            category,
+                        ),
+                    )
                 )
                 for category in categories
             ]
 
         if isinstance(labels, (list, tuple)):
-            label_list = list(labels)
+            resolved_labels = list(labels)
 
-            if len(label_list) < len(categories):
-                return label_list + [
-                    str(category)
-                    for category in categories[len(label_list):]
-                ]
+            if len(resolved_labels) != len(categories):
+                raise ValueError(
+                    "'labels' must have the same length as "
+                    "the number of plotted categories."
+                )
 
-            return label_list[:len(categories)]
+            if not all(
+                isinstance(label, str)
+                for label in resolved_labels
+            ):
+                raise TypeError(
+                    "Every item in 'labels' must be a string."
+                )
+
+            return resolved_labels
 
         raise TypeError(
-            "`labels` must be None, a list, a tuple, or a dictionary keyed by index category."
+            "'labels' must be a list, tuple, dictionary, "
+            "or None."
         )
-
 
     def _resolve_pie_colors(
         self,
-        categories: list,
-        colors: list[str] | tuple[str, ...] | str | dict,
+        categories: Sequence,
+        colors: (
+            Sequence[str]
+            | dict[Any, str]
+            | str
+            | None
+        ),
     ) -> list[str]:
+        """
+        Resolve colors for pie categories.
+        """
+        if not PALETA_COLORES:
+            raise ValueError(
+                "PALETA_COLORES cannot be empty."
+            )
+
+        if colors is None:
+            return [
+                PALETA_COLORES[
+                    position % len(PALETA_COLORES)
+                ]
+                for position in range(len(categories))
+            ]
+
         if isinstance(colors, str):
             return [
                 colors
@@ -135,129 +205,223 @@ class PieChartMixin:
                     category,
                     colors.get(
                         str(category),
-                        PALETA_COLORES[i % len(PALETA_COLORES)],
+                        PALETA_COLORES[
+                            position
+                            % len(PALETA_COLORES)
+                        ],
                     ),
                 )
-                for i, category in enumerate(categories)
+                for position, category
+                in enumerate(categories)
             ]
 
         if isinstance(colors, (list, tuple)):
-            color_list = list(colors)
+            resolved_colors = list(colors)
+
+            if not resolved_colors:
+                raise ValueError(
+                    "'colors' cannot be an empty sequence."
+                )
+
+            if not all(
+                isinstance(color, str)
+                for color in resolved_colors
+            ):
+                raise TypeError(
+                    "Every item in 'colors' must be a string."
+                )
 
             return [
-                color_list[i]
-                if i < len(color_list)
-                else PALETA_COLORES[i % len(PALETA_COLORES)]
-                for i in range(len(categories))
+                resolved_colors[
+                    position % len(resolved_colors)
+                ]
+                for position in range(len(categories))
             ]
 
-        return [
-            PALETA_COLORES[i % len(PALETA_COLORES)]
-            for i in range(len(categories))
-        ]
+        raise TypeError(
+            "'colors' must be a string, list, tuple, "
+            "dictionary, or None."
+        )
 
+    def _resolve_pie_explode(
+        self,
+        categories: Sequence,
+        explode: (
+            Sequence[float]
+            | dict[Any, float]
+            | float
+            | None
+        ),
+    ) -> list[float] | None:
+        """
+        Resolve explode values for pie categories.
+        """
+        if explode is None:
+            return None
 
-    def _prepare_pie_context(
+        if isinstance(explode, (int, float)):
+            if explode < 0:
+                raise ValueError(
+                    "'explode' cannot contain negative values."
+                )
+
+            return [
+                float(explode)
+                for _ in categories
+            ]
+
+        if isinstance(explode, dict):
+            resolved_explode = [
+                float(
+                    explode.get(
+                        category,
+                        explode.get(
+                            str(category),
+                            0.0,
+                        ),
+                    )
+                )
+                for category in categories
+            ]
+
+        elif isinstance(explode, (list, tuple)):
+            resolved_explode = [
+                float(value)
+                for value in explode
+            ]
+
+            if len(resolved_explode) != len(categories):
+                raise ValueError(
+                    "'explode' must have the same length as "
+                    "the number of plotted categories."
+                )
+
+        else:
+            raise TypeError(
+                "'explode' must be numeric, a list, tuple, "
+                "dictionary, or None."
+            )
+
+        if any(
+            value < 0
+            for value in resolved_explode
+        ):
+            raise ValueError(
+                "'explode' cannot contain negative values."
+            )
+
+        return resolved_explode
+
+    def _build_pie_wedgeprops(
+        self,
+        wedgeprops: dict[str, Any] | None,
+        donut_width: float | None,
+    ) -> dict[str, Any]:
+        """
+        Build wedge properties, including optional donut width.
+        """
+        resolved_wedgeprops = dict(
+            wedgeprops or {}
+        )
+
+        if donut_width is None:
+            return resolved_wedgeprops
+
+        if not isinstance(
+            donut_width,
+            (int, float),
+        ):
+            raise TypeError(
+                "'donut_width' must be numeric or None."
+            )
+
+        if not 0 < donut_width <= 1:
+            raise ValueError(
+                "'donut_width' must be greater than zero "
+                "and less than or equal to one."
+            )
+
+        resolved_wedgeprops["width"] = float(
+            donut_width
+        )
+
+        return resolved_wedgeprops
+
+    def _style_pie_texts(
         self,
         *,
-        df_index: int,
-        tickers,
-        labels,
-        colors,
-        title,
-        subtitle,
-        source,
-        legend,
-        sort_values: bool,
-        textprops,
-        wedgeprops,
-        donut_width,
-    ):
-        db = self._select_df(df_idx=df_index)
-        state = self._ensure_active_state()
+        label_texts,
+        percentage_texts,
+        label_color: str,
+        autopct_color: str,
+        autopct_fontweight: str | int,
+        text_edge_color: str | None,
+        text_edge_width: float,
+    ) -> None:
+        """
+        Apply pie-specific text formatting.
+        """
+        for text in label_texts:
+            text.set_color(label_color)
 
-        if db is None or not isinstance(db, pd.DataFrame):
-            raise TypeError("`dataframe` must be a pandas DataFrame.")
+        for text in percentage_texts:
+            text.set_color(autopct_color)
+            text.set_fontweight(
+                autopct_fontweight
+            )
 
-        if db.empty:
-            raise ValueError("Cannot create a pie chart from an empty DataFrame.")
+        if (
+            text_edge_color is None
+            or text_edge_width <= 0
+        ):
+            return
 
-        value_column = self._resolve_pie_value_column(
-            dataframe=db,
-            tickers=tickers,
-        )
-
-        serie = self._build_pie_series(
-            dataframe=db,
-            value_column=value_column,
-            sort_values=sort_values,
-        )
-
-        plot_categories = serie.index.tolist()
-        plot_keys = [
-            str(category)
-            for category in plot_categories
+        effects = [
+            path_effects.withStroke(
+                linewidth=text_edge_width,
+                foreground=text_edge_color,
+            )
         ]
 
-        plot_labels = self._resolve_pie_labels(
-            categories=plot_categories,
-            labels=labels,
-        )
+        for text in label_texts:
+            text.set_path_effects(effects)
 
-        plot_colors = self._resolve_pie_colors(
-            categories=plot_categories,
-            colors=colors,
-        )
+        for text in percentage_texts:
+            text.set_path_effects(effects)
 
-        configs = coerce_configs(
-            title=(title, FigureTitle),
-            subtitle=(subtitle, FigureSubtitle),
-            source=(source, FigureSource),
-            legend=(legend, LegendConfig),
-        )
+    def _store_pie_metadata(
+        self,
+        *,
+        value_column: str,
+        series: pd.Series,
+        categories: list,
+        labels: list[str],
+        colors: list[str],
+        wedges,
+        label_texts,
+        percentage_texts,
+    ) -> None:
+        """
+        Store pie-chart metadata in the active chart state.
+        """
+        state = self._ensure_active_state()
 
-        title = config_to_dict(configs["title"])
-        subtitle = config_to_dict(configs["subtitle"])
-        source = config_to_dict(configs["source"])
-        legend = config_to_dict(configs["legend"])
+        category_keys = [
+            str(category)
+            for category in categories
+        ]
 
-        textprops = textprops if textprops is not None else {}
-        wedgeprops = wedgeprops if wedgeprops is not None else {}
-
-        if donut_width is not None:
-            wedgeprops["width"] = donut_width
-
-        return {
-            "db": db,
-            "state": state,
-            "value_column": value_column,
-            "serie": serie,
-            "plot_categories": plot_categories,
-            "plot_keys": plot_keys,
-            "plot_labels": plot_labels,
-            "plot_colors": plot_colors,
-            "title": title,
-            "subtitle": subtitle,
-            "source": source,
-            "legend": legend,
-            "textprops": textprops,
-            "wedgeprops": wedgeprops,
-        }
-
-
-    def _store_pie_axis_metadata(self, context: dict) -> dict:
-        state = context["state"]
-        value_column = context["value_column"]
-        plot_keys = context["plot_keys"]
-        plot_labels = context["plot_labels"]
-        plot_colors = context["plot_colors"]
-        plot_categories = context["plot_categories"]
+        total = float(series.sum())
 
         state.series_config = [
             {
                 "ticker": value_column,
-                "label": str(value_column),
-                "color": plot_colors[0] if plot_colors else None,
+                "label": value_column,
+                "color": (
+                    colors[0]
+                    if colors
+                    else None
+                ),
                 "axis_side": "left",
             }
         ]
@@ -267,248 +431,398 @@ class PieChartMixin:
         }
 
         state.ticker_label_color = [
-            (plot_keys[i], plot_labels[i], plot_colors[i])
-            for i in range(len(plot_keys))
+            (
+                category_keys[position],
+                labels[position],
+                colors[position],
+            )
+            for position in range(
+                len(category_keys)
+            )
         ]
 
         state.x_axis_mode = "categorical"
         state.x_axis_fechas = None
-        state.x_vals = np.arange(len(plot_categories), dtype=float)
+
+        state.x_vals = np.arange(
+            len(categories),
+            dtype=float,
+        )
 
         state.x_axis_metadata = {
             "mode": "categorical",
             "chart_type": "pie",
             "value_column": value_column,
-            "categories": plot_categories,
-            "labels": plot_labels,
+            "categories": categories,
+            "labels": labels,
         }
-
-        return context
-
-
-    def _ensure_pie_figure(
-        self,
-        context: dict,
-        figsize: tuple[float, float],
-    ) -> dict:
-        if not hasattr(self, "_ax") or self._ax is None:
-            self.plot(figsize=figsize)
-
-        self._ax.clear()
-
-        return context
-
-
-    def _apply_pie_layout(self, context: dict) -> dict:
-        self.add_title(**context["title"])
-        self.add_subtitle(**context["subtitle"])
-        self.add_source(**context["source"])
-
-        return context
-
-
-    def _draw_pie(
-        self,
-        context: dict,
-        *,
-        startangle: float,
-        counterclock: bool,
-        autopct: str | None,
-        pctdistance: float,
-        labeldistance: float,
-        normalize: bool,
-    ):
-        pie_out = self._ax.pie(
-            context["serie"].values,
-            labels=context["plot_labels"],
-            colors=context["plot_colors"],
-            startangle=startangle,
-            counterclock=counterclock,
-            autopct=autopct,
-            pctdistance=pctdistance,
-            labeldistance=labeldistance,
-            textprops=context["textprops"],
-            wedgeprops=context["wedgeprops"],
-            normalize=normalize,
-        )
-
-        context["pie_out"] = pie_out
-
-        return context
-
-
-    def _store_pie_data(self, context: dict) -> dict:
-        state = context["state"]
-        serie = context["serie"]
-        plot_keys = context["plot_keys"]
-        plot_categories = context["plot_categories"]
-        plot_labels = context["plot_labels"]
-        plot_colors = context["plot_colors"]
-        value_column = context["value_column"]
-        pie_out = context["pie_out"]
-
-        total = serie.sum()
 
         state.pie_data = {
-            plot_keys[i]: {
-                "category": plot_categories[i],
-                "label": plot_labels[i],
-                "color": plot_colors[i],
+            category_keys[position]: {
+                "category": categories[position],
+                "label": labels[position],
+                "color": colors[position],
                 "column": value_column,
-                "wedge": pie_out[0][i],
-                "value": serie.iloc[i],
-                "pct": (serie.iloc[i] / total * 100.0) if total else 0.0,
+                "wedge": wedges[position],
+                "label_text": label_texts[position],
+                "percentage_text": (
+                    percentage_texts[position]
+                    if position
+                    < len(percentage_texts)
+                    else None
+                ),
+                "value": float(
+                    series.iloc[position]
+                ),
+                "pct": (
+                    float(
+                        series.iloc[position]
+                        / total
+                        * 100
+                    )
+                    if total
+                    else 0.0
+                ),
             }
-            for i in range(len(plot_keys))
+            for position in range(
+                len(category_keys)
+            )
         }
 
-        return context
+        self._x_axis_mode = "categorical"
+        self._x_axis_fechas = None
 
-
-    def _style_pie_texts(
-        self,
-        context: dict,
-        *,
-        label_color: str,
-        autopct_color: str,
-        text_edge_color: str | None,
-        text_edge_width: float,
-    ) -> dict:
-        pie_out = context["pie_out"]
-
-        if len(pie_out) > 1:
-            for txt in pie_out[1]:
-                txt.set_color(label_color)
-
-        if len(pie_out) > 2:
-            for txt in pie_out[2]:
-                txt.set_color(autopct_color)
-                txt.set_fontweight("bold")
-
-        self._ax.axis("equal")
-
-        if text_edge_color is not None and text_edge_width and text_edge_width > 0:
-            path_effect = [
-                path_effects.withStroke(
-                    linewidth=text_edge_width,
-                    foreground=text_edge_color,
-                )
-            ]
-
-            if len(pie_out) > 1:
-                for txt in pie_out[1]:
-                    txt.set_path_effects(path_effect)
-
-            if len(pie_out) > 2:
-                for txt in pie_out[2]:
-                    txt.set_path_effects(path_effect)
-
-        return context
-
-
-    def _finalize_pie_legend(self, context: dict) -> dict:
-        legend = context["legend"]
-        pie_out = context["pie_out"]
-        plot_labels = context["plot_labels"]
-
-        if legend.get("show", False):
-            legend_config = legend.copy()
-            legend_config.pop("show", None)
-
-            legend_config.setdefault("loc", "center left")
-            legend_config.setdefault("bbox_to_anchor", (1.02, 0.5))
-
-            self._ax.legend(
-                pie_out[0],
-                plot_labels,
-                **legend_config,
-            )
-
-        return context
-
-
-    def _finalize_pie_layout(self, context: dict) -> dict:
-        self._fig.subplots_adjust(
-            left=0.08,
-            right=0.88,
-            top=0.80,
-            bottom=0.18,
+        self._x_vals = np.arange(
+            len(categories),
+            dtype=float,
         )
 
-        return context
-
+        self._x_axis_metadata = {
+            "mode": "categorical",
+            "chart_type": "pie",
+            "value_column": value_column,
+            "categories": categories,
+            "labels": labels,
+        }
 
     def graph_pie(
         self,
-        figsize: tuple[float, float] = (6.00, 5.00),
-        title: dict | FigureTitle | None = None,
-        subtitle: dict | FigureSubtitle | None = None,
-        source: dict | FigureSource | None = None,
+        ticker: str | None = None,
         df_index: int = 0,
-        tickers: list[str] | str = "all",
-        labels: list[str] | tuple[str, ...] | dict | None = None,
-        colors: list[str] | tuple[str, ...] | str | dict = PALETA_COLORES,
+        labels: (
+            Sequence[str]
+            | dict[Any, str]
+            | None
+        ) = None,
+        colors: (
+            Sequence[str]
+            | dict[Any, str]
+            | str
+            | None
+        ) = None,
+        explode: (
+            Sequence[float]
+            | dict[Any, float]
+            | float
+            | None
+        ) = None,
         donut_width: float | None = None,
         startangle: float = 90,
         counterclock: bool = False,
         autopct: str | None = "%1.1f%%",
         pctdistance: float = 0.72,
-        labeldistance: float = 1.05,
-        textprops: dict | None = None,
-        wedgeprops: dict | None = None,
-        legend: dict | LegendConfig | None = None,
-        sort_values: bool = False,
+        labeldistance: float | None = 1.05,
         normalize: bool = True,
-        text_edge_color: str | None = None,
-        text_edge_width: float = 0.0,
+        sort_values: bool = False,
+        textprops: dict[str, Any] | None = None,
+        wedgeprops: dict[str, Any] | None = None,
         label_color: str = "black",
         autopct_color: str = "white",
+        autopct_fontweight: str | int = "bold",
+        text_edge_color: str | None = None,
+        text_edge_width: float = 0.0,
     ) -> Self:
-        context = self._prepare_pie_context(
-            df_index=df_index,
-            tickers=tickers,
-            labels=labels,
-            colors=colors,
-            title=title,
-            subtitle=subtitle,
-            source=source,
-            legend=legend,
+        """
+        Add a pie chart to the active figure.
+
+        This method handles only pie-specific behavior. Figure
+        creation, titles, subtitles, sources, legends, and general
+        layout are handled through their standalone methods.
+
+        Parameters
+        ----------
+        ticker:
+            DataFrame column plotted by the pie chart. If None, the
+            selected DataFrame must contain exactly one column.
+
+        df_index:
+            Position of the DataFrame stored in the graph object.
+
+        labels:
+            Display labels assigned to pie categories.
+
+        colors:
+            Colors assigned to pie categories.
+
+        explode:
+            Offset applied to one or more pie wedges.
+
+        donut_width:
+            Width of the wedges when creating a donut chart.
+
+        startangle:
+            Starting angle of the first wedge.
+
+        counterclock:
+            Whether wedges are plotted counterclockwise.
+
+        autopct:
+            Format used for percentage labels. Use None to hide
+            percentage values.
+
+        pctdistance:
+            Radial distance of percentage labels.
+
+        labeldistance:
+            Radial distance of category labels. Use None to omit
+            category labels from the chart while preserving metadata.
+
+        normalize:
+            Whether Matplotlib normalizes values to a complete pie.
+
+        sort_values:
+            Whether categories are sorted from largest to smallest.
+
+        textprops:
+            Matplotlib text properties applied to pie labels.
+
+        wedgeprops:
+            Matplotlib properties applied to pie wedges.
+
+        label_color:
+            Color applied to category labels.
+
+        autopct_color:
+            Color applied to percentage labels.
+
+        autopct_fontweight:
+            Font weight applied to percentage labels.
+
+        text_edge_color:
+            Optional stroke color applied to pie text.
+
+        text_edge_width:
+            Width of the optional text stroke.
+
+        Returns
+        -------
+        Self
+            The current graph instance.
+        """
+        if not isinstance(df_index, int):
+            raise TypeError(
+                "'df_index' must be an integer."
+            )
+
+        if not isinstance(
+            startangle,
+            (int, float),
+        ):
+            raise TypeError(
+                "'startangle' must be numeric."
+            )
+
+        if not isinstance(counterclock, bool):
+            raise TypeError(
+                "'counterclock' must be a boolean."
+            )
+
+        if (
+            autopct is not None
+            and not isinstance(autopct, str)
+            and not callable(autopct)
+        ):
+            raise TypeError(
+                "'autopct' must be a string, callable, "
+                "or None."
+            )
+
+        if not isinstance(
+            pctdistance,
+            (int, float),
+        ):
+            raise TypeError(
+                "'pctdistance' must be numeric."
+            )
+
+        if (
+            labeldistance is not None
+            and not isinstance(
+                labeldistance,
+                (int, float),
+            )
+        ):
+            raise TypeError(
+                "'labeldistance' must be numeric or None."
+            )
+
+        if not isinstance(normalize, bool):
+            raise TypeError(
+                "'normalize' must be a boolean."
+            )
+
+        if not isinstance(sort_values, bool):
+            raise TypeError(
+                "'sort_values' must be a boolean."
+            )
+
+        if not isinstance(
+            text_edge_width,
+            (int, float),
+        ):
+            raise TypeError(
+                "'text_edge_width' must be numeric."
+            )
+
+        if text_edge_width < 0:
+            raise ValueError(
+                "'text_edge_width' cannot be negative."
+            )
+
+        dataframe = self._select_df(
+            df_idx=df_index,
+        )
+
+        if not isinstance(
+            dataframe,
+            pd.DataFrame,
+        ):
+            raise TypeError(
+                "The selected object must be a "
+                "pandas DataFrame."
+            )
+
+        if dataframe.empty:
+            raise ValueError(
+                "Cannot create a pie chart from an "
+                "empty DataFrame."
+            )
+
+        value_column = (
+            self._resolve_pie_value_column(
+                dataframe=dataframe,
+                ticker=ticker,
+            )
+        )
+
+        series = self._build_pie_series(
+            dataframe=dataframe,
+            value_column=value_column,
             sort_values=sort_values,
-            textprops=textprops,
-            wedgeprops=wedgeprops,
-            donut_width=donut_width,
         )
 
-        self._store_pie_axis_metadata(context)
+        categories = series.index.tolist()
 
-        self._ensure_pie_figure(
-            context=context,
-            figsize=figsize,
+        plot_labels = self._resolve_pie_labels(
+            categories=categories,
+            labels=labels,
         )
 
-        self._apply_pie_layout(context)
+        plot_colors = self._resolve_pie_colors(
+            categories=categories,
+            colors=colors,
+        )
 
-        self._draw_pie(
-            context,
-            startangle=startangle,
+        plot_explode = self._resolve_pie_explode(
+            categories=categories,
+            explode=explode,
+        )
+
+        resolved_textprops = dict(
+            textprops or {}
+        )
+
+        resolved_wedgeprops = (
+            self._build_pie_wedgeprops(
+                wedgeprops=wedgeprops,
+                donut_width=donut_width,
+            )
+        )
+
+        if not hasattr(self, "_ax") or self._ax is None:
+            self.plot()
+
+        pie_output = self._ax.pie(
+            series.to_numpy(dtype=float),
+            labels=(
+                plot_labels
+                if labeldistance is not None
+                else None
+            ),
+            colors=plot_colors,
+            explode=plot_explode,
+            startangle=float(startangle),
             counterclock=counterclock,
             autopct=autopct,
-            pctdistance=pctdistance,
+            pctdistance=float(pctdistance),
             labeldistance=labeldistance,
+            textprops=resolved_textprops,
+            wedgeprops=resolved_wedgeprops,
             normalize=normalize,
         )
 
-        self._store_pie_data(context)
+        wedges = pie_output[0]
+
+        if labeldistance is not None:
+            label_texts = list(
+                pie_output[1]
+            )
+        else:
+            label_texts = []
+
+        if autopct is not None:
+            percentage_texts = list(
+                pie_output[2]
+            )
+        else:
+            percentage_texts = []
 
         self._style_pie_texts(
-            context,
+            label_texts=label_texts,
+            percentage_texts=percentage_texts,
             label_color=label_color,
             autopct_color=autopct_color,
+            autopct_fontweight=(
+                autopct_fontweight
+            ),
             text_edge_color=text_edge_color,
-            text_edge_width=text_edge_width,
+            text_edge_width=float(
+                text_edge_width
+            ),
         )
 
-        self._finalize_pie_legend(context)
-        self._finalize_pie_layout(context)
+        self._ax.axis("equal")
+
+        metadata_label_texts = [
+            (
+                label_texts[position]
+                if position < len(label_texts)
+                else None
+            )
+            for position in range(
+                len(categories)
+            )
+        ]
+
+        self._store_pie_metadata(
+            value_column=value_column,
+            series=series,
+            categories=categories,
+            labels=plot_labels,
+            colors=plot_colors,
+            wedges=wedges,
+            label_texts=metadata_label_texts,
+            percentage_texts=percentage_texts,
+        )
 
         return self

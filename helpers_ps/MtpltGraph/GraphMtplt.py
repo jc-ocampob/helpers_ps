@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .base import GraphBase
 from .tags import (
     LineTags,
     BoxWTags,
@@ -16,11 +15,34 @@ from .charts import (
     BoxWChartMixin
 )
 
+from .mixins import (
+    AnnotationMixin,
+    AxesMixin,
+    ChainMixin,
+    ExportMixin,
+    LayoutMixin,
+    LegendMixin,
+    RecessionMixin,
+    ReferenceLinesMixin
+)
+
+from .metadata import GraphMetaData
+
 
 class GraphMtplt(
 
+    # base graph configs
+    GraphMetaData,
+    AnnotationMixin,
+    AxesMixin,
+    ChainMixin,
+    ExportMixin,
+    LayoutMixin,
+    LegendMixin,
+    RecessionMixin,
+    ReferenceLinesMixin,
+
     # Tag management
-    GraphBase,
     LineTags,
     BarTags,
     PieTags,

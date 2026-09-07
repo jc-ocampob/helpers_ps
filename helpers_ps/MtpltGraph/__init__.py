@@ -8,10 +8,19 @@ Matplotlib charts.
 from .config import set_graph_theme
 from .renderer import render_from_dict
 from .GraphMtplt import GraphMtplt
+from . import models
 
 
 __all__ = [
+    # General theme setting
     "set_graph_theme",
+
+    # Main Class
     "GraphMtplt",
-    "render_from_dict"
+
+    # Batch rendering from dict
+    "render_from_dict",
+
+    # Models helpers
+    "models"
 ]

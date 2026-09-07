@@ -22,7 +22,7 @@ Functions used for general financial metricas to be calculated over a dataframe 
 
 Main reference:
 ```python
-hp.FinCalculations
+hp.FinCalc
 ```
 
 ------

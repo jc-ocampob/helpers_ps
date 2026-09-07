@@ -8,11 +8,26 @@ from ..models import FigureTitle, FigureSubtitle, FigureSource
 
 class LayoutMixin:
     """
-    Provide figure creation, layout, titles and source notes
+    Figure layout and presentation utilities.
+
+    This mixin provides high-level helpers for managing figure
+    structure, titles, subtitles, source notes, subplot layouts,
+    and overall visual presentation.
+
+    Features
+    --------
+    - Figure-level titles and subtitles.
+    - Source notes and footers.
+    - Standard and GridSpec subplot layouts.
+    - Plot-level titles.
+    - Global subplot adjustments.
+
+    Notes
+    -----
+    Methods in this mixin operate primarily at the figure level
+    rather than on individual chart series.
     """
-    # -----
-    # Figure level layout
-    # -----
+
     def add_title(
         self,
         text: str,
@@ -28,6 +43,53 @@ class LayoutMixin:
     ) -> Self:
         """
         Add a figure-level title.
+
+        This method places a title on the figure canvas rather than
+        inside the active axis. Figure-level titles remain consistent
+        across multi-panel layouts and are positioned independently
+        from subplot content.
+
+        Parameters
+        ----------
+        text : str
+            Title text.
+
+        x : float, default 0.02
+            Horizontal figure coordinate.
+
+        y : float, default 0.93
+            Vertical figure coordinate.
+
+        fontsize : int, default 12
+            Title font size.
+
+        color : str, default "#000000"
+            Title color.
+
+        fontweight : str, default "bold"
+            Font weight.
+
+        ha : str, default "left"
+            Horizontal alignment.
+
+        va : str, default "top"
+            Vertical alignment.
+
+        **kwargs
+            Additional keyword arguments passed to
+            `Figure.text()`.
+
+        Returns
+        -------
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        >>> (
+        ...     graph
+        ...     .add_title("Global Equity Performance")
+        ... )
         """
 
         self._ax.set_title("")
@@ -73,6 +135,55 @@ class LayoutMixin:
     ) -> Self:
         """
         Add a figure-level subtitle.
+
+        This method places descriptive text below the figure title.
+        Subtitles are useful for additional context such as date
+        ranges, portfolio names, scenario descriptions, or report
+        notes.
+
+        Parameters
+        ----------
+        text : str
+            Subtitle text.
+
+        x : float, default 0.02
+            Horizontal figure coordinate.
+
+        y : float, default 0.88
+            Vertical figure coordinate.
+
+        fontsize : int, default 9
+            Subtitle font size.
+
+        color : str, default "#333333"
+            Subtitle color.
+
+        fontweight : str, default "normal"
+            Font weight.
+
+        ha : str, default "left"
+            Horizontal alignment.
+
+        va : str, default "top"
+            Vertical alignment.
+
+        **kwargs
+            Additional keyword arguments passed to
+            `Figure.text()`.
+
+        Returns
+        -------
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        >>> (
+        ...     graph
+        ...     .add_subtitle(
+        ...         "Performance since inception"
+        ...     )
+        ... )
         """
 
         self._fig.text(
@@ -111,37 +222,65 @@ class LayoutMixin:
         line_spacing: float = 0.022,
     ) -> Self:
         """
-        Add a source note or footer text to the active figure.
+        Add source notes or footer text to the figure.
 
-        The source can be provided as a single string or as a list of lines. The
-        method supports up to four lines and places them in the lower section of the
-        figure.
+        This method displays one or more text lines in the footer area
+        of the figure. Source notes are typically used for data sources,
+        disclosures, assumptions, methodology descriptions, or report
+        footnotes.
 
         Parameters
         ----------
         text : str, list, or None, optional
-            Source text to display. If None, no source note is added.
+            Source text to display.
+
         x : float, default 0.02
-            Horizontal figure coordinate for the source text.
+            Horizontal figure coordinate.
+
         y : float, default 0.022
-            Vertical figure coordinate for the first source line.
+            Vertical position of the first source line.
+
         fontsize : float, default 6
-            Font size of the source note.
+            Text font size.
+
         color : str, default "#606060"
-            Text color of the source note.
+            Text color.
+
         line_spacing : float, default 0.022
-            Vertical spacing between source lines.
+            Vertical spacing between lines.
 
         Returns
         -------
-        None
-            Source text is added directly to the active figure.
+        Self
+            Returns the chart instance for method chaining.
 
         Raises
         ------
         ValueError
             If more than four source lines are provided.
+
+        Examples
+        --------
+        Single source:
+
+        >>> (
+        ...     graph
+        ...     .add_source(
+        ...         "Source: Bloomberg"
+        ...     )
+        ... )
+
+        Multiple sources:
+
+        >>> (
+        ...     graph
+        ...     .add_source([
+        ...         "Source: Bloomberg",
+        ...         "Prepared by Portfolio Solutions"
+        ...     ])
+        ... )
         """
+        
         if text is None:
             return self
         
@@ -195,52 +334,93 @@ class LayoutMixin:
         wspace: float | None = None
     ) -> Self:
         """
-        Create the base Matplotlib figure and axes layout.
+        Create the base figure and subplot layout.
 
-        This method initializes the figure and axes used by all chart methods. It
-        supports standard subplot creation as well as custom GridSpec layouts when
-        height ratios, width ratios, spacing, or DPI are provided.
+        This method initializes the Matplotlib figure, subplot grid,
+        and internal chart metadata. It is the starting point for
+        all chart construction workflows.
+
+        The layout can be created using either a standard subplot
+        configuration or a custom GridSpec configuration with
+        user-defined spacing and size ratios.
 
         Parameters
         ----------
         figsize : tuple[float, float], default (6.00, 4.80)
             Figure size in inches.
+
         color : str, default "#D5D5D5"
-            Color of the decorative horizontal divider lines.
-        researchtype : bool default True
-            Adds decorative figure dividers.
+            Color of the decorative figure divider lines.
+
+        researchtype : bool, default True
+            Whether to add institutional-style divider lines.
+
         lw : float, default 0.8
-            Line width of the decorative figure dividers.
+            Width of the decorative divider lines.
+
         nrows : int, default 1
             Number of subplot rows.
+
         ncols : int, default 1
             Number of subplot columns.
+
         sharex : bool, default False
-            Whether subplots should share the x-axis.
+            Whether subplots share the x-axis.
+
         sharey : bool, default False
-            Whether subplots should share the y-axis.
+            Whether subplots share the y-axis.
+
         dpi : int or None, optional
-            Figure DPI. If provided, a custom GridSpec layout is used.
+            Figure DPI.
+
         height_ratios : list[float] or None, optional
-            Relative height ratios for GridSpec rows.
+            Relative row heights for GridSpec layouts.
+
         width_ratios : list[float] or None, optional
-            Relative width ratios for GridSpec columns.
+            Relative column widths for GridSpec layouts.
+
         hspace : float or None, optional
-            Vertical spacing between GridSpec rows.
+            Vertical spacing between subplots.
+
         wspace : float or None, optional
-            Horizontal spacing between GridSpec columns.
+            Horizontal spacing between subplots.
 
         Returns
         -------
-        None
-            The figure and axes are created and stored internally.
+        Self
+            Returns the chart instance for method chaining.
 
-        Notes
-        -----
-        The method also adds institutional-style decorative horizontal lines to the
-        figure and applies default subplot spacing when no custom GridSpec settings
-        are used.
+        Examples
+        --------
+        Standard figure:
+
+        >>> (
+        ...     graph
+        ...     .plot()
+        ... )
+
+        Create a 2x2 layout:
+
+        >>> (
+        ...     graph
+        ...     .plot(
+        ...         nrows=2,
+        ...         ncols=2
+        ...     )
+        ... )
+
+        Custom GridSpec layout:
+
+        >>> (
+        ...     graph
+        ...     .plot(
+        ...         nrows=2,
+        ...         ncols=1,
+        ...         height_ratios=[3, 1]
+        ...     )
+        ... )
         """
+        
         # -------------------------------------------------
         # 1. Crear figura + axes
         # -------------------------------------------------
@@ -354,13 +534,44 @@ class LayoutMixin:
 
         return self
 
+
     def subplot_adjust(
             self,
             **kwargs
     ) -> Self:
+        """
+        Adjust subplot spacing and margins.
+
+        This is a thin wrapper around Matplotlib's
+        `Figure.subplots_adjust()` method and can be used to
+        fine-tune figure spacing after creation.
+
+        Parameters
+        ----------
+        **kwargs
+            Keyword arguments accepted by
+            `Figure.subplots_adjust()`.
+
+        Returns
+        -------
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        >>> (
+        ...     graph
+        ...     .subplot_adjust(
+        ...         left=0.10,
+        ...         right=0.95
+        ...     )
+        ... )
+        """
+        
         self._fig.subplots_adjust(**kwargs)
 
         return self
+
     # -----
     # Plot level layout
     # -----
@@ -375,6 +586,66 @@ class LayoutMixin:
             pad: int = 3,
             y: int = 1.0
     ) -> Self:
+        """
+        Add a title to the active subplot.
+
+        Unlike `add_title()`, which operates at the figure level,
+        this method places the title directly on the current axis.
+        It is useful for multi-panel charts where each subplot
+        requires its own title.
+
+        Parameters
+        ----------
+        text : str
+            Plot title text.
+
+        loc : {"left", "right", "center"}, default "center"
+            Title alignment.
+
+        fontsize : int, default 7
+            Title font size.
+
+        fontweight : {"bold", "semibold", "normal"}, default "bold"
+            Font weight.
+
+        fontstyle : {"normal", "italic"}, default "normal"
+            Font style.
+
+        color : str, default "black"
+            Title color.
+
+        pad : int, default 3
+            Padding between title and plotting area.
+
+        y : float, default 1.0
+            Vertical title position.
+
+        Returns
+        -------
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        Add a subplot title:
+
+        >>> (
+        ...     graph
+        ...     .add_plot_title(
+        ...         "Performance"
+        ...     )
+        ... )
+
+        Align title to the left:
+
+        >>> (
+        ...     graph
+        ...     .add_plot_title(
+        ...         "Portfolio A",
+        ...         loc="left"
+        ...     )
+        ... )
+        """
 
         self._ax.set_title(
             text,

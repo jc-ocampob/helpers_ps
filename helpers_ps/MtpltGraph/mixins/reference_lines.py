@@ -5,7 +5,24 @@ from typing import Self
 
 class ReferenceLinesMixin:
     """
-    Provide horizontal and vertical guides and reference line utilities
+    Reference line and guide utilities.
+
+    This mixin provides helpers for adding grid-style guides,
+    horizontal reference lines, and vertical reference lines to charts.
+
+    Features
+    --------
+    - Horizontal guide lines on the left, right, or both y-axes.
+    - Vertical guide lines on the x-axis.
+    - Horizontal reference levels.
+    - Vertical reference events and markers.
+    - Support for datetime, categorical, numeric, and Bloomberg-style axes.
+
+    Notes
+    -----
+    Guide methods are intended to improve readability, while reference
+    line methods are intended to highlight specific levels, dates,
+    events, thresholds, or targets.
     """
 
     def horizontal_guides(
@@ -26,39 +43,86 @@ class ReferenceLinesMixin:
         """
         Add horizontal guide lines to one or both y-axes.
 
+        This method enables y-axis grid lines and optionally highlights
+        the zero level using a separate style. It can be applied to the
+        left axis, right axis, both axes, or an explicitly provided axis.
+
         Parameters
         ----------
-        mostrar_cero:
-            Whether to add a highlighted horizontal line at y=0.
-        side:
-            Axis side where guides should be applied. Use 'left', 'right', or 'both'.
-        ax:
-            Explicit Matplotlib axis to apply guides to. If provided, side is ignored
-            for axis selection.
-        linestyle:
-            Grid line style.
-        linewidth:
-            Grid line width.
-        color:
-            Grid line color.
-        alpha:
-            Grid line transparency.
-        zero_color:
-            Color of the zero line. If None, uses color.
-        zero_linestyle:
-            Style of the zero line. If None, uses linestyle.
-        zero_linewidth:
-            Width of the zero line.
-        zero_alpha:
-            Transparency of the zero line. If None, uses alpha.
-        zorder:
-            Drawing order of the guide lines.
+        mostrar_cero : bool, default True
+            Whether to draw an emphasized horizontal line at y=0.
+
+        side : {"left", "right", "both"}, default "left"
+            Axis side where guides should be applied.
+
+        ax : matplotlib.axes.Axes or None, optional
+            Explicit axis where guides should be applied. When provided,
+            `side` is ignored.
+
+        linestyle : str, default "--"
+            Guide line style.
+
+        linewidth : float, default 0.5
+            Guide line width.
+
+        color : str, default "gray"
+            Guide line color.
+
+        alpha : float, default 0.35
+            Guide line transparency.
+
+        zero_color : str or None, optional
+            Color of the zero reference line. If omitted, `color`
+            is used.
+
+        zero_linestyle : str or None, optional
+            Style of the zero reference line. If omitted,
+            `linestyle` is used.
+
+        zero_linewidth : float, default 0.8
+            Width of the zero reference line.
+
+        zero_alpha : float or None, optional
+            Transparency of the zero reference line. If omitted,
+            `alpha` is used.
+
+        zorder : int, default 0
+            Drawing order of the guides.
 
         Returns
         -------
-        Graph_base
-            Current graph object.
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        Standard horizontal guides:
+
+        >>> (
+        ...     graph
+        ...     .horizontal_guides()
+        ... )
+
+        Guides on both axes:
+
+        >>> (
+        ...     graph
+        ...     .horizontal_guides(
+        ...         side="both"
+        ...     )
+        ... )
+
+        Custom zero line:
+
+        >>> (
+        ...     graph
+        ...     .horizontal_guides(
+        ...         zero_color="black",
+        ...         zero_linewidth=1.5
+        ...     )
+        ... )
         """
+        
         if ax is not None:
             axes = [ax]
 
@@ -107,8 +171,92 @@ class ReferenceLinesMixin:
         return self
 
 
-    def vertical_guides():
-        ...
+    def vertical_guides(
+        self,
+        side: str = "bottom",
+        ax=None,
+        linestyle: str = "--",
+        linewidth: float = 0.5,
+        color: str = "gray",
+        alpha: float = 0.35,
+        zorder: int = 0,
+    ):
+        """
+        Add vertical guide lines to the chart.
+
+        This method enables x-axis grid lines that span the plotting area.
+        Vertical guides are useful for improving date alignment and visual
+        comparison across observations.
+
+        Parameters
+        ----------
+        side : {"bottom", "top", "both"}, default "bottom"
+            Included for API consistency. Currently guides are applied
+            to the selected axis.
+
+        ax : matplotlib.axes.Axes or None, optional
+            Explicit axis where guides should be applied. When omitted,
+            the active chart axis is used.
+
+        linestyle : str, default "--"
+            Guide line style.
+
+        linewidth : float, default 0.5
+            Guide line width.
+
+        color : str, default "gray"
+            Guide line color.
+
+        alpha : float, default 0.35
+            Guide line transparency.
+
+        zorder : int, default 0
+            Drawing order of the guides.
+
+        Returns
+        -------
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        Standard vertical guides:
+
+        >>> (
+        ...     graph
+        ...     .vertical_guides()
+        ... )
+
+        Heavier vertical guides:
+
+        >>> (
+        ...     graph
+        ...     .vertical_guides(
+        ...         linewidth=1,
+        ...         alpha=0.5
+        ...     )
+        ... )
+        """
+
+        target_ax = self._ax if ax is None else ax
+
+        if target_ax is None:
+            raise RuntimeError(
+                "No axis available. Create a chart before adding guides."
+            )
+
+        target_ax.xaxis.grid(
+            True,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            color=color,
+            alpha=alpha,
+            zorder=zorder,
+        )
+
+        target_ax.set_axisbelow(True)
+
+        return self
 
 
     def vertical_lines(
@@ -126,37 +274,78 @@ class ReferenceLinesMixin:
         """
         Add one or more vertical reference lines to the active axis.
 
-        This method supports standard numeric, datetime, categorical, and
-        Bloomberg-style x-axis modes. It is intended to be used as a chainable
-        public helper after a chart has been created.
+        This method draws vertical lines at specific x-axis locations.
+        It supports numeric, datetime, categorical, and Bloomberg-style
+        axes and is commonly used to highlight events, regime changes,
+        earnings releases, policy meetings, or rebalance dates.
 
         Parameters
         ----------
-        x_values:
-            X-axis value or values where vertical lines should be drawn.
-            If None, no lines are added.
-        linestyle:
+        x_values : scalar, list-like, or None
+            X-axis value or values where reference lines should be drawn.
+
+        linestyle : str or None, optional
             Matplotlib line style used for the reference lines.
-        linewidth:
+
+        linewidth : float, default 0.5
             Width of the reference lines.
-        color:
+
+        color : str, default "gray"
             Color of the reference lines.
-        alpha:
+
+        alpha : float, default 1.0
             Transparency of the reference lines.
-        ymin:
-            Lower vertical bound of the line in axis-relative coordinates.
-        ymax:
-            Upper vertical bound of the line in axis-relative coordinates.
-        labels:
-            Optional label or list of labels for legend integration.
-        zorder:
+
+        ymin : float, default 0.0
+            Lower extent of the line in axis-relative coordinates.
+
+        ymax : float, default 1.0
+            Upper extent of the line in axis-relative coordinates.
+
+        labels : str, list[str], or None, optional
+            Optional legend labels associated with the reference lines.
+
+        zorder : int, default 4
             Drawing order of the reference lines.
 
         Returns
         -------
-        Graph_base
-            The current graph object.
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        Single event date:
+
+        >>> (
+        ...     graph
+        ...     .vertical_lines("2023-03-10")
+        ... )
+
+        Multiple event dates:
+
+        >>> (
+        ...     graph
+        ...     .vertical_lines(
+        ...         [
+        ...             "2020-03-01",
+        ...             "2022-06-15"
+        ...         ]
+        ...     )
+        ... )
+
+        Vertical line with legend entry:
+
+        >>> (
+        ...     graph
+        ...     .vertical_lines(
+        ...         "2024-01-01",
+        ...         color="red",
+        ...         label="Portfolio Launch"
+        ...     )
+        ... )
         """
+        
         if x_values is None:
             return self
 
@@ -236,36 +425,78 @@ class ReferenceLinesMixin:
         zorder: int = 4,
     ):
         """
-        Add one or more horizontal reference lines to one y-axis.
+        Add one or more horizontal reference lines.
+
+        This method draws horizontal lines at specified y-axis values.
+        Reference levels are commonly used to indicate targets,
+        averages, thresholds, caps, floors, or policy ranges.
 
         Parameters
         ----------
-        y_values:
-            Y-axis value or values where horizontal lines should be drawn.
-            If None, no lines are added.
-        linestyle:
+        y_values : float, list[float], or None
+            Y-axis value or values where reference lines should be drawn.
+
+        linestyle : str or None, optional
             Matplotlib line style used for the reference lines.
-        linewidth:
+
+        linewidth : float, default 0.5
             Width of the reference lines.
-        color:
+
+        color : str, default "gray"
             Color of the reference lines.
-        alpha:
+
+        alpha : float, default 1.0
             Transparency of the reference lines.
-        side:
-            Axis side where lines should be added. Use 'left' or 'right'.
-        ax:
-            Explicit Matplotlib axis to use. If provided, side is ignored for
-            axis selection.
-        label:
-            Optional legend label. Applied only to the first line to avoid duplicates.
-        zorder:
+
+        side : {"left", "right"}, default "left"
+            Axis side where the reference lines should be added.
+
+        ax : matplotlib.axes.Axes or None, optional
+            Explicit axis where reference lines should be added.
+            When provided, `side` is ignored.
+
+        label : str or None, optional
+            Optional legend label associated with the first
+            reference line.
+
+        zorder : int, default 4
             Drawing order of the reference lines.
 
         Returns
         -------
-        Graph_base
-            Current graph object.
+        Self
+            Returns the chart instance for method chaining.
+
+        Examples
+        --------
+        Single reference level:
+
+        >>> (
+        ...     graph
+        ...     .horizontal_lines(100)
+        ... )
+
+        Multiple levels:
+
+        >>> (
+        ...     graph
+        ...     .horizontal_lines(
+        ...         [80, 100, 120]
+        ...     )
+        ... )
+
+        Target level with legend:
+
+        >>> (
+        ...     graph
+        ...     .horizontal_lines(
+        ...         100,
+        ...         color="green",
+        ...         label="Target"
+        ...     )
+        ... )
         """
+        
         if y_values is None:
             return self
 

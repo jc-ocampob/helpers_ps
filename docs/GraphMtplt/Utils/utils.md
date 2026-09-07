@@ -22,7 +22,7 @@
       separate_signature: true
       show_signature_annotations: true
       
-::: helpers_ps.MtpltGraph.mixins.chain.ChainMixin.axis
+::: helpers_ps.MtpltGraph.mixins.axes.AxesMixin.axis
     options:
       heading_level: 3
       show_root_heading: true
@@ -31,7 +31,7 @@
       show_signature_annotations: true
 ---------
 
-::: helpers_ps.MtpltGraph.mixins.chain.ChainMixin.get_axis
+::: helpers_ps.MtpltGraph.mixins.axes.AxesMixin.get_axis
     options:
       heading_level: 3
       show_root_heading: true

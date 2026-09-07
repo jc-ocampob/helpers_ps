@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from typing import Self
+from collections.abc import Sequence
+from dataclasses import asdict
+from typing import Any, Self
 
 import pandas as pd
 
 from ..models import (
+    LineSeriesConfig,
+    LineSeriesDict,
+    LineSeriesLike,
     XAxisConfig,
-    YAxisConfig,
-    LegendConfig,
-    FigureTitle,
-    FigureSubtitle,
-    FigureSource,
+    XAxisLike,
     coerce_configs,
-    config_to_dict
+    config_to_dict,
 )
 from ..tags._colors import PALETA_COLORES
 
@@ -22,83 +23,192 @@ class LineChartMixin:
     Provides line chart construction logic for GraphMtplt.
     """
 
+    def _normalize_line_series(
+        self,
+        dataframe: pd.DataFrame,
+        series: Sequence[LineSeriesLike] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Normalize and validate line-series configurations.
+
+        If series is None, all DataFrame columns are included using
+        their default configuration.
+        """
+        if series is None:
+            series = [
+                LineSeriesConfig(ticker=str(column))
+                for column in dataframe.columns
+            ]
+
+        if not series:
+            raise ValueError(
+                "'series' cannot be empty. "
+                "Use None to plot all DataFrame columns."
+            )
+
+        normalized: list[LineSeriesConfig] = []
+
+        for position, item in enumerate(series):
+            if isinstance(item, LineSeriesConfig):
+                config = item
+
+            elif isinstance(item, dict):
+                try:
+                    config = LineSeriesConfig(**item)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        "Invalid line series configuration at "
+                        f"position {position}: {item}."
+                    ) from exc
+
+            else:
+                raise TypeError(
+                    "Each item in 'series' must be a dictionary "
+                    "or a LineSeriesConfig instance."
+                )
+
+            if config.ticker not in dataframe.columns:
+                raise KeyError(
+                    f"Ticker '{config.ticker}' was not found "
+                    "in the selected DataFrame."
+                )
+
+            normalized.append(config)
+
+        tickers = [
+            config.ticker
+            for config in normalized
+        ]
+
+        if len(tickers) != len(set(tickers)):
+            raise ValueError(
+                "Duplicated tickers are not allowed in 'series'."
+            )
+
+        if not PALETA_COLORES:
+            raise ValueError(
+                "PALETA_COLORES cannot be empty."
+            )
+
+        for position, config in enumerate(normalized):
+            if config.color is None:
+                config.color = PALETA_COLORES[
+                    position % len(PALETA_COLORES)
+                ]
+
+        return [
+            LineSeriesDict(**asdict(config))
+            for config in normalized
+        ]
+
     def _plot_line_series(
         self,
         dataframe: pd.DataFrame,
-        series_config: list[dict],
+        series_config: list[LineSeriesDict],
         left_ax,
         right_ax,
-        lw: float,
+        default_lw: float,
     ) -> None:
+        """
+        Plot line series on their configured axes.
+        """
         for item in series_config:
             ticker = item["ticker"]
-            label = item["label"]
-            color = item["color"]
             selected_side = item["axis_side"]
 
-            serie_df = dataframe[[ticker]].copy()
-
-            if serie_df.empty:
-                continue
-
-            plot_ax = right_ax if selected_side == "right" else left_ax
+            plot_ax = (
+                right_ax
+                if selected_side == "right"
+                else left_ax
+            )
 
             if plot_ax is None:
-                raise RuntimeError("Right axis was not initialized correctly.")
+                raise RuntimeError(
+                    f"Axis '{selected_side}' was not "
+                    "initialized correctly."
+                )
+
+            series_lw = (
+                item["lw"]
+                if item["lw"] is not None
+                else default_lw
+            )
+
+            plot_kwargs = {
+                "color": item["color"],
+                "lw": series_lw,
+                "linestyle": item["linestyle"],
+                "label": item["label"],
+            }
 
             if self._x_axis_mode == "bbg":
-                serie = serie_df.reindex(self._x_axis_fechas)[ticker]
+                serie = dataframe[ticker].reindex(
+                    self._x_axis_fechas
+                )
 
                 plot_ax.plot(
                     self._x_vals,
                     serie.to_numpy(),
-                    color=color,
-                    lw=lw,
-                    label=label,
-                )
-            else:
-                x_plot = (
-                    self._x_vals
-                    if self._x_axis_mode == "categorical"
-                    else serie_df.index
+                    **plot_kwargs,
                 )
 
-                plot_ax.plot(
-                    x_plot,
-                    serie_df[ticker],
-                    color=color,
-                    lw=lw,
-                    label=label,
-                )
+                continue
+
+            x_plot = (
+                self._x_vals
+                if self._x_axis_mode == "categorical"
+                else dataframe.index
+            )
+
+            plot_ax.plot(
+                x_plot,
+                dataframe[ticker],
+                **plot_kwargs,
+            )
 
     def graph_line(
         self,
-        figsize: tuple[float, float] = (6.00, 5.00),
-        title: dict | FigureTitle | None = None,
-        subtitle: dict | FigureSubtitle | None = None,
-        source: dict | FigureSource | None = None,
+        series: Sequence[ LineSeriesLike] | None = None,
         df_index: int = 0,
-        tickers: list[str] | str = "all",
-        labels: list[str] | str | dict[str, str] | None = None,
-        colors: list[str] | str | dict[str, str] = PALETA_COLORES,
         lw: float = 1.6,
-        tag_dot: dict | None = None,
-        y_axis: dict | YAxisConfig | None = None,
-        axis_side: str | list[str] | dict[str, str] | None = None,
-        y_axis_right: dict | YAxisConfig | None = None,
-        x_axis: dict | XAxisConfig | None = None,
-        legend: dict | LegendConfig | None = None,
-        hlines: dict | None = None,
-        show_hguide: bool = False,
+        x_axis: XAxisLike | None = None,
     ) -> Self:
-        db = self._select_df(df_idx=df_index)
+        """
+        Add line series to the active figure.
 
-        series_config = self._normalize_series_config(
-            dataframe=db,
-            tickers=tickers,
-            labels=labels,
-            colors=colors,
-            axis_side=axis_side,
+        If series is None, all DataFrame columns are plotted using:
+
+        - Column name as label.
+        - Automatic palette colors.
+        - Left axis.
+        - Continuous line style.
+        - Default line width.
+        """
+        if not isinstance(lw, (int, float)):
+            raise TypeError(
+                "'lw' must be numeric."
+            )
+
+        if lw <= 0:
+            raise ValueError(
+                "'lw' must be greater than zero."
+            )
+
+        dataframe = self._select_df(
+            df_idx=df_index,
+        )
+
+        configs = coerce_configs(
+            x_axis=(x_axis, XAxisConfig),
+        )
+
+        x_axis_config = config_to_dict(
+            configs["x_axis"]
+        )
+
+        series_config = self._normalize_line_series(
+            dataframe=dataframe,
+            series=series,
         )
 
         axis_map = {
@@ -107,88 +217,43 @@ class LineChartMixin:
         }
 
         state = self._ensure_active_state()
+
         state.series_config = series_config
         state.axis_map = axis_map
         state.ticker_label_color = [
-            (item["ticker"], item["label"], item["color"])
+            (
+                item["ticker"],
+                item["label"],
+                item["color"],
+            )
             for item in series_config
         ]
 
-        configs = coerce_configs(
-            x_axis=(x_axis, XAxisConfig),
-            y_axis=(y_axis, YAxisConfig),
-            y_axis_right=(y_axis_right, YAxisConfig),
-            title=(title, FigureTitle),
-            subtitle=(subtitle, FigureSubtitle),
-            legend=(legend, LegendConfig),
-            source=(source, FigureSource),
+        if not hasattr(self, "_ax") or self._ax is None:
+            self.plot()
+
+        left_ax, right_ax = self._resolve_line_axes(
+            axis_map=axis_map,
         )
 
-        x_axis = config_to_dict(configs["x_axis"])
-
-        y_axis = config_to_dict(configs["y_axis"])
-        y_axis["side"] = "left"
-        y_axis_right = config_to_dict(configs["y_axis_right"])
-        y_axis_right["side"] = "right"
-
-        title = config_to_dict(configs["title"])
-        subtitle = config_to_dict(configs["subtitle"])
-        legend = config_to_dict(configs["legend"])
-        source = config_to_dict(configs["source"])
-
-        hlines = hlines if hlines is not None else {}
-
-        if not hasattr(self, "_ax") or self._ax is None:
-            self.plot(figsize=figsize)
-
-        left_ax, right_ax = self._resolve_line_axes(axis_map)
-
-        self.add_title(**title)
-        self.add_subtitle(**subtitle)
-        self.add_source(**source)
-
-        db = self.prep_x_axis(dataframe=db, **x_axis)
+        dataframe = self.prep_x_axis(
+            dataframe=dataframe,
+            **x_axis_config,
+        )
 
         self._plot_line_series(
-            dataframe=db,
+            dataframe=dataframe,
             series_config=series_config,
             left_ax=left_ax,
             right_ax=right_ax,
-            lw=lw,
+            default_lw=float(lw),
         )
 
-        self._apply_line_tags_by_axis(
-            tag_dot=tag_dot,
-            axis_map=axis_map,
+        self._apply_line_tags(
+            dataframe=dataframe,
+            series_config=series_config,
             left_ax=left_ax,
             right_ax=right_ax,
-        )
-
-        self.config_yaxis(
-            **y_axis,
-        )
-
-        if right_ax is not None:
-            self.config_yaxis(
-                **y_axis_right,
-            )
-
-        self._ax = left_ax
-
-        if hlines:
-            hlines.setdefault("side", "left")
-            self.horizontal_lines(**hlines)
-
-        if show_hguide:
-            self.horizontal_guides(
-                side="both" if right_ax is not None else "left",
-                mostrar_cero=False,
-            )
-
-        self.add_combined_legend(
-            ax=left_ax,
-            include_right_axis=right_ax is not None,
-            **legend,
         )
 
         self._ax = left_ax
