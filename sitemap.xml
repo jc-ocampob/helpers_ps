@@ -25,10 +25,6 @@
          <lastmod>2026-09-07</lastmod>
     </url>
     <url>
-         <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/multi_graph/</loc>
-         <lastmod>2026-09-07</lastmod>
-    </url>
-    <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/GraphMtplt/plotting/</loc>
          <lastmod>2026-09-07</lastmod>
     </url>
@@ -78,6 +74,14 @@
     </url>
     <url>
          <loc>https://jc-ocampob.github.io/Helpers_PS/api/helpers/</loc>
+         <lastmod>2026-09-07</lastmod>
+    </url>
+    <url>
+         <loc>https://jc-ocampob.github.io/Helpers_PS/api/GraphMtplt/layout/</loc>
+         <lastmod>2026-09-07</lastmod>
+    </url>
+    <url>
+         <loc>https://jc-ocampob.github.io/Helpers_PS/api/GraphMtplt/plotting/</loc>
          <lastmod>2026-09-07</lastmod>
     </url>
     <url>
