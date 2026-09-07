@@ -113,3 +113,8 @@ nav:
 
   - Excel:
       - Getting Started: Excel/getting_started.md
+  
+  - API:
+      - GraphMtplt:
+          - LayoutMixin: api/GraphMtplt/layout.md
+          - PlottingMixin: api/GraphMtplt/plotting.md
