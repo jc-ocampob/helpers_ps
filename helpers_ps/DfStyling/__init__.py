@@ -18,6 +18,10 @@ from .mapping import (
     background_color_by_range
 )
 
+from .table import (
+    style_table,
+)
+
 __all__ = [
     "style_cell",
     "style_cells",
@@ -32,5 +36,7 @@ __all__ = [
     "border_columns",
 
     "text_color_by_range",
-    "background_color_by_range"
+    "background_color_by_range",
+
+    "style_tables"
 ]

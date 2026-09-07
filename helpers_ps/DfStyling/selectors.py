@@ -646,3 +646,412 @@ def get_cell_selector(
         f"td.row{row_position}"
         f".col{column_position}"
     )
+
+
+def get_row_line_selectors(
+    df: pd.DataFrame,
+    rows: Targets,
+) -> list:
+    """
+    Build CSS selectors for horizontal lines across DataFrame rows.
+
+    The generated selectors target the complete HTML table row rather
+    than its individual data and index cells. This allows a horizontal
+    border to extend across sparse MultiIndex rows, including index cells
+    rendered with ``rowspan``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame whose row positions are used to build the selectors.
+
+    rows : Hashable | Iterable[Hashable]
+        Single row label or iterable of row labels.
+
+        For a MultiIndex, a tuple is interpreted as one complete row
+        label. To select multiple MultiIndex rows, provide an iterable
+        of tuples.
+
+    Returns
+    -------
+    list[str]
+        CSS selectors targeting the complete selected HTML rows.
+
+    Examples
+    --------
+    Select one standard row.
+
+    >>> selectors = get_row_line_selectors(
+    ...     df=df,
+    ...     rows="Total",
+    ... )
+
+    Select multiple MultiIndex rows.
+
+    >>> selectors = get_row_line_selectors(
+    ...     df=df,
+    ...     rows=[
+    ...         ("Delta Yield", "MTD", "A"),
+    ...         ("Delta Yield", "YTD", "A"),
+    ...     ],
+    ... )
+    """
+    row_positions = get_axis_positions(
+        axis_index=df.index,
+        targets=rows,
+    )
+
+    return [
+        f"tr:has(td.row{row_position})"
+        for row_position in row_positions
+    ]
+
+
+def get_table_selector() -> list:
+    """
+    Return the CSS selector for the complete DataFrame table.
+
+    Returns
+    -------
+    list[str]
+        Selector targeting the Styler-generated HTML table.
+
+    Examples
+    --------
+    >>> get_table_selector()
+    ['table']
+    """
+    return ["table"]
+
+
+def get_data_selector() -> list:
+    """
+    Return the CSS selector for all DataFrame data cells.
+
+    Returns
+    -------
+    list[str]
+        Selector targeting all table data cells.
+
+    Examples
+    --------
+    >>> get_data_selector()
+    ['td']
+    """
+    return ["td"]
+
+
+def get_header_selector() -> list:
+    """
+    Return the CSS selector for all column-header cells.
+
+    Returns
+    -------
+    list[str]
+        Selector targeting all column-header cells.
+
+    Examples
+    --------
+    >>> get_header_selector()
+    ['th.col_heading']
+    """
+    return ["th.col_heading"]
+
+
+def get_index_selector() -> list:
+    """
+    Return the CSS selector for all row-index cells.
+
+    Returns
+    -------
+    list[str]
+        Selector targeting all row-index cells.
+
+    Examples
+    --------
+    >>> get_index_selector()
+    ['th.row_heading']
+    """
+    return ["th.row_heading"]
+
+
+def get_column_header_selectors(
+    df: pd.DataFrame,
+    columns: Targets,
+    header_level: int | None = None,
+) -> list:
+    """
+    Build selectors for specific column-header cells.
+
+    The function supports standard columns and MultiIndex columns. Sparse
+    MultiIndex column rendering is preserved because selectors target
+    the physical header cell that owns the rendered label.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the target columns.
+
+    columns : Hashable | Iterable[Hashable]
+        Single column label or iterable of column labels.
+
+        For MultiIndex columns, a tuple represents one complete column
+        label.
+
+    header_level : int | None, default None
+        Header level to style.
+
+        If ``None`` and the columns are not a MultiIndex, level zero is
+        used. If ``None`` and the columns are a MultiIndex, the final
+        header level is used.
+
+    Returns
+    -------
+    list[str]
+        CSS selectors targeting the requested column headers.
+
+    Raises
+    ------
+    TypeError
+        If ``header_level`` is not an integer or ``None``.
+
+    ValueError
+        If ``header_level`` is negative or exceeds the available levels.
+
+    Examples
+    --------
+    Select standard column headers.
+
+    >>> get_column_header_selectors(
+    ...     df=df,
+    ...     columns=["1M", "2M", "3M"],
+    ... )
+    ['th.col_heading.level0.col0',
+     'th.col_heading.level0.col1',
+     'th.col_heading.level0.col2']
+    """
+    if header_level is None:
+        selected_level = df.columns.nlevels - 1
+    else:
+        if not isinstance(header_level, int):
+            raise TypeError(
+                "header_level must be an integer or None."
+            )
+
+        if header_level < 0:
+            raise ValueError(
+                "header_level cannot be negative."
+            )
+
+        if header_level >= df.columns.nlevels:
+            raise ValueError(
+                f"header_level={header_level} exceeds the available "
+                f"column levels. Maximum level is "
+                f"{df.columns.nlevels - 1}."
+            )
+
+        selected_level = header_level
+
+    column_positions = get_axis_positions(
+        axis_index=df.columns,
+        targets=columns,
+    )
+
+    return [
+        (
+            f"th.col_heading.level{selected_level}"
+            f".col{column_position}"
+        )
+        for column_position in column_positions
+    ]
+
+
+def get_index_value_selectors(
+    df: pd.DataFrame,
+    values: Targets,
+    level: int | str,
+    parent: tuple[Hashable, ...] | None = None,
+) -> list:
+    """
+    Build selectors for specific row-index values at one index level.
+
+    The function supports sparse MultiIndex rendering and optional
+    parent-path filtering. Parent filtering allows repeated values such
+    as ``"MTD"``, ``"YTD"``, or ``"AAA"`` to receive different styles
+    according to their surrounding MultiIndex section.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the target index values.
+
+    values : Hashable | Iterable[Hashable]
+        Single index value or iterable of index values to style.
+
+    level : int | str
+        Zero-based index level or index-level name containing the target
+        values.
+
+    parent : tuple[Hashable, ...] | None, default None
+        Optional parent index path used to restrict matching values.
+
+        The tuple must contain the values of the index levels preceding
+        ``level``.
+
+        For example, when styling level 1:
+
+        ``parent=("Δ Yield",)``
+
+        When styling level 2:
+
+        ``parent=("Δ Yield", "MTD")``
+
+        A shorter parent path may also be used to style all descendants
+        of an outer section:
+
+        ``parent=("Δ Yield",)``
+
+    Returns
+    -------
+    list[str]
+        CSS selectors targeting the physical sparse MultiIndex cells
+        matching the requested values and parent path.
+
+    Raises
+    ------
+    KeyError
+        If a string level name does not exist.
+
+    TypeError
+        If ``level`` is not an integer or string, or if ``parent`` is
+        not a tuple or ``None``.
+
+    ValueError
+        If an integer level is outside the available index levels, or if
+        the parent path is longer than the number of preceding levels.
+
+    Examples
+    --------
+    Select the outer ``Δ Yield`` cell.
+
+    >>> selectors = get_index_value_selectors(
+    ...     df=df,
+    ...     values="Δ Yield",
+    ...     level=0,
+    ... )
+
+    Select ``MTD`` and ``YTD`` only within ``Δ Yield``.
+
+    >>> selectors = get_index_value_selectors(
+    ...     df=df,
+    ...     values=["MTD", "YTD"],
+    ...     level=1,
+    ...     parent=("Δ Yield",),
+    ... )
+
+    Select ratings only within ``Δ Spreads``.
+
+    >>> selectors = get_index_value_selectors(
+    ...     df=df,
+    ...     values=["AAA", "AA+", "AA", "AA-", "A"],
+    ...     level=2,
+    ...     parent=("Δ Spreads",),
+    ... )
+    """
+    if isinstance(level, str):
+        if level not in df.index.names:
+            raise KeyError(
+                f"Index level {level!r} does not exist. "
+                f"Available names are {list(df.index.names)!r}."
+            )
+
+        level_number = df.index.names.index(level)
+
+    elif isinstance(level, int):
+        if level < 0 or level >= df.index.nlevels:
+            raise ValueError(
+                f"level={level} is outside the available index levels. "
+                f"Expected a value from 0 to {df.index.nlevels - 1}."
+            )
+
+        level_number = level
+
+    else:
+        raise TypeError(
+            "level must be an integer or index-level name."
+        )
+
+    if parent is not None:
+        if not isinstance(parent, tuple):
+            raise TypeError(
+                "parent must be a tuple or None."
+            )
+
+        if len(parent) > level_number:
+            raise ValueError(
+                f"parent contains {len(parent)} values, but level "
+                f"{level_number} has only {level_number} preceding "
+                "index levels."
+            )
+
+    level_values = pd.Index(
+        df.index.get_level_values(level_number)
+    )
+
+    normalized_values = normalize_targets(
+        targets=values,
+        axis_index=level_values,
+    )
+
+    matching_positions: list[int] = []
+
+    for position, index_label in enumerate(df.index):
+        if isinstance(df.index, pd.MultiIndex):
+            full_label = tuple(index_label)
+        else:
+            full_label = (index_label,)
+
+        current_value = full_label[level_number]
+
+        if current_value not in normalized_values:
+            continue
+
+        if (
+            parent is not None
+            and full_label[: len(parent)] != parent
+        ):
+            continue
+
+        matching_positions.append(position)
+
+    selectors: list[str] = []
+
+    for position in matching_positions:
+        if not isinstance(df.index, pd.MultiIndex):
+            selectors.append(
+                f"th.row_heading.level0.row{position}"
+            )
+            continue
+
+        current_prefix = tuple(
+            df.index[position][: level_number + 1]
+        )
+
+        if position == 0:
+            is_physical_cell = True
+        else:
+            previous_prefix = tuple(
+                df.index[position - 1][: level_number + 1]
+            )
+
+            is_physical_cell = (
+                current_prefix != previous_prefix
+            )
+
+        if is_physical_cell:
+            selectors.append(
+                f"th.row_heading.level{level_number}"
+                f".row{position}"
+            )
+
+    return list(dict.fromkeys(selectors))

@@ -2,21 +2,21 @@
 # 1. make code changes
 
 # 2. bump version in pyproject.toml
-# example: 0.1.0 -> 0.4.1
+# example: 0.1.0 -> 0.4.2
 
 # 3. optional: build locally to validate packaging
 python -m build
 
 # 4. commit
 git add .
-git commit -m "Release v0.4.1"
+git commit -m "Release v0.4.2"
 
 # 5. push branch
 git push origin main
 
 # 6. create tag
-git tag v0.4.1
-git push origin v0.4.1
+git tag v0.4.2
+git push origin v0.4.2
 
 
 # 7. Para instalaciones hacer lo siguiente reemplazando por la version v0.4.0

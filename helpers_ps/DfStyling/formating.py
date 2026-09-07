@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterable, Mapping
-from numbers import Real
-from typing import Literal, TypeAlias
-
-import pandas as pd
-from pandas import DataFrame
 from pandas.io.formats.style import Styler
 
 from .constants import DEFAULT_HIGHLIGHT_STYLE
@@ -13,6 +7,7 @@ from .selectors import (
     get_cell_selector,
     get_column_selectors,
     get_row_selectors,
+    get_row_line_selectors
 )
 from .utils import (
     apply_table_styles,
@@ -522,12 +517,14 @@ def border_rows(
     obj: StylerLike,
     rows: Labels,
     position: RowBorderPosition = "bottom",
-    include_index: bool = True,
-    index_level: int | None = None,
     styles: OptionalCSSProperties = None,
 ) -> Styler:
     """
-    Add a horizontal border to one or more DataFrame rows.
+    Add a horizontal border across one or more DataFrame rows.
+
+    The border is applied to the complete HTML table row. This allows
+    the separator to extend across sparse MultiIndex labels rendered
+    with ``rowspan``.
 
     Parameters
     ----------
@@ -537,55 +534,56 @@ def border_rows(
     rows : Hashable | Iterable[Hashable]
         Single row label or iterable of row labels.
 
+        For a MultiIndex, a tuple is interpreted as one complete row
+        label. To select multiple MultiIndex rows, provide an iterable
+        of tuples.
+
     position : {"top", "bottom"}, default "bottom"
-        Side of each selected row on which the border is added.
-
-    include_index : bool, default True
-        Whether the border is extended through the row index labels.
-
-    index_level : int | None, default None
-        Index level through which border styling is applied. The precise
-        behavior depends on ``get_row_selectors``.
+        Side of each selected row on which the horizontal border is
+        added.
 
     styles : Mapping[str, str] | None, default None
-        Border configuration passed to ``build_border_css``. Supported
-        properties depend on that utility, typically including
-        ``"width"``, ``"color"``, and ``"line_style"``.
+        Optional border configuration passed to ``build_border_css``.
+
+        Common properties include:
+
+        - ``"width"``
+        - ``"line_style"``
+        - ``"color"``
 
     Returns
     -------
     pandas.io.formats.style.Styler
-        Styler containing the row borders.
+        Styler containing the horizontal row borders.
 
     Examples
     --------
-    Add a separator below a total row.
+    Add a separator below one standard row.
 
     >>> styled = border_rows(
-    ...     df,
+    ...     obj=df,
     ...     rows="Total",
-    ...     position="bottom",
     ... )
 
-    Add a thick blue separator above a row.
+    Add separators below multiple MultiIndex rows.
 
     >>> styled = border_rows(
-    ...     df,
-    ...     rows="Total",
-    ...     position="top",
+    ...     obj=df,
+    ...     rows=[
+    ...         ("Delta Yield", "MTD", "A"),
+    ...         ("Delta Yield", "YTD", "A"),
+    ...     ],
     ...     styles={
-    ...         "width": "2px",
-    ...         "color": "blue",
+    ...         "width": "1px",
+    ...         "color": "red",
     ...     },
     ... )
     """
     styler = ensure_styler(obj)
 
-    selectors = get_row_selectors(
-        styler.data,
-        rows,
-        include_index=include_index,
-        index_level=index_level,
+    selectors = get_row_line_selectors(
+        df=styler.data,
+        rows=rows,
     )
 
     css = build_border_css(
@@ -594,9 +592,9 @@ def border_rows(
     )
 
     return apply_table_styles(
-        styler,
-        selectors,
-        css,
+        styler=styler,
+        selectors=selectors,
+        css=css,
     )
 
 
