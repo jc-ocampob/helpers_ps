@@ -1,6 +1,12 @@
 from __future__ import annotations
 from matplotlib.lines import Line2D
-from typing import Self
+from typing import Self, Literal
+
+LegendMode = Literal[
+    "all",
+    "series",
+    "points",
+]
 
 class LegendMixin:
     """
@@ -38,6 +44,7 @@ class LegendMixin:
         facecolor: str = "white",
         framealpha: float = 0.6,
         include_right_axis: bool = True,
+        legend_mode: LegendMode = "all",
     ) -> Self:
         """
         Add a legend to the chart.
@@ -119,6 +126,7 @@ class LegendMixin:
 
         handles, labels = self._collect_legend_handles_labels(
             include_right_axis=include_right_axis,
+            legend_mode=legend_mode,
         )
 
         final_handles, final_labels = self._deduplicate_legend_handles(
@@ -239,6 +247,7 @@ class LegendMixin:
         self,
         ax=None,
         include_right_axis: bool = True,
+        legend_mode: LegendMode = "all",
     ):
         """
         Collect legend handles and labels from all relevant chart components.
@@ -291,6 +300,17 @@ class LegendMixin:
             "_custom_legend_handles",
             [],
         )
+
+        if legend_mode == "points":
+
+            handles = list(custom_handles)
+
+            labels = [
+                h.get_label()
+                for h in custom_handles
+            ]
+
+            return handles, labels
 
         if custom_handles:
             handles.extend(custom_handles)

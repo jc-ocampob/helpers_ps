@@ -140,6 +140,7 @@ def style_table(
     column_header_styles: Sequence[HeaderStyleConfig] | None = None,
     row_index_styles: Sequence[IndexStyleConfig] | None = None,
     show_index_names: bool = True,
+    corner_styles: CSSProperties | None = None,
 ) -> Styler:
     """
     Configure the general appearance of a DataFrame table.
@@ -350,5 +351,15 @@ def style_table(
                 selectors=selectors,
                 styles=config["styles"],
             )
+
+    if corner_styles is not None:
+        styler = _apply_selector_styles(
+            styler=styler,
+            selectors=[
+                "th.blank",
+                "th.index_name",
+            ],
+            styles=corner_styles,
+        )
 
     return styler
