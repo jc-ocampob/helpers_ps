@@ -302,15 +302,21 @@ class LegendMixin:
         )
 
         if legend_mode == "points":
+            handles = (
+                self._custom_handles.get(
+                    "points",
+                    [],
+                )
+            )
 
-            handles = list(custom_handles)
+            labels = (
+                self._custom_handle_labels.get(
+                    "points",
+                    [],
+                )
+            )
 
-            labels = [
-                h.get_label()
-                for h in custom_handles
-            ]
-
-            return handles, labels
+            return list(handles), list(labels)
 
         if custom_handles:
             handles.extend(custom_handles)
