@@ -171,84 +171,65 @@ class AnnotationMixin:
         alpha: float = 1.0,
         clip_on: bool = True,
         label: str | None = None,
+        legend: bool = True,
         **scatter_kwargs,
     ) -> Self:
         """
         Add a highlighted point marker to the active chart.
 
         The method supports datetime, numeric, categorical, and
-        Bloomberg-style X-axis modes. It can be called directly or
-        receive controls from a nested ``dot`` dictionary inside a
-        chart-series configuration.
-
-        The original ``color``, ``size``, and ``zorder`` parameters are
-        preserved for backward compatibility. The ``marker_color`` and
-        ``markersize`` parameters provide descriptive aliases for use
-        inside typed series configurations.
+        Bloomberg-style X-axis modes. When ``label`` is provided, the
+        generated scatter artist can also be registered as a custom
+        ``"points"`` legend handle.
 
         Parameters
         ----------
         x_value:
             X-axis value where the marker is placed.
 
-            For a standard datetime axis, the value is converted to a
-            pandas Timestamp when possible. For a Bloomberg-style axis,
-            the value is mapped to its corresponding internal numeric
-            position. For numeric or categorical axes, Matplotlib axis
-            conversion is applied.
-
         y_value:
             Y-axis value where the marker is placed.
 
         color:
-            Default marker face color. This parameter is preserved from
-            the original API. It is used when ``marker_color`` is None.
+            Default marker face color. Used when ``marker_color`` is None.
 
         size:
-            Marker area in points squared, passed to the ``s`` parameter
-            of ``Axes.scatter``. This parameter is preserved from the
-            original API and defaults to 30.
+            Marker area in points squared, passed to ``Axes.scatter``.
 
         zorder:
-            Drawing order of the marker. Higher values are drawn over
-            elements with lower values.
+            Drawing order of the marker.
 
         marker:
-            Matplotlib marker style, such as ``"o"``, ``"D"``, ``"s"``,
-            ``"^"``, or ``"X"``.
+            Matplotlib marker style.
 
         markersize:
-            Marker diameter in points.
-
-            When provided, the value is converted to a scatter area using
-            ``markersize ** 2``. When omitted, ``size`` is used directly
-            as the scatter area.
+            Marker diameter in points. When provided, it is converted to
+            scatter area using ``markersize ** 2``.
 
         marker_color:
-            Marker face color. When omitted, the value from ``color`` is
-            used.
+            Marker face color. When omitted, ``color`` is used.
 
         marker_edgecolor:
-            Marker edge color. When omitted, Matplotlib selects the edge
-            color automatically.
+            Marker edge color.
 
         marker_edgewidth:
-            Width of the marker edge.
+            Marker edge width.
 
         alpha:
-            Marker opacity. Must be between 0 and 1.
+            Marker opacity.
 
         clip_on:
             Whether the marker is clipped to the active axes.
 
         label:
-            Optional label assigned to the marker. This can be used by
-            legends or other artist-processing methods.
+            Optional legend label assigned to the marker.
+
+        legend:
+            Whether the marker should be registered in the custom
+            ``"points"`` legend category when ``label`` is provided.
 
         **scatter_kwargs:
-            Additional keyword arguments passed directly to
-            ``Axes.scatter``. Explicit arguments defined by this method
-            cannot be overridden through ``scatter_kwargs``.
+            Additional keyword arguments passed to ``Axes.scatter``.
 
         Returns
         -------
@@ -261,54 +242,10 @@ class AnnotationMixin:
             If the active axis has not been initialized.
 
         TypeError
-            If numeric, boolean, or string parameters receive an invalid
-            type.
+            If a parameter receives an invalid type.
 
         ValueError
-            If ``size``, ``markersize``, or ``marker_edgewidth`` is
-            negative, or if ``alpha`` is outside the interval from 0 to 1.
-
-        Examples
-        --------
-        Add a marker using the original API:
-
-        >>> graph.dot(
-        ...     x_value="2026-08-31",
-        ...     y_value=25.4,
-        ...     color="red",
-        ...     size=30,
-        ...     zorder=5,
-        ... )
-
-        Add a customized diamond marker:
-
-        >>> graph.dot(
-        ...     x_value="2026-08-31",
-        ...     y_value=25.4,
-        ...     marker="D",
-        ...     markersize=5,
-        ...     marker_color="#E0A228",
-        ...     marker_edgecolor="white",
-        ...     marker_edgewidth=0.7,
-        ...     alpha=1.0,
-        ...     zorder=24,
-        ... )
-
-        Use the method through a box-series reference:
-
-        >>> {
-        ...     "x_values": "last",
-        ...     "dot": {
-        ...         "marker": "o",
-        ...         "markersize": 5,
-        ...         "marker_color": "#C53B3B",
-        ...         "marker_edgecolor": "white",
-        ...         "marker_edgewidth": 0.7,
-        ...         "alpha": 1.0,
-        ...         "zorder": 24,
-        ...         "clip_on": False,
-        ...     },
-        ... }
+            If numeric parameters are outside their permitted ranges.
         """
         if not hasattr(self, "_ax") or self._ax is None:
             raise RuntimeError(
@@ -341,10 +278,7 @@ class AnnotationMixin:
                 "'markersize' cannot be negative."
             )
 
-        if not isinstance(
-            marker_edgewidth,
-            (int, float),
-        ):
+        if not isinstance(marker_edgewidth, (int, float)):
             raise TypeError(
                 "'marker_edgewidth' must be numeric."
             )
@@ -372,6 +306,11 @@ class AnnotationMixin:
         if not isinstance(clip_on, bool):
             raise TypeError(
                 "'clip_on' must be a boolean."
+            )
+
+        if not isinstance(legend, bool):
+            raise TypeError(
+                "'legend' must be a boolean."
             )
 
         if not isinstance(marker, str):
@@ -464,9 +403,7 @@ class AnnotationMixin:
             "marker": marker,
             "s": resolved_size,
             "color": resolved_color,
-            "linewidths": float(
-                marker_edgewidth
-            ),
+            "linewidths": float(marker_edgewidth),
             "alpha": float(alpha),
             "zorder": float(zorder),
             "clip_on": clip_on,
@@ -480,13 +417,89 @@ class AnnotationMixin:
         if label is not None:
             plot_kwargs["label"] = label
 
-        plot_kwargs.update(scatter_kwargs)
+        protected_kwargs = {
+            "marker",
+            "s",
+            "color",
+            "linewidths",
+            "alpha",
+            "zorder",
+            "clip_on",
+            "edgecolors",
+            "label",
+        }
 
-        self._ax.scatter(
+        invalid_overrides = (
+            protected_kwargs
+            .intersection(scatter_kwargs)
+        )
+
+        if invalid_overrides:
+            invalid_names = ", ".join(
+                sorted(invalid_overrides)
+            )
+
+            raise TypeError(
+                "The following arguments must be passed "
+                "directly to dot() and cannot be provided "
+                f"through scatter_kwargs: {invalid_names}."
+            )
+
+        plot_kwargs.update(
+            scatter_kwargs
+        )
+
+        dot_artist = self._ax.scatter(
             x_plot,
             y_value,
             **plot_kwargs,
         )
+
+        if (
+            legend
+            and label is not None
+            and label
+            and not label.startswith("_")
+        ):
+            if not hasattr(self, "_custom_handles"):
+                self._custom_handles = {}
+
+            if not hasattr(self, "_custom_handle_labels"):
+                self._custom_handle_labels = {}
+
+            if not isinstance(self._custom_handles, dict):
+                raise TypeError(
+                    "'_custom_handles' must be a dictionary "
+                    "organized by legend element type."
+                )
+
+            if not isinstance(
+                self._custom_handle_labels,
+                dict,
+            ):
+                raise TypeError(
+                    "'_custom_handle_labels' must be a "
+                    "dictionary organized by legend element type."
+                )
+
+            point_handles = (
+                self._custom_handles
+                .setdefault("points", [])
+            )
+
+            point_labels = (
+                self._custom_handle_labels
+                .setdefault("points", [])
+            )
+
+            if label not in point_labels:
+                point_handles.append(
+                    dot_artist
+                )
+
+                point_labels.append(
+                    label
+                )
 
         return self
 
