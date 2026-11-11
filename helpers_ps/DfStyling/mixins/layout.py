@@ -50,7 +50,12 @@ class LayoutMixin(SheetBase):
         self._header = Header(text, size, color, weight) if text else None
         return self
 
-    def add_note(self, *notes: str | Sequence[str]) -> Self:
+    def add_note(
+        self,
+        *notes: str | Sequence[str],
+        size: float | None = None,
+        color: str | None = None,
+    ) -> Self:
         """
         Append general notes below the panels (above the sources).
 
@@ -58,21 +63,39 @@ class LayoutMixin(SheetBase):
         ----------
         *notes : str | Sequence[str]
             One or several notes.
+        size : float | None, default None
+            Font size in points of **all** notes: the general ones and the
+            ones under each panel. ``None`` leaves the current size
+            unchanged (``footer_size`` unless it was set before). To go
+            back to ``footer_size`` use ``config_layout(note_size=None)``.
+        color : str | None, default None
+            Color of all notes. ``None`` leaves it unchanged.
 
         Returns
         -------
         TableSheet
             The sheet, for chaining.
 
+        Raises
+        ------
+        ValueError
+            If ``size`` is not positive. Nothing is changed in that case.
+
         Examples
         --------
-        >>> sheet.add_note("MTD: month to date.", "YTD: year to date.")
+        >>> sheet.add_note("MTD: month to date.", "YTD: year to date.", size=6)
         """
+        self._set_text_style("note", size, color)
         for note in notes:
             self._notes.extend(_as_list(note))
         return self
 
-    def add_source(self, *sources: str | Sequence[str]) -> Self:
+    def add_source(
+        self,
+        *sources: str | Sequence[str],
+        size: float | None = None,
+        color: str | None = None,
+    ) -> Self:
         """
         Set the source lines at the bottom (replaces previous ones).
 
@@ -83,20 +106,45 @@ class LayoutMixin(SheetBase):
         ----------
         *sources : str | Sequence[str]
             One or several lines. Call with no arguments to clear.
+        size : float | None, default None
+            Font size in points of the source lines. ``None`` leaves the
+            current size unchanged (``footer_size`` unless it was set
+            before). To go back to ``footer_size`` use
+            ``config_layout(source_size=None)``.
+        color : str | None, default None
+            Color of the source lines. ``None`` leaves it unchanged.
 
         Returns
         -------
         TableSheet
             The sheet, for chaining.
 
+        Raises
+        ------
+        ValueError
+            If ``size`` is not positive. Nothing is changed in that case.
+
         Examples
         --------
-        >>> sheet.add_source("Fuente: Example Data", "© My Company")
+        >>> sheet.add_source("Fuente: Example Data", "© My Company", size=6)
         """
+        self._set_text_style("source", size, color)
         self._sources = [
             line for source in sources for line in _as_list(source)
         ]
         return self
+
+    def _set_text_style(
+        self,
+        kind: str,
+        size: float | None,
+        color: str | None,
+    ) -> None:
+        """Set ``note_*`` / ``source_*`` style fields that were given."""
+        given = {f"{kind}_size": size, f"{kind}_color": color}
+        changes = {name: value for name, value in given.items() if value is not None}
+        if changes:
+            self.config_layout(**changes)
 
     # ------------------------------------------------------------------
     # Visual parameters

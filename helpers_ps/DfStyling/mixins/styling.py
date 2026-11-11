@@ -218,31 +218,308 @@ class StylingMixin(SheetBase):
         """
         Configure the general appearance of the active tables.
 
-        See ``helpers_ps.DfStyling.style_table`` for the meaning of every
-        parameter. Sparse MultiIndex rendering is preserved.
+        Every argument is optional: only the ones you pass are applied.
+        Dictionaries hold plain CSS properties, for example
+        ``{"background-color": "#12275A", "font-weight": "bold"}``. Calling
+        ``style_table`` several times is fine: the rules are replayed in
+        call order, so the latest call wins.
+
+        Inside one call the rules are applied in this order. When two of
+        them set the same CSS property, the later one wins (a color in
+        ``column_header_styles`` beats one in ``header_styles``):
+
+        1. ``font_family``, ``font_size``, ``text_color``,
+           ``background_color``, ``text_align``: header, index and data
+           cells.
+        2. ``header_styles``, ``index_styles``, ``data_styles``: every cell
+           of that kind.
+        3. ``column_header_styles``: selected column headers.
+        4. ``row_index_styles``: selected row-index labels.
+        5. ``corner_styles``: the corner and the index-names row.
+
+        Sparse MultiIndex rendering is preserved. See
+        ``helpers_ps.DfStyling.style_table`` for the functional version.
+
+        Parts of a table
+        ----------------
+        ::
+
+            +----------+----------+----------+-------+-------+
+            | corner   | corner   | corner   |  1M   |  3M   |  <- column headers
+            +----------+----------+----------+-------+-------+
+            | Metric   | Period   | Rating   |       |       |  <- index-names row
+            +----------+----------+----------+-------+-------+
+            | Δ Yield  | MTD      | AAA      |   5   |   8   |
+            |          |          | AA+      |  -9   |  39   |
+            +----------+----------+----------+-------+-------+
+              ^ index cells                    ^ data cells
+
+        * Column headers: ``header_styles``, ``column_header_styles``.
+        * Index cells (all levels): ``index_styles``, ``row_index_styles``.
+        * Data cells: ``data_styles``.
+        * Corner cells and index-names row: ``corner_styles``. The
+          index-names row is hidden by ``show_index_names=False``.
+
+        Parameters
+        ----------
+        font_family : str | None, default None
+            CSS font family of the header, index and data cells. A list is
+            a fallback chain, e.g. ``"Inter, Arial, sans-serif"``. The
+            titles, notes and sources drawn around the table use the sheet
+            font instead (``config_layout(font_family=...)``).
+
+        font_size : str | int | float | None, default None
+            Font size of the header, index and data cells. A number means
+            pixels (``11`` is ``"11px"``); a string may use any CSS unit
+            (``"9pt"``, ``"0.8rem"``). With ``scale="natural"`` the size on
+            the page is real (1 px = 0.75 pt, so 11 px = 8.25 pt). With the
+            default ``scale="uniform"`` the table is resized to fill its
+            cell, so ``font_size`` barely changes the final text size; it
+            changes how heavy fixed-pixel borders look next to the text.
+
+        text_color : str | None, default None
+            Text color of the header, index and data cells.
+
+        background_color : str | None, default None
+            Background color of the header, index and data cells. It also
+            covers the alternating row shading (``zebra``).
+
+        text_align : str | None, default None
+            ``"left"``, ``"center"`` or ``"right"`` for the header, index
+            and data cells. Without it the table is right-aligned.
+
+        header_styles : Mapping[str, str] | None, default None
+            CSS for every column-header cell (the labels above the data).
+            Header labels are bold by default; use
+            ``{"font-weight": "normal"}`` to undo it. It does not reach the
+            corner cells; use ``corner_styles``.
+
+        index_styles : Mapping[str, str] | None, default None
+            CSS for every row-index cell, at all index levels. Index labels
+            are bold by default, like the headers.
+
+        data_styles : Mapping[str, str] | None, default None
+            CSS for every data cell.
+
+        column_header_styles : Sequence[dict] | None, default None
+            Rules for selected column headers. Each dictionary has:
+
+            * ``"columns"``: one column label or a list of labels. With
+              MultiIndex columns use complete labels as tuples. To style a
+              group label of an upper level, the list must include the
+              first column of that group (the one that carries the label).
+            * ``"styles"``: the CSS to apply.
+            * ``"level"`` (optional): header row to style. Default is the
+              last one, the row of the labels closest to the data.
+
+        row_index_styles : Sequence[dict] | None, default None
+            Rules for selected row-index labels. Each dictionary has:
+
+            * ``"values"``: one index value or a list of values.
+            * ``"level"``: index level, as a position (``0`` is the outer
+              level) or as its name (``"Period"``).
+            * ``"styles"``: the CSS to apply.
+            * ``"parent"`` (optional): tuple with the values of the outer
+              levels, to style a repeated label only inside one section.
+
+        show_index_names : bool, default True
+            Show the row with the index level names (``Metric``,
+            ``Period``, ``Rating``). ``False`` hides it without changing
+            the DataFrame.
+
+        corner_styles : Mapping[str, str] | None, default None
+            CSS for the corner cells above the index and for the
+            index-names row, including its empty cells under the column
+            headers.
 
         Returns
         -------
         TableSheet
             The sheet, for chaining.
 
+        Notes
+        -----
+        * A value that does not exist in the table matches nothing and is
+          ignored.
+        * The header row is as tall as its tallest cell, corner included.
+          If you lower the padding or font size of the header, give
+          ``corner_styles`` the same values or the row stays tall. In the
+          same way, a data row is as tall as its tallest cell, index
+          included.
+        * ``row_index_styles`` paints the index label only. To style the
+          data cells of a row use ``highlight_rows`` or ``style_cells``.
+
         Examples
         --------
+        The examples use a table with the index levels ``Metric``
+        (``Δ Yield``, ``Δ Spreads``), ``Period`` (``MTD``, ``YTD``) and
+        ``Rating`` (``AAA``, ``AA+``, ``AA``, ``A``), and the columns
+        ``1M``, ``3M``, ``6M``, ``1Y``, ``3Y``, ``5Y``, ``10Y``.
+
+        ``font_family``.
+
+        >>> sheet.style_table(font_family="Inter, Arial, sans-serif")
+
+        ``font_size``: a number is pixels, a string can use any CSS unit.
+
+        >>> sheet.style_table(font_size=11)
+        >>> sheet.style_table(font_size="9pt")
+
+        ``text_color`` and ``background_color``.
+
+        >>> sheet.style_table(text_color="#222222", background_color="white")
+
+        ``text_align``: centered labels, right-aligned numbers (the data
+        rule is applied after the general one).
+
         >>> sheet.style_table(
-        ...     font_family="Inter, Arial",
-        ...     font_size=11,
         ...     text_align="center",
+        ...     data_styles={"text-align": "right"},
+        ... )
+
+        ``header_styles``: dark header with white text.
+
+        >>> sheet.style_table(
+        ...     header_styles={
+        ...         "color": "white",
+        ...         "background-color": "#12275A",
+        ...     },
+        ... )
+
+        ``index_styles``: normal-weight index labels (bold is the default)
+        on a grey background.
+
+        >>> sheet.style_table(
+        ...     index_styles={
+        ...         "font-weight": "normal",
+        ...         "background-color": "#F2F2F2",
+        ...     },
+        ... )
+
+        ``data_styles``: a thin line under every row.
+
+        >>> sheet.style_table(
+        ...     data_styles={"border-bottom": "1px solid #E5E5E5"},
+        ... )
+
+        Shorter rows: lower the padding in the data cells and in the index
+        cells, because the tallest cell sets the row height.
+
+        >>> sheet.style_table(
+        ...     data_styles={"padding": "0.25em 0.6em"},
+        ...     index_styles={"padding": "0.25em 0.6em"},
+        ... )
+
+        ``column_header_styles``: color some headers differently. The
+        general ``header_styles`` applies to all of them and the rules of
+        the list are applied after it.
+
+        >>> sheet.style_table(
         ...     header_styles={"color": "white", "background-color": "#12275A"},
+        ...     column_header_styles=[
+        ...         {
+        ...             "columns": ["1M", "3M", "6M"],
+        ...             "styles": {"background-color": "#3075DB"},
+        ...         },
+        ...         {
+        ...             "columns": "10Y",
+        ...             "styles": {"background-color": "#B7331F"},
+        ...         },
+        ...     ],
+        ... )
+
+        ``column_header_styles`` with MultiIndex columns, for example
+        ``("Yield", "1M")``, ``("Yield", "3M")``, ``("Spread", "1M")`` and
+        ``("Spread", "3M")``. ``"level": 0`` styles the group label
+        (``Yield``), so list the group's columns starting with its first
+        one; without ``"level"`` the rule styles the last level (``1M``,
+        ``3M``).
+
+        >>> sheet.style_table(
+        ...     column_header_styles=[
+        ...         {
+        ...             "columns": [("Yield", "1M"), ("Yield", "3M")],
+        ...             "level": 0,
+        ...             "styles": {"background-color": "#B7331F", "color": "white"},
+        ...         },
+        ...         {
+        ...             "columns": [("Spread", "1M"), ("Spread", "3M")],
+        ...             "styles": {"background-color": "#3075DB", "color": "white"},
+        ...         },
+        ...     ],
+        ... )
+
+        ``row_index_styles``: the outer label, the labels of one section
+        (``parent``) and every ``AAA`` of a level selected by name.
+
+        >>> sheet.style_table(
         ...     row_index_styles=[
         ...         {
         ...             "values": "Δ Yield",
         ...             "level": 0,
         ...             "styles": {"background-color": "#B7331F", "color": "white"},
         ...         },
+        ...         {
+        ...             "values": ["MTD", "YTD"],
+        ...             "level": 1,
+        ...             "parent": ("Δ Yield",),
+        ...             "styles": {"font-style": "italic"},
+        ...         },
+        ...         {
+        ...             "values": "AAA",
+        ...             "level": "Rating",
+        ...             "styles": {"color": "#B7331F"},
+        ...         },
+        ...     ],
+        ... )
+
+        ``show_index_names``: hide the ``Metric`` / ``Period`` / ``Rating``
+        row.
+
+        >>> sheet.style_table(show_index_names=False)
+
+        ``corner_styles``: paint the corner like the header, and keep the
+        header row short by giving the corner the same padding.
+
+        >>> sheet.style_table(
+        ...     header_styles={
+        ...         "color": "white",
+        ...         "background-color": "#12275A",
+        ...         "padding": "0.2em 0.5em",
+        ...     },
+        ...     corner_styles={
+        ...         "background-color": "#12275A",
+        ...         "padding": "0.2em 0.5em",
+        ...     },
+        ...     show_index_names=False,
+        ... )
+
+        Everything together: an institutional table.
+
+        >>> sheet.style_table(
+        ...     font_family="Inter, Arial",
+        ...     font_size=11,
+        ...     text_align="center",
+        ...     header_styles={"color": "white", "background-color": "#12275A"},
+        ...     corner_styles={"background-color": "#12275A"},
+        ...     index_styles={"background-color": "#F2F2F2"},
+        ...     data_styles={"border-bottom": "1px solid #E5E5E5"},
+        ...     row_index_styles=[
+        ...         {
+        ...             "values": "Δ Yield",
+        ...             "level": 0,
+        ...             "styles": {"background-color": "#B7331F", "color": "white"},
+        ...         },
+        ...         {
+        ...             "values": "Δ Spreads",
+        ...             "level": 0,
+        ...             "styles": {"background-color": "#163A87", "color": "white"},
+        ...         },
         ...     ],
         ...     show_index_names=False,
         ... )
         """
+
         self._record(
             "style_table",
             style_table,

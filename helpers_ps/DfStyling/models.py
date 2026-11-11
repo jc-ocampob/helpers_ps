@@ -75,8 +75,8 @@ Key: TypeAlias = int | str
 Notes: TypeAlias = str | Sequence[str] | None
 
 Align: TypeAlias = Literal["left", "center", "right"]
-VAlign: TypeAlias = Literal["top", "center", "bottom"]
 ScaleMode: TypeAlias = Literal["uniform", "fit", "natural"]
+VAlign: TypeAlias = Literal["top", "center", "bottom"]
 Resampling: TypeAlias = Literal["lanczos", "bicubic", "bilinear", "nearest"]
 PanelKind: TypeAlias = Literal["table", "image"]
 
@@ -89,8 +89,8 @@ StylerFunc: TypeAlias = Callable[..., Styler]
 
 SCALE_MODES = ("uniform", "fit", "natural")
 VALIGNS = ("top", "center", "bottom")
-ALIGNS = ("left", "center", "right")
 RESAMPLINGS = ("lanczos", "bicubic", "bilinear", "nearest")
+ALIGNS = ("left", "center", "right")
 
 #: Marker of an empty cell in a layout (``None`` works as well).
 EMPTY_CELL = "."
@@ -167,7 +167,14 @@ class SheetStyle:
     title_gap_in : float
         Gap between a panel title block and its table.
     footer_size, footer_color
-        Style of panel notes, general notes and sources.
+        Default size and color of panel notes, general notes and sources.
+    note_size, note_color : float | None, str | None
+        Size and color of the notes: the ones under each panel
+        (``panel(notes=...)``) and the general ones (``add_note``).
+        ``None`` uses ``footer_size`` / ``footer_color``.
+    source_size, source_color : float | None, str | None
+        Size and color of the source lines (``add_source``). ``None``
+        uses ``footer_size`` / ``footer_color``.
     line_spacing : float
         Line height as a multiple of the font size.
     wrap_text : bool
@@ -234,6 +241,10 @@ class SheetStyle:
     title_gap_in: float = 0.08
     footer_size: float = 9
     footer_color: str = "#666666"
+    note_size: float | None = None
+    note_color: str | None = None
+    source_size: float | None = None
+    source_color: str | None = None
     line_spacing: float = 1.5
     wrap_text: bool = True
 
@@ -259,6 +270,12 @@ class SheetStyle:
             raise ValueError("table_font_px must be > 0.")
         if self.line_spacing <= 0:
             raise ValueError("line_spacing must be > 0.")
+        for name in ("note_size", "source_size"):
+            value = getattr(self, name)
+            if value is not None and value <= 0:
+                raise ValueError(
+                    f"{name} must be > 0 (or None to use footer_size)."
+                )
         for name, allowed in (
             ("valign", VALIGNS),
             ("scale", SCALE_MODES),
@@ -329,6 +346,10 @@ class SheetStyleOptions(TypedDict, total=False):
     title_gap_in: float
     footer_size: float
     footer_color: str
+    note_size: float | None
+    note_color: str | None
+    source_size: float | None
+    source_color: str | None
     line_spacing: float
     wrap_text: bool
     line_color: str

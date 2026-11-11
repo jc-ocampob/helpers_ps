@@ -468,6 +468,13 @@ def compose(
     meter = TextMeter()
     width = style.width_in
 
+    # Notes and sources have their own size and color; ``None`` falls back
+    # to ``footer_size`` / ``footer_color``.
+    note_size = style.note_size or style.footer_size
+    note_color = style.note_color or style.footer_color
+    source_size = style.source_size or style.footer_size
+    source_color = style.source_color or style.footer_color
+
     left_in = style.left * width if style.left is not None else style.margin_in
     right_in = (
         style.right * width
@@ -512,7 +519,7 @@ def compose(
             cell.notes = [
                 line
                 for note in panel.notes
-                for line in wrap(note, text_w, style.footer_size, "normal")
+                for line in wrap(note, text_w, note_size, "normal")
             ]
 
             head = _step(cell.title_size, style) * len(cell.title)
@@ -521,7 +528,7 @@ def compose(
                 head += style.title_gap_in
             cell.head_h = head
             cell.foot_h = (
-                _step(style.footer_size, style) * len(cell.notes)
+                _step(note_size, style) * len(cell.notes)
                 + _GAP_BEFORE_NOTES
                 if cell.notes
                 else 0.0
@@ -554,10 +561,15 @@ def compose(
         if header and header.text
         else []
     )
-    footer_lines = [
-        line
-        for text in [*notes, *sources]
-        for line in wrap(text, grid_w, style.footer_size, "normal")
+    # (text, size, color) of every footer line: general notes, then sources.
+    footer_lines: list[tuple[str, float, str]] = [
+        (line, size, color)
+        for texts, size, color in (
+            (notes, note_size, note_color),
+            (sources, source_size, source_color),
+        )
+        for text in texts
+        for line in wrap(text, grid_w, size, "normal")
     ]
 
     header_block = (
@@ -566,7 +578,7 @@ def compose(
         else _GAP_NO_HEADER
     )
     top_block = style.pad_top_in + _GAP_AFTER_TOP_RULE + header_block
-    footer_block = _step(style.footer_size, style) * len(footer_lines)
+    footer_block = sum(_step(size, style) for _, size, _ in footer_lines)
     bottom_block = (
         _GAP_BEFORE_BOTTOM_RULE
         + _GAP_AFTER_BOTTOM_RULE
@@ -600,25 +612,29 @@ def compose(
             else height - bottom_block
         )
         available = region_bottom - region_top
-
-        # Even with the panels reduced to nothing the texts need room.
-        minimum = content_height(_MIN_SHRINK)
-        if minimum > available:
-            if style.top is None and style.bottom is None:
-                raise ValueError(
-                    f"height_in={style.height_in:g} is too small: titles, "
-                    "notes and spacing alone need at least "
-                    f"{top_block + bottom_block + minimum:.2f} in."
-                )
+        if available <= 0:
             raise ValueError(
-                f"The area between bottom and top is {max(available, 0):.2f} "
-                "in; titles, notes and spacing alone need at least "
-                f"{minimum:.2f} in."
+                "top/bottom leave no room for the panels "
+                f"(area of {available:.2f} in)."
             )
 
         if content_height(1.0) <= available:
             shrink = 1.0
         else:
+            minimum = content_height(_MIN_SHRINK)
+            if minimum > available:
+                if style.top is None and style.bottom is None:
+                    raise ValueError(
+                        f"height_in={style.height_in:g} is too small: "
+                        "titles, notes and spacing alone need at least "
+                        f"{top_block + bottom_block + minimum:.2f} in."
+                    )
+                raise ValueError(
+                    f"The area between bottom and top is {available:.2f} "
+                    "in; titles, notes and spacing alone need at least "
+                    f"{minimum:.2f} in."
+                )
+
             # Largest scale that fits (content height grows with it).
             low, high = _MIN_SHRINK, 1.0
             for _ in range(40):
@@ -729,8 +745,6 @@ def compose(
             header_weight,
         )
 
-    footer_step = _step(style.footer_size, style)
-
     for cell in cells:
         panel = cell.panel
         span = cell.span
@@ -790,22 +804,12 @@ def compose(
 
         y_note = y_image + cell.img_h + _GAP_BEFORE_NOTES
         for line in cell.notes:
-            text(
-                cell.x_table,
-                y_note,
-                line,
-                style.footer_size,
-                style.footer_color,
-            )
-            y_note += footer_step
+            text(cell.x_table, y_note, line, note_size, note_color)
+            y_note += _step(note_size, style)
 
-    for k, line in enumerate(footer_lines):
-        text(
-            left_in,
-            y_footer + k * footer_step,
-            line,
-            style.footer_size,
-            style.footer_color,
-        )
+    y_line = y_footer
+    for line, size, color in footer_lines:
+        text(left_in, y_line, line, size, color)
+        y_line += _step(size, style)
 
     return fig

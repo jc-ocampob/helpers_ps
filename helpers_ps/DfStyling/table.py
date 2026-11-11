@@ -159,13 +159,16 @@ def style_table(
         DataFrame or existing Styler object to modify.
 
     font_family : str | None, default None
-        CSS font family applied to header, index, and data cells.
+        CSS font family applied to header, index, and data cells, and to
+        the corner cells above the index.
 
         Examples include ``"Arial"``, ``"Calibri"``, and
         ``"'Aptos', sans-serif"``.
 
     font_size : str | int | float | None, default None
-        Font size applied to header, index, and data cells.
+        Font size applied to header, index, and data cells, and to the
+        corner cells above the index (so they do not make the header row
+        taller than the rest).
 
         Numeric values are interpreted as pixels. String values may use
         any valid CSS unit, such as ``"10px"``, ``"0.8rem"``, or
@@ -300,6 +303,23 @@ def style_table(
             "td",
         ],
         styles=general_styles,
+    )
+
+    # The empty corner cells (and the index-name cells) belong to the header
+    # row. If they kept the browser's default font size they would set the
+    # height of the whole row, so they follow the table typography.
+    # ``corner_styles`` is applied afterwards and can still override this.
+    styler = _apply_selector_styles(
+        styler=styler,
+        selectors=[
+            "th.blank",
+            "th.index_name",
+        ],
+        styles={
+            key: value
+            for key, value in general_styles.items()
+            if key in ("font-family", "font-size")
+        },
     )
 
     if header_styles is not None:
