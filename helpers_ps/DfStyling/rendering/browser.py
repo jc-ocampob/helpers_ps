@@ -29,6 +29,10 @@ def build_base_css(font_px: int = 14, zebra: bool = True) -> str:
     under the header, optional zebra rows, collapsed borders). Anything set
     through ``Styler`` is applied afterwards and therefore overrides it.
 
+    The table has no outline; draw one with ``TableSheet.table_border()``.
+    The line under the column headers can be changed with
+    ``TableSheet.header_line()``.
+
     Parameters
     ----------
     font_px : int, default 14
@@ -47,7 +51,7 @@ def build_base_css(font_px: int = 14, zebra: bool = True) -> str:
     table {{
         background-color: transparent;
         font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-        border: 1px solid #f5f5f5;
+        border: none;  /* draw one with table_border() */
         border-collapse: collapse;
         border-spacing: 0;
         color: black;

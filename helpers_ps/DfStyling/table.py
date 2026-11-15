@@ -14,6 +14,7 @@ from .selectors import (
 )
 from .utils import (
     apply_table_styles,
+    build_border_css,
     ensure_styler,
     style_dict_to_css,
 )
@@ -153,6 +154,9 @@ def style_table(
     are applied to the physical HTML cells that represent each visible
     sparse MultiIndex label.
 
+    The outline of the whole table and the line under the column headers
+    are not set here: see ``style_table_border`` and ``style_header_line``.
+
     Parameters
     ----------
     obj : pandas.DataFrame | pandas.io.formats.style.Styler
@@ -206,7 +210,7 @@ def style_table(
 
         Each configuration must contain ``"values"``, ``"level"``, and
         ``"styles"``.
-    
+
     show_index_names : bool, default True
         Whether DataFrame index-level names are displayed.
 
@@ -383,3 +387,97 @@ def style_table(
         )
 
     return styler
+
+
+# ---------------------------------------------------------------------
+# Table outline and header line
+# ---------------------------------------------------------------------
+
+def style_table_border(
+    obj: StylerLike,
+    width: str | int | float = "1px",
+    color: str = "#cccccc",
+    line_style: str = "solid",
+) -> Styler:
+    """
+    Draw an outline around the whole table.
+
+    The rendered table has no outline by default. Widths are drawn in whole
+    CSS pixels (minimum 1px).
+
+    Parameters
+    ----------
+    obj : pandas.DataFrame | pandas.io.formats.style.Styler
+        DataFrame or existing Styler object to modify.
+
+    width : str | int | float, default "1px"
+        CSS width, or a number of pixels.
+
+    color : str, default "#cccccc"
+        CSS color.
+
+    line_style : str, default "solid"
+        CSS line style. ``"none"`` removes the outline.
+
+    Returns
+    -------
+    pandas.io.formats.style.Styler
+        Styler containing the outline.
+
+    Examples
+    --------
+    >>> styled = style_table_border(df, width="1px", color="#12275A")
+    """
+    styler = ensure_styler(obj)
+
+    css = build_border_css(
+        position=None,
+        styles={"width": width, "style": line_style, "color": color},
+    )
+
+    return apply_table_styles(styler, [""], css)
+
+
+def style_header_line(
+    obj: StylerLike,
+    width: str | int | float = "1px",
+    color: str = "black",
+    line_style: str = "solid",
+) -> Styler:
+    """
+    Style the line between the column headers and the data.
+
+    By default the rendered table draws a 1px black line there.
+
+    Parameters
+    ----------
+    obj : pandas.DataFrame | pandas.io.formats.style.Styler
+        DataFrame or existing Styler object to modify.
+
+    width : str | int | float, default "1px"
+        CSS width, or a number of pixels. Drawn in whole CSS pixels.
+
+    color : str, default "black"
+        CSS color.
+
+    line_style : str, default "solid"
+        CSS line style. ``"none"`` removes the line.
+
+    Returns
+    -------
+    pandas.io.formats.style.Styler
+        Styler containing the header line.
+
+    Examples
+    --------
+    >>> styled = style_header_line(df, color="#12275A", width="2px")
+    >>> styled = style_header_line(df, line_style="none")
+    """
+    styler = ensure_styler(obj)
+
+    css = build_border_css(
+        position="bottom",
+        styles={"width": width, "style": line_style, "color": color},
+    )
+
+    return apply_table_styles(styler, ["thead"], css)

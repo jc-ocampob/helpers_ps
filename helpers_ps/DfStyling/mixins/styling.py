@@ -32,7 +32,13 @@ from ..models import (
     StylerFunc,
 )
 from ..selectors import get_column_header_selectors, get_index_value_selectors
-from ..table import HeaderStyleConfig, IndexStyleConfig, style_table
+from ..table import (
+    HeaderStyleConfig,
+    IndexStyleConfig,
+    style_header_line,
+    style_table,
+    style_table_border,
+)
 from .base import SheetBase
 
 
@@ -259,6 +265,10 @@ class StylingMixin(SheetBase):
         * Data cells: ``data_styles``.
         * Corner cells and index-names row: ``corner_styles``. The
           index-names row is hidden by ``show_index_names=False``.
+
+        The outline of the whole table and the line between the column
+        headers and the data are not part of ``style_table``: use
+        ``table_border`` and ``header_line``.
 
         Parameters
         ----------
@@ -519,7 +529,6 @@ class StylingMixin(SheetBase):
         ...     show_index_names=False,
         ... )
         """
-
         self._record(
             "style_table",
             style_table,
@@ -540,6 +549,89 @@ class StylingMixin(SheetBase):
             row_index_styles, column_header_styles
         )
         return self
+
+    def table_border(
+        self,
+        width: str | int | float = "1px",
+        color: str = "#cccccc",
+        line_style: BorderLineStyle = "solid",
+    ) -> Self:
+        """
+        Draw an outline around the whole table.
+
+        Tables have **no outline by default**; call this only if you want
+        one. It applies to the active tables.
+
+        Parameters
+        ----------
+        width : str | int | float, default "1px"
+            CSS width, or a number of pixels. See *Line thickness* in
+            ``border_rows``: widths are drawn in whole CSS pixels.
+        color : str, default "#cccccc"
+            CSS color.
+        line_style : str, default "solid"
+            CSS line style. ``"none"`` removes a previous outline.
+
+        Returns
+        -------
+        TableSheet
+            The sheet, for chaining.
+
+        Examples
+        --------
+        >>> sheet.table_border(color="#12275A")
+        >>> sheet.table_border(2, "black", "dashed")
+        >>> sheet.table_border(line_style="none")        # remove it again
+        """
+        return self._record(
+            "table_border",
+            style_table_border,
+            width=width,
+            color=color,
+            line_style=line_style,
+        )
+
+    def header_line(
+        self,
+        width: str | int | float = "1px",
+        color: str = "black",
+        line_style: BorderLineStyle = "solid",
+    ) -> Self:
+        """
+        Style the line between the column headers and the data.
+
+        By default tables draw a 1px black line there. It belongs to the
+        header row, so ``header_styles={"border": ...}`` does not change it;
+        use this method.
+
+        Parameters
+        ----------
+        width : str | int | float, default "1px"
+            CSS width, or a number of pixels. See *Line thickness* in
+            ``border_rows``: widths are drawn in whole CSS pixels.
+        color : str, default "black"
+            CSS color.
+        line_style : str, default "solid"
+            CSS line style. ``"none"`` removes the line.
+
+        Returns
+        -------
+        TableSheet
+            The sheet, for chaining.
+
+        Examples
+        --------
+        >>> sheet.header_line(color="#12275A", width=2)    # navy, 2px
+        >>> sheet.header_line(color="#BFBFBF")             # light grey, 1px
+        >>> sheet.header_line(line_style="none")           # no line
+        """
+        return self._record(
+            "header_line",
+            style_header_line,
+            width=width,
+            color=color,
+            line_style=line_style,
+        )
 
     def format(
         self,
@@ -696,13 +788,63 @@ class StylingMixin(SheetBase):
         """
         Add a horizontal border across rows.
 
-        See ``helpers_ps.DfStyling.border_rows``.
+        The line is drawn under (or over) the complete HTML row, so it also
+        crosses the merged cells of a sparse MultiIndex. See
+        ``helpers_ps.DfStyling.border_rows``.
+
+        Parameters
+        ----------
+        rows : label | list of labels
+            Row to draw the line under. For a MultiIndex pass the complete
+            tuple, or a list of tuples.
+        position : {"bottom", "top"}, default "bottom"
+            Side of the row that receives the line.
+        styles : dict | None, default None
+            Any of these options (anything else raises ``ValueError``):
+
+            * ``"width"``: a CSS length (``"2px"``) or a number of pixels.
+            * ``"style"`` (or ``"line_style"``): ``"solid"``, ``"dashed"``,
+              ``"dotted"``, ``"double"``...
+            * ``"color"``: any CSS color.
+
+            ``"border-width"``, ``"border-style"`` and ``"border-color"``
+            are accepted as aliases. Defaults: ``1px solid black``.
+
+        Notes
+        -----
+        **Line thickness.** The browser draws the borders of a table in
+        whole CSS pixels with a minimum of 1px, so ``"0.1px"``, ``"0.5px"``
+        and ``"1px"`` are the same line and ``"1.5px"`` is drawn as ``"1px"``
+        (a warning tells you). The thickness you see is relative to the text:
+
+            line thickness = text size x width / font_size
+
+        The sheet scales the table to fit its cell, so the **final text size
+        does not depend on** ``style_table(font_size=...)``, but the line
+        does. With ``font_size=3`` a ``1px`` line is a third of the height of
+        the text. To get a thinner line, raise ``font_size``; to keep the
+        look of the rest of the table, give sizes inside the table in ``em``
+        instead of ``px``. Measured on a 5.4 in sheet with two tables and
+        text of about 5.3 pt (``1px`` and ``2px`` lines):
+
+        ============  =========  =========
+        font_size     1px line   2px line
+        ============  =========  =========
+        3             1.8 pt     3.5 pt
+        6             0.9 pt     1.8 pt
+        12            0.45 pt    0.9 pt
+        24            0.23 pt    0.46 pt
+        ============  =========  =========
 
         Examples
         --------
         >>> sheet.border_rows(
         ...     [("Δ Yield", "MTD", "A")],
         ...     styles={"width": "2px", "color": "#12275A"},
+        ... )
+        >>> sheet.border_rows(
+        ...     [("Δ Yield", "MTD", "A"), ("Δ Spreads", "MTD", "A")],
+        ...     styles={"width": 1, "color": "#808080", "line_style": "dashed"},
         ... )
         """
         return self._record(
