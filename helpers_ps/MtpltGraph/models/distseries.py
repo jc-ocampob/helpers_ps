@@ -1,14 +1,21 @@
 """
-Series configuration models for distribution (histogram) charts.
+Series and curve configuration models for distribution (histogram) charts.
 
 Mirrors the conventions used by ``barseries.py`` and ``boxseries.py``:
 a dataclass for user input, a TypedDict for the normalized form and a
 ``*Like`` alias accepting either.
+
+Two configuration objects live here:
+
+- ``DistSeriesConfig``: one distribution series (a DataFrame column).
+- ``DistCurveConfig``: one overlaid curve (known or estimated) together
+  with its style. It is used inside ``known=[...]`` / ``fit=[...]``,
+  exactly like ``DistSeriesConfig`` is used inside ``series=[...]``.
 """
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date, datetime
 from typing import (
     Any,
@@ -65,18 +72,6 @@ DistObservations: TypeAlias = (
     | set[DistObservation]
 )
 
-# A curve can be declared as:
-#   - a scipy.stats distribution name: "norm", "t", "lognorm", "kde", ...
-#   - a dictionary (see DistCurveDict)
-#   - a frozen scipy distribution (anything exposing ``.pdf``)
-#   - a callable ``pdf(x) -> y``
-DistCurveSpec: TypeAlias = (
-    str
-    | dict[str, Any]
-    | Callable[..., Any]
-    | Any
-)
-
 _VALID_SHOW_TOKENS = {"line", "tag", "dot"}
 _STATISTIC_PATTERN = re.compile(
     r"^(mean|median|q1|q3|min|max|p\d+(\.\d+)?)$"
@@ -120,6 +115,167 @@ def is_valid_dist_statistic(statistic: Any) -> bool:
     return True
 
 
+# ---------------------------------------------------------------------------
+# Curve configuration
+# ---------------------------------------------------------------------------
+class DistCurveDict(TypedDict, total=False):
+    """
+    Configuration of one overlaid curve (known or estimated) and its style.
+
+    What is drawn:
+        - ``dist``: scipy.stats name (``"norm"``, ``"t"``, ...) or
+          ``"kde"`` (only in ``fit``). In ``known`` it can also be a
+          frozen scipy distribution or a callable ``pdf(x)``.
+        - ``params`` (known only): dict (``{"loc": 0, "scale": 1}``) or
+          tuple of positional parameters. Omitted -> scipy defaults.
+        - ``fit_kwargs`` (fit only): extra kwargs for ``dist.fit``
+          (e.g. ``{"floc": 0}``).
+        - ``bw_method`` (``"kde"`` only): bandwidth rule or factor.
+
+    How it looks (all optional):
+        - ``color`` (``c``), ``linewidth`` (``lw``), ``linestyle``
+          (``ls``), ``alpha``, ``zorder``.
+        - ``label``: fixed legend text.
+        - ``label_template``: legend text with ``{fields}``:
+          ``{series}``, ``{ticker}``, ``{dist}``, ``{dist_key}``,
+          ``{kind}``, ``{params}``, ``{n}``, every parameter by name
+          (``{loc}``, ``{scale}``, ``{df}``...), ``{mu}`` / ``{sigma}``
+          (aliases of loc / scale) and ``{bandwidth}`` for KDE.
+        - ``legend``: False hides the curve from the legend.
+        - ``param_fmt`` / ``param_sep``: format and separator used by
+          ``{params}`` (defaults ``".3g"`` and ``", "``).
+        - ``fill``: True or ``{"color", "alpha", "zorder", "hatch"}``.
+        - ``line_kwargs``: any extra ``Axes.plot`` argument.
+    """
+    dist: Any
+    params: dict[str, float] | tuple[float, ...] | list[float]
+    fit_kwargs: dict[str, Any]
+    bw_method: Any
+    label: str | None
+    label_template: str | None
+    color: str
+    linewidth: float
+    linestyle: Any
+    alpha: float
+    zorder: float
+    legend: bool
+    param_fmt: str
+    param_sep: str
+    fill: bool | dict[str, Any]
+    line_kwargs: dict[str, Any]
+
+
+@dataclass(slots=True)
+class DistCurveConfig:
+    """
+    Configuration for one overlaid curve, with its style.
+
+    It is the curve counterpart of ``DistSeriesConfig`` and can be used
+    anywhere a curve is accepted (``known=[...]``, ``fit=[...]``, also
+    inside ``DistSeriesConfig``). Plain strings and dictionaries are
+    still valid and equivalent::
+
+        fit=["norm", {"dist": "t", "color": "green"},
+             DistCurveConfig("kde", fill=True)]
+
+    Parameters
+    ----------
+    dist:
+        scipy.stats name, ``"kde"`` (fit only), frozen distribution or
+        callable pdf (known only).
+    params:
+        Parameters of a *known* distribution (dict or tuple).
+    fit_kwargs:
+        Extra keyword arguments for ``dist.fit`` (fit only).
+    bw_method:
+        Bandwidth for ``"kde"``.
+    label, label_template:
+        Fixed legend text, or legend text built from ``{fields}``
+        (see ``DistCurveDict``). ``label`` wins if both are given.
+    color, linewidth, linestyle, alpha, zorder:
+        Line style. None keeps the default.
+    legend:
+        False hides the curve from the legend.
+    param_fmt, param_sep:
+        Format / separator used by ``{params}``.
+    fill:
+        True or a dict with ``color``, ``alpha``, ``zorder``, ``hatch``.
+    line_kwargs:
+        Extra ``Axes.plot`` keyword arguments.
+    """
+    dist: Any
+    params: Any = None
+    fit_kwargs: dict[str, Any] | None = None
+    bw_method: Any = None
+    label: str | None = None
+    label_template: str | None = None
+    color: str | None = None
+    linewidth: float | None = None
+    linestyle: Any = None
+    alpha: float | None = None
+    zorder: float | None = None
+    legend: bool | None = None
+    param_fmt: str | None = None
+    param_sep: str | None = None
+    fill: bool | dict[str, Any] | None = None
+    line_kwargs: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if self.dist is None:
+            raise ValueError("'dist' cannot be None.")
+        if isinstance(self.dist, str) and not self.dist.strip():
+            raise ValueError("'dist' cannot be an empty string.")
+        for name in ("label", "label_template", "param_fmt", "param_sep"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, str):
+                raise TypeError(f"'{name}' must be a string or None.")
+        if self.color is not None and not isinstance(self.color, str):
+            raise TypeError("'color' must be a string or None.")
+        for name in ("linewidth", "alpha", "zorder"):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+            ):
+                raise TypeError(f"'{name}' must be numeric or None.")
+        if self.linewidth is not None and self.linewidth <= 0:
+            raise ValueError("'linewidth' must be positive.")
+        if self.alpha is not None and not 0 <= self.alpha <= 1:
+            raise ValueError("'alpha' must be between 0 and 1.")
+        if self.legend is not None and not isinstance(self.legend, bool):
+            raise TypeError("'legend' must be a boolean or None.")
+        if self.fill is not None and not isinstance(
+            self.fill, (bool, dict)
+        ):
+            raise TypeError(
+                "'fill' must be a boolean, a dictionary or None."
+            )
+        for name in ("fit_kwargs", "line_kwargs"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, dict):
+                raise TypeError(f"'{name}' must be a dictionary or None.")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the non-None fields as a ``DistCurveDict``."""
+        return {
+            item.name: getattr(self, item.name)
+            for item in fields(self)
+            if getattr(self, item.name) is not None
+        }
+
+
+DistCurveLike: TypeAlias = (
+    str
+    | DistCurveDict
+    | DistCurveConfig
+    | Callable[..., Any]
+    | Any
+)
+
+# Kept as an alias of DistCurveLike for backwards compatibility.
+DistCurveSpec: TypeAlias = DistCurveLike
+
+
 def normalize_curve_specs(
     value: Any,
     *,
@@ -128,8 +284,9 @@ def normalize_curve_specs(
     """
     Normalize a ``known`` / ``fit`` declaration into a list of curve specs.
 
-    None stays None (meaning "inherit the function-level default"), an
-    empty list means "no curves" and a single spec is wrapped in a list.
+    ``DistCurveConfig`` instances are converted to dictionaries. None
+    stays None (meaning "inherit the function-level default"), an empty
+    list means "no curves" and a single spec is wrapped in a list.
     """
     if value is None:
         return None
@@ -137,7 +294,10 @@ def normalize_curve_specs(
         specs = list(value)
     else:
         specs = [value]
+    output: list[Any] = []
     for position, spec in enumerate(specs):
+        if isinstance(spec, DistCurveConfig):
+            spec = spec.to_dict()
         if isinstance(spec, str):
             if not spec.strip():
                 raise ValueError(
@@ -149,8 +309,7 @@ def normalize_curve_specs(
                     "'kde' is an estimated curve; use it in 'fit', "
                     "not in 'known'."
                 )
-            continue
-        if isinstance(spec, dict):
+        elif isinstance(spec, dict):
             if "dist" not in spec:
                 raise ValueError(
                     f"Every dictionary in '{field}' must define "
@@ -162,55 +321,36 @@ def normalize_curve_specs(
                     "distribution name or 'kde'. Invalid item at "
                     f"position {position}."
                 )
-            continue
-        if field == "fit":
+            if (
+                field == "known"
+                and isinstance(spec["dist"], str)
+                and spec["dist"].strip().lower() == "kde"
+            ):
+                raise ValueError(
+                    "'kde' is an estimated curve; use it in 'fit', "
+                    "not in 'known'."
+                )
+        elif field == "fit":
             raise TypeError(
-                "'fit' only accepts distribution names or "
-                "dictionaries, because the parameters are estimated "
-                f"from the data. Invalid item at position {position}."
+                "'fit' only accepts distribution names, dictionaries "
+                "or DistCurveConfig, because the parameters are "
+                f"estimated from the data. Invalid item at position "
+                f"{position}."
             )
-        if not (hasattr(spec, "pdf") or callable(spec)):
+        elif not (hasattr(spec, "pdf") or callable(spec)):
             raise TypeError(
                 f"Invalid item at position {position} in '{field}'. "
-                "Use a distribution name, a dictionary, a frozen "
-                "scipy distribution or a callable pdf(x)."
+                "Use a distribution name, a dictionary, a "
+                "DistCurveConfig, a frozen scipy distribution or a "
+                "callable pdf(x)."
             )
-    return specs
+        output.append(spec)
+    return output
 
 
 # ---------------------------------------------------------------------------
-# TypedDicts
+# Reference (tag) TypedDicts
 # ---------------------------------------------------------------------------
-class DistCurveDict(TypedDict, total=False):
-    """
-    Configuration of one overlaid curve.
-
-    For ``known`` curves:
-        - ``dist``: scipy.stats name ("norm", "t", ...), frozen
-          distribution or callable pdf(x).
-        - ``params``: dict (``{"loc": 0, "scale": 1}``) or tuple of
-          positional parameters. Omitted -> scipy defaults.
-
-    For ``fit`` curves (parameters estimated from the data):
-        - ``dist``: scipy.stats name or ``"kde"``.
-        - ``fit_kwargs``: extra kwargs for ``dist.fit`` (e.g.
-          ``{"floc": 0}``).
-        - ``bw_method``: bandwidth for ``"kde"``.
-
-    Style fields are optional.
-    """
-    dist: Any
-    params: dict[str, float] | tuple[float, ...] | list[float]
-    fit_kwargs: dict[str, Any]
-    bw_method: Any
-    label: str | None
-    color: str
-    linewidth: float
-    linestyle: str
-    alpha: float
-    zorder: float
-
-
 class DistTagLineDict(TypedDict, total=False):
     """Style of the vertical reference line."""
     extent: DistLineExtent
@@ -305,7 +445,7 @@ class DistSeriesDict(TypedDict):
 
 
 # ---------------------------------------------------------------------------
-# Dataclass
+# Series dataclass
 # ---------------------------------------------------------------------------
 @dataclass(slots=True)
 class DistSeriesConfig:
@@ -325,12 +465,14 @@ class DistSeriesConfig:
         Whether to draw the histogram. If False only the curves are
         drawn (at least one curve is then required).
     known:
-        Curve(s) of a known distribution drawn over the series. None
-        inherits the ``known`` argument of ``graph_dist``; ``[]``
-        disables it for this series.
+        Curve(s) of a known distribution drawn over the series. Accepts
+        strings, dictionaries or ``DistCurveConfig``. None inherits the
+        ``known`` argument of ``graph_dist``; ``[]`` disables it for
+        this series.
     fit:
-        Curve(s) estimated from the series data. None inherits the
-        ``fit`` argument of ``graph_dist``; ``[]`` disables it.
+        Curve(s) estimated from the series data (same accepted types).
+        None inherits the ``fit`` argument of ``graph_dist``; ``[]``
+        disables it.
     tag:
         Highlighted references (see ``DistTagDict``).
     """

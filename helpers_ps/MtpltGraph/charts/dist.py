@@ -9,7 +9,8 @@ import pandas as pd
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
 from ..models import (
-    DistCurveSpec,
+    DistCurveConfig,
+    DistCurveLike,
     DistSeriesConfig,
     DistSeriesDict,
     DistSeriesLike,
@@ -45,6 +46,31 @@ _VALID_STATS = {"density", "count", "probability"}
 _FIT_LINESTYLES = ["-", "-.", ":", (0, (5, 1))]
 _KNOWN_LINESTYLES = ["--", (0, (1, 1)), (0, (3, 1, 1, 1))]
 
+# ---------------------------------------------------------------------------
+# Curve styling
+# ---------------------------------------------------------------------------
+# Keys that define WHAT is drawn (not how); they are only valid inside the
+# curve dictionary itself.
+_CURVE_STRUCTURE_KEYS = {"dist", "params", "fit_kwargs", "bw_method"}
+
+# Keys that define HOW a curve looks.
+_CURVE_STYLE_KEYS = {
+    "color",
+    "linewidth",
+    "linestyle",
+    "alpha",
+    "zorder",
+    "label",           # fixed legend text
+    "label_template",  # legend text built with {fields}
+    "legend",          # False -> hide from the legend
+    "param_fmt",       # number format used by {params}
+    "param_sep",       # separator used by {params}
+    "fill",            # True or dict(color, alpha, zorder, hatch)
+    "line_kwargs",     # extra kwargs for Axes.plot (marker, ...)
+}
+_CURVE_STYLE_ALIASES = {"c": "color", "lw": "linewidth", "ls": "linestyle"}
+_FILL_KEYS = {"color", "alpha", "zorder", "hatch"}
+
 # Extra X-axis styling keys accepted (as dictionary keys) in addition to
 # the fields of XAxisConfig. They are removed before XAxisConfig
 # validation, so they work without modifying that dataclass.
@@ -57,6 +83,50 @@ _DIST_XAXIS_EXTRAS = (
     "axis_label_fontsize",
     "axis_label_color",
 )
+
+
+def _normalize_curve_style(
+    style: dict[str, Any] | None,
+    *,
+    where: str,
+    allow_structure: bool = False,
+) -> dict[str, Any]:
+    """Validate a curve-style dictionary and resolve key aliases."""
+    if style is None:
+        return {}
+    if not isinstance(style, dict):
+        raise TypeError(f"{where} must be a dictionary or None.")
+    allowed = set(_CURVE_STYLE_KEYS)
+    if allow_structure:
+        allowed |= _CURVE_STRUCTURE_KEYS
+    output: dict[str, Any] = {}
+    for key, value in style.items():
+        key = _CURVE_STYLE_ALIASES.get(key, key)
+        if key not in allowed:
+            raise ValueError(
+                f"Unknown key {key!r} in {where}. Allowed keys: "
+                f"{', '.join(sorted(allowed | set(_CURVE_STYLE_ALIASES)))}."
+            )
+        output[key] = value
+    fill = output.get("fill")
+    if isinstance(fill, dict):
+        unknown = set(fill) - _FILL_KEYS
+        if unknown:
+            raise ValueError(
+                f"Unknown key(s) {sorted(unknown)} in 'fill' of "
+                f"{where}. Allowed keys: {', '.join(sorted(_FILL_KEYS))}."
+            )
+    elif fill is not None and not isinstance(fill, bool):
+        raise TypeError(
+            f"'fill' in {where} must be a boolean, a dictionary or None."
+        )
+    line_kwargs = output.get("line_kwargs")
+    if line_kwargs is not None and not isinstance(line_kwargs, dict):
+        raise TypeError(f"'line_kwargs' in {where} must be a dictionary.")
+    template = output.get("label_template")
+    if template is not None and not isinstance(template, str):
+        raise TypeError(f"'label_template' in {where} must be a string.")
+    return output
 
 
 def _get_scipy_dist(name: str):
@@ -88,15 +158,20 @@ def _param_names(distribution) -> list[str]:
     return names + ["loc", "scale"]
 
 
-def _format_params(name: str, params: dict[str, Any]) -> str:
+def _format_params(
+    name: str,
+    params: dict[str, Any],
+    fmt: str = ".3g",
+    sep: str = ", ",
+) -> str:
     symbols = _PARAM_SYMBOLS.get(name, {})
     parts = []
     for key, value in params.items():
         try:
-            parts.append(f"{symbols.get(key, key)}={float(value):.3g}")
+            parts.append(f"{symbols.get(key, key)}={float(value):{fmt}}")
         except (TypeError, ValueError):
             continue
-    return ", ".join(parts)
+    return sep.join(parts)
 
 
 class DistChartMixin:
@@ -241,6 +316,7 @@ class DistChartMixin:
         values: np.ndarray,
         grid: np.ndarray,
         scale: float,
+        series_ticker: str,
         series_label: str,
         series_color: str,
         lw: float,
@@ -248,21 +324,32 @@ class DistChartMixin:
         curve_index: int = 0,
     ) -> dict[str, Any]:
         """
-        Evaluate one curve over ``grid``.
+        Evaluate one curve over ``grid`` and resolve its style.
 
         ``kind`` is ``"known"`` or ``"fit"``. The returned dictionary
         contains the data and the resolved style, ready to be plotted.
+
+        The style comes from the curve itself (dictionary or
+        ``DistCurveConfig``) on top of the built-in defaults.
         """
+        if isinstance(raw_spec, DistCurveConfig):
+            raw_spec = raw_spec.to_dict()
         if isinstance(raw_spec, str):
             spec: dict[str, Any] = {"dist": raw_spec}
         elif isinstance(raw_spec, dict):
             spec = dict(raw_spec)
         else:
             spec = {"dist": raw_spec}
+        spec = _normalize_curve_style(
+            spec,
+            where=f"a '{kind}' curve dictionary",
+            allow_structure=True,
+        )
 
         dist = spec["dist"]
         params: dict[str, Any] = {}
         name = "custom"
+        extra_fields: dict[str, Any] = {}
 
         if kind == "fit":
             name = dist.strip().lower()
@@ -274,6 +361,7 @@ class DistChartMixin:
                     bw_method=spec.get("bw_method"),
                 )
                 y_values = kde(grid)
+                extra_fields["bandwidth"] = float(kde.factor)
             else:
                 distribution = _get_scipy_dist(name)
                 estimated = distribution.fit(
@@ -298,6 +386,8 @@ class DistChartMixin:
                 )
             elif raw_params is None:
                 frozen = distribution()
+                if not getattr(distribution, "shapes", None):
+                    params = {"loc": 0.0, "scale": 1.0}
             else:
                 raise TypeError(
                     "'params' must be a dictionary, a tuple/list "
@@ -327,36 +417,100 @@ class DistChartMixin:
             )
         y_values = y_values * scale
 
-        if spec.get("label") is not None:
-            label = str(spec["label"])
-        else:
-            pretty = _DIST_LABELS.get(name, name)
-            if name == "kde":
-                base = "KDE"
-            else:
-                suffix = "ajustada" if kind == "fit" else "teórica"
-                base = f"{pretty} {suffix}"
-            param_text = _format_params(name, params)
-            label = f"{base} ({param_text})" if param_text else base
-            if prefix_label:
-                label = f"{series_label}: {label}"
-
-        # Several curves of the same kind get different line styles so
-        # they stay distinguishable even when they share a color.
+        # ---- resolve style ------------------------------------------
         if kind == "known":
-            defaults = {
+            base_style = {
                 "color": "#222222",
                 "linestyle": _KNOWN_LINESTYLES[
                     curve_index % len(_KNOWN_LINESTYLES)
                 ],
             }
         else:
-            defaults = {
+            base_style = {
                 "color": series_color,
                 "linestyle": _FIT_LINESTYLES[
                     curve_index % len(_FIT_LINESTYLES)
                 ],
             }
+        base_style.update(
+            {
+                "linewidth": lw,
+                "alpha": 1.0,
+                "zorder": 3,
+                "legend": True,
+                "param_fmt": ".3g",
+                "param_sep": ", ",
+                "fill": None,
+                "line_kwargs": {},
+            }
+        )
+        style = dict(base_style)
+        for key, value in spec.items():
+            if key in _CURVE_STRUCTURE_KEYS:
+                continue
+            if key == "line_kwargs":
+                style["line_kwargs"] = {
+                    **style["line_kwargs"],
+                    **(value or {}),
+                }
+            else:
+                style[key] = value
+
+        # ---- legend text --------------------------------------------
+        pretty = _DIST_LABELS.get(name, name)
+        kind_text = "ajustada" if kind == "fit" else "teórica"
+        params_text = _format_params(
+            name,
+            params,
+            fmt=str(style["param_fmt"]),
+            sep=str(style["param_sep"]),
+        )
+        if style.get("label") is not None:
+            label = str(style["label"])
+        elif style.get("label_template") is not None:
+            template_fields: dict[str, Any] = {
+                "series": series_label,
+                "ticker": series_ticker,
+                "dist": pretty,
+                "dist_key": name,
+                "kind": kind_text,
+                "params": params_text,
+                "n": int(len(values)),
+                **extra_fields,
+                **params,
+            }
+            if "loc" in params:
+                template_fields.setdefault("mu", params["loc"])
+            if "scale" in params:
+                template_fields.setdefault("sigma", params["scale"])
+            try:
+                label = style["label_template"].format(**template_fields)
+            except KeyError as exc:
+                raise ValueError(
+                    f"Unknown field {exc} in label_template "
+                    f"{style['label_template']!r} for the '{name}' "
+                    f"curve. Available fields: "
+                    f"{', '.join(sorted(template_fields))}."
+                ) from exc
+            except (ValueError, TypeError, IndexError) as exc:
+                raise ValueError(
+                    "Invalid label_template "
+                    f"{style['label_template']!r} for the '{name}' "
+                    "curve."
+                ) from exc
+        else:
+            base = "KDE" if name == "kde" else f"{pretty} {kind_text}"
+            label = f"{base} ({params_text})" if params_text else base
+            if prefix_label:
+                label = f"{series_label}: {label}"
+        if not style["legend"]:
+            label = "_nolegend_"
+
+        fill = style["fill"]
+        fill_options = None
+        if fill:
+            fill_options = {} if fill is True else dict(fill)
+
         return {
             "kind": kind,
             "name": name,
@@ -364,11 +518,13 @@ class DistChartMixin:
             "label": label,
             "x": grid,
             "y": y_values,
-            "color": spec.get("color", defaults["color"]),
-            "linestyle": spec.get("linestyle", defaults["linestyle"]),
-            "linewidth": float(spec.get("linewidth", lw)),
-            "alpha": float(spec.get("alpha", 1.0)),
-            "zorder": float(spec.get("zorder", 3)),
+            "color": style["color"],
+            "linestyle": style["linestyle"],
+            "linewidth": float(style["linewidth"]),
+            "alpha": float(style["alpha"]),
+            "zorder": float(style["zorder"]),
+            "fill": fill_options,
+            "line_kwargs": dict(style["line_kwargs"]),
         }
 
     # ------------------------------------------------------------------
@@ -596,8 +752,8 @@ class DistChartMixin:
         hist_edgecolor: str | None = "white",
         hist_linewidth: float = 0.4,
         hist_style: dict[str, Any] | None = None,
-        known: DistCurveSpec | Sequence[DistCurveSpec] | None = None,
-        fit: DistCurveSpec | Sequence[DistCurveSpec] | None = None,
+        known: DistCurveLike | Sequence[DistCurveLike] | None = None,
+        fit: DistCurveLike | Sequence[DistCurveLike] | None = None,
         curve_points: int = 400,
         x_range: tuple[float | None, float | None] | None = None,
         lw: float = 1.6,
@@ -635,21 +791,48 @@ class DistChartMixin:
             example ``{"histtype": "step"}``).
         known:
             Default curve(s) of a *known* distribution applied to every
-            series without its own ``known``. Examples::
+            series without its own ``known``. Each curve is a string,
+            a dictionary or a ``DistCurveConfig`` (style included)::
 
                 known="norm"                            # N(0, 1)
                 known={"dist": "norm",
-                       "params": {"loc": 0.0, "scale": 0.01}}
-                known={"dist": "t", "params": (4, 0, 0.01)}
+                       "params": {"loc": 0.0, "scale": 0.01},
+                       "color": "#C00000", "lw": 2.2, "ls": "--",
+                       "label_template": "N(μ={mu:.1%}, σ={sigma:.1%})"}
+                known=[DistCurveConfig("t", params=(4, 0, 0.01),
+                                       legend=False)]
 
         fit:
-            Default curve(s) *estimated from each series* applied to
-            every series without its own ``fit``. Examples::
+            Default curve(s) *estimated from each series*, applied to
+            every series without its own ``fit``. Same format as
+            ``known``; strings, dictionaries and ``DistCurveConfig`` can
+            be mixed in one list, like ``series``::
 
-                fit="norm"                              # MLE fit
-                fit=["norm", "t", "kde"]
-                fit={"dist": "lognorm",
-                     "fit_kwargs": {"floc": 0}}
+                fit=["norm",
+                     {"dist": "t", "color": "#2E7D32", "ls": "-."},
+                     {"dist": "kde", "fill": True,
+                      "label_template": "KDE (bw={bandwidth:.2f})"}]
+                fit={"dist": "lognorm", "fit_kwargs": {"floc": 0}}
+
+        Curve keys (dictionary or ``DistCurveConfig``)
+        ----------------------------------------------
+        What is drawn: ``dist``, ``params`` (known), ``fit_kwargs``
+        (fit) and ``bw_method`` (kde).
+
+        How it looks: ``color`` (``c``), ``linewidth`` (``lw``),
+        ``linestyle`` (``ls``), ``alpha``, ``zorder``, ``label``,
+        ``label_template``, ``legend`` (False hides it), ``param_fmt``,
+        ``param_sep``, ``fill`` (True or ``{"color", "alpha",
+        "zorder", "hatch"}``) and ``line_kwargs`` (extra ``Axes.plot``
+        arguments).
+
+        ``label_template`` fields: ``{series}``, ``{ticker}``,
+        ``{dist}`` (pretty name), ``{dist_key}`` (scipy name),
+        ``{kind}`` (ajustada / teórica), ``{params}`` (all parameters
+        as text, formatted with ``param_fmt`` / ``param_sep``), ``{n}``,
+        every parameter by name (``{loc}``, ``{scale}``, ``{df}``...),
+        ``{mu}`` / ``{sigma}`` (aliases of loc / scale) and
+        ``{bandwidth}`` (kde).
 
         curve_points:
             Number of points used to evaluate the curves.
@@ -657,7 +840,8 @@ class DistChartMixin:
             Optional ``(min, max)`` of the distribution axis data.
             Either side may be None to use the data limit.
         lw:
-            Default line width of the curves.
+            Default line width of the curves (overridden by the
+            ``linewidth`` / ``lw`` of a curve).
         x_axis:
             Shared X-axis configuration (dictionary or ``XAxisConfig``)
             applied to the distribution axis, like in the other charts.
@@ -669,12 +853,7 @@ class DistChartMixin:
             When given as a dictionary it also accepts ``fontweight``,
             ``fontstyle``, ``tick_color``, ``spine_color``,
             ``axis_label``, ``axis_label_fontsize`` and
-            ``axis_label_color``. Example::
-
-                x_axis={"fmt": ".1%", "fontsize": 7,
-                        "label_color": "#444", "fontweight": "bold",
-                        "tick_step": 0.01, "axis_label": "Retorno diario"}
-
+            ``axis_label_color``.
         Returns
         -------
         Self
@@ -835,6 +1014,7 @@ class DistChartMixin:
                         values=array,
                         grid=grid,
                         scale=scale,
+                        series_ticker=ticker,
                         series_label=item["label"],
                         series_color=item["color"],
                         lw=float(lw),
@@ -850,8 +1030,24 @@ class DistChartMixin:
                         alpha=curve["alpha"],
                         zorder=curve["zorder"],
                         label=curve["label"],
+                        **curve["line_kwargs"],
                     )
                     curve["artist"] = line
+                    if curve["fill"] is not None:
+                        fill = curve["fill"]
+                        curve["fill_artist"] = ax.fill_between(
+                            curve["x"],
+                            0.0,
+                            curve["y"],
+                            color=fill.get("color", curve["color"]),
+                            alpha=float(fill.get("alpha", 0.15)),
+                            zorder=float(
+                                fill.get("zorder", curve["zorder"] - 0.5)
+                            ),
+                            hatch=fill.get("hatch"),
+                            linewidth=0,
+                            label="_nolegend_",
+                        )
                     curves.append(curve)
 
             dist_data[ticker] = {

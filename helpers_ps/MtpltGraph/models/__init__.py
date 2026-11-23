@@ -48,7 +48,7 @@ from .barseries import (
 )
 
 from .distseries import (
-    DistStat, DistCurveSpec, DistCurveDict, DistTagDict, DistSeriesDict,
+    DistStat, DistCurveSpec, DistCurveConfig, DistCurveLike, DistCurveDict, DistTagDict, DistSeriesDict,
     DistSeriesConfig, DistSeriesLike, normalize_curve_specs,
 )
 
@@ -105,7 +105,9 @@ __all__ = [
 
     # Dist series configs
     "DistStat", 
-    "DistCurveSpec", 
+    "DistCurveSpec",
+    "DistCurveConfig", 
+    "DistCurveLike", 
     "DistCurveDict", 
     "DistTagDict", 
     "DistSeriesDict",
