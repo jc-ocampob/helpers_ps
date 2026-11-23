@@ -6,13 +6,15 @@ from .tags import (
     LineTags,
     BoxWTags,
     BarTags,
-    PieTags
+    PieTags,
+    DistTags
 )
 from .charts import (
     LineChartMixin,
     BarChartMixin,
     PieChartMixin,
-    BoxWChartMixin
+    BoxWChartMixin,
+    DistChartMixin
 )
 
 from .mixins import (
@@ -47,12 +49,14 @@ class GraphMtplt(
     BarTags,
     PieTags,
     BoxWTags,
+    DistTags,
 
     # Chart graphing
     LineChartMixin,
     BarChartMixin,
     PieChartMixin,
-    BoxWChartMixin
+    BoxWChartMixin,
+    DistChartMixin,
 ):
     """
     High-level Matplotlib chart builder for institutional reporting.

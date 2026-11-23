@@ -22,6 +22,8 @@ STATE_ATTRS: dict[str, str] = {
 
     "_pie_data": "pie_data",
 
+    "_dist_data": "dist_data",
+
     "_ticker_label_color": "ticker_label_color",
     "_series_config": "series_config",
 
@@ -32,4 +34,5 @@ STATE_ATTRS: dict[str, str] = {
     "_right_axis_enabled": "right_axis_enabled",
     "_right_axis_config": "right_axis_config",
     "_y_axis_right": "y_axis_right",
+    
 }

@@ -47,6 +47,11 @@ from .barseries import (
     BarSeriesLike,
 )
 
+from .distseries import (
+    DistStat, DistCurveSpec, DistCurveDict, DistTagDict, DistSeriesDict,
+    DistSeriesConfig, DistSeriesLike, normalize_curve_specs,
+)
+
 __all__ = [
     "coerce_configs",
     "coerce_config",
@@ -97,5 +102,15 @@ __all__ = [
     "BoxSeriesConfig",
     "BoxSeriesDict",
     "BoxSeriesLike",
+
+    # Dist series configs
+    "DistStat", 
+    "DistCurveSpec", 
+    "DistCurveDict", 
+    "DistTagDict", 
+    "DistSeriesDict",
+    "DistSeriesConfig", 
+    "DistSeriesLike", 
+    "normalize_curve_specs",
 
 ]

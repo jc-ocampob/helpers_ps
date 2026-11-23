@@ -38,6 +38,9 @@ class AxisState:
     # Pie metadata
     pie_data: dict[str, Any] = field(default_factory=dict)
 
+    # Dist metadata
+    dist_data: dict[str, Any] = field(default_factory=dict)
+
     # Series metadata
     ticker_label_color: list[tuple[str, str, str]] = field(default_factory=list)
     series_config: list[dict[str, Any]] = field(default_factory=list)
@@ -74,6 +77,8 @@ class AxisState:
         self.bars_x_reference = []
 
         self.pie_data = {}
+
+        self.dist_data = {}
 
         self.ticker_label_color = []
         self.series_config = []
