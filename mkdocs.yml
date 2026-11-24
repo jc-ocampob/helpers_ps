@@ -6,7 +6,6 @@ site_author: Equipo de Soluciones de Portafolio
 theme:
   name: material
   language: es
-
   palette:
     - scheme: default
       primary: black
@@ -14,14 +13,12 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-
     - scheme: slate
       primary: black
       accent: blue
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-
   features:
     - navigation.tabs
     - navigation.sections
@@ -34,79 +31,98 @@ theme:
 
 plugins:
   - search
-
   - mkdocs-jupyter:
       execute: false
-
   - mkdocstrings:
       default_handler: python
-
       handlers:
         python:
           paths:
             - .
-
           options:
             docstring_style: numpy
             show_source: true
             show_root_heading: true
             show_root_full_path: false
             show_signature_annotations: true
+            separate_signature: true
             members_order: source
             inherited_members: true
 
 markdown_extensions:
   - admonition
-
   - toc:
       permalink: true
-
   - tables
-
   - pymdownx.details
-
-  - pymdownx.superfences
-
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
-
   - pymdownx.inlinehilite
-
   - pymdownx.tabbed:
       alternate_style: true
 
 nav:
   - Helpers PS: index.md
-
-  - Instalation: install_guide.md
-
+  - Installation: install_guide.md
   - GraphMtplt:
-      - Getting Started: GraphMtplt/getting_started.ipynb
+      - Getting Started: GraphMtplt/getting_started.md
       - Plotting: GraphMtplt/plotting.ipynb
       - Layout Annotations: GraphMtplt/layout.ipynb
-
-      - Line Chart:
-          - Graph: GraphMtplt/Line/graph.ipynb
-
-      - Bar Chart:
-          - Graph: GraphMtplt/Bar/graph.md
-
-      - Pie Chart:
-          - Graph: GraphMtplt/Pie/graph.md
-
-      - Box Whiskers Chart:
-          - Graph: GraphMtplt/Box/graph.md
-
-  - FinCalculations:
-      - Getting Started: FinCalculations/getting_started.md
-
-  - Powerpoint:
-      - Getting Started: Powerpoint/getting_started.md
-
+      - Chart types:
+          - Line Chart:
+              - Tutorial: GraphMtplt/Line/graph.ipynb
+              - Reference: GraphMtplt/Line/reference.md
+          - Bar Chart: GraphMtplt/Bar/graph.md
+          - Pie Chart: GraphMtplt/Pie/graph.md
+          - Box Whiskers Chart: GraphMtplt/Box/graph.md
+          - Distribution Chart: GraphMtplt/Dist/graph.md
+      - Axes: GraphMtplt/axes.md
+      - Annotations: GraphMtplt/annotations.md
+      - Legends and Reference Lines: GraphMtplt/guides.md
+      - Export and Chaining: GraphMtplt/export.md
+  - Calcs:
+      - Getting Started: Calcs/getting_started.md
+      - Returns and Performance: Calcs/returns_performance.md
+      - Benchmark-relative: Calcs/benchmark_relative.md
+      - Risk (VaR / ES): Calcs/risk.md
+      - Technical Indicators: Calcs/technical.md
+      - Transformations: Calcs/transformations.md
+      - Metrics Class: Calcs/metrics_class.md
+  - DfStyling:
+      - Getting Started: DfStyling/getting_started.md
+      - Styling Tables: DfStyling/tables.md
+      - Panels, Charts and Layout: DfStyling/panels_images.md
+      - Appearance and Output: DfStyling/output.md
+      - Functional Styling: DfStyling/functional.md
+  - Ppt:
+      - Getting Started: Ppt/getting_started.md
+      - Charts: Ppt/charts.md
+      - Template Helpers: Ppt/utilities.md
   - Excel:
       - Getting Started: Excel/getting_started.md
-  
+  - Examples:
+      - Line with last value: examples/line_last_value.md
+      - Stacked bars with totals: examples/bar_stacked.md
+      - Box & Whiskers with last value: examples/box_whiskers.md
   - API:
       - GraphMtplt:
-          - LayoutMixin: api/GraphMtplt/layout.md
-          - PlottingMixin: api/GraphMtplt/plotting.md
+          - Graph types: api/GraphMtplt/graphs.md
+          - Plotting: api/GraphMtplt/plotting.md
+          - Layout: api/GraphMtplt/layout.md
+          - Axes: api/GraphMtplt/axes.md
+          - Annotations: api/GraphMtplt/annotations.md
+          - Legends and lines: api/GraphMtplt/legends_lines.md
+          - Export and theme: api/GraphMtplt/export.md
+          - Models: api/GraphMtplt/models.md
+      - Calcs: api/Calcs/functions.md
+      - DfStyling:
+          - TableSheet: api/DfStyling/sheet.md
+          - Sheet style and rendering: api/DfStyling/style_models.md
+          - Functional styling: api/DfStyling/functions.md
+      - Ppt: api/Ppt/ppt.md
+      - Excel: api/Excel/excel.md

@@ -2,7 +2,6 @@
 
 ----
 
-
 ## Title
 
 ::: helpers_ps.MtpltGraph.mixins.layout.LayoutMixin.add_title
@@ -12,7 +11,6 @@
       show_root_full_path: false
       separate_signature: true
       show_signature_annotations: true
-
 
 ## Subtitle
 
@@ -24,7 +22,6 @@
       separate_signature: true
       show_signature_annotations: true
 
-
 ## Source
 
 ::: helpers_ps.MtpltGraph.mixins.layout.LayoutMixin.add_source
@@ -34,7 +31,6 @@
       show_root_full_path: false
       separate_signature: true
       show_signature_annotations: true
-
 
 ## Plot-level title
 

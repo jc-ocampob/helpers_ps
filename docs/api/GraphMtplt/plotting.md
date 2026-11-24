@@ -2,7 +2,6 @@
 
 ----
 
-
 ## Plot
 
 ::: helpers_ps.MtpltGraph.mixins.layout.LayoutMixin.plot
@@ -13,7 +12,6 @@
       separate_signature: true
       show_signature_annotations: true
 
-
 ## Axis selection
 
 ::: helpers_ps.MtpltGraph.mixins.axes.AxesMixin.axis
@@ -23,7 +21,6 @@
       show_root_full_path: false
       separate_signature: true
       show_signature_annotations: true
-
 
 ## Subplot adjust
 

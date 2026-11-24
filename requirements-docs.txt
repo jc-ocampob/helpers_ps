@@ -1,9 +1,6 @@
-mkdocs-material
-mkdocstrings[python]
-mkdocs-autorefs
-mkdocs-jupyter
-pandas
-numpy
-matplotlib
-openpyxl
-python-pptx
+mkdocs>=1.6
+mkdocs-material>=9.5
+mkdocstrings>=0.26
+mkdocstrings-python>=1.12
+mkdocs-jupyter>=0.25
+pymdown-extensions>=10.0
