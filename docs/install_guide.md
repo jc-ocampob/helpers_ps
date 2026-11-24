@@ -3,10 +3,10 @@
 ## Install the package
 
 ```bash
-pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.3
+pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.4.10
 ```
 
-Replace `v0.3.3` with the **tag** (or branch) you want. Without a tag the default branch is installed:
+Replace `v0.4.10` with the **tag** (or branch) you want. Without a tag the default branch is installed:
 
 ```bash
 pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git
@@ -15,7 +15,7 @@ pip install helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git
 To upgrade an existing installation:
 
 ```bash
-pip install --upgrade --force-reinstall --no-deps helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.3.3
+pip install --upgrade --force-reinstall --no-deps helpers_ps@git+https://github.com/jc-ocampob/helpers_ps.git@v0.4.10
 ```
 
 Check the version:
